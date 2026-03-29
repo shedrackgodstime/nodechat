@@ -4,4 +4,30 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# P2P & Discovery
+iroh = "0.97.0"
+iroh-gossip = "0.97.0"
+pkarr = "5.0"
 
+# E2EE Crypto
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+chacha20poly1305 = "0.10"
+sha2 = "0.10.8"
+
+# Storage
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Async Core
+tokio = { version = "1.37", features = ["full", "rt-multi-thread"] }
+uuid = { version = "1.8", features = ["v4", "serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+
+# UI
+eframe = { version = "0.34", features = ["glow", "default_fonts", "wayland", "x11"] }
+egui = "0.34"
+digest = { version = "0.10", optional = true }
+
+[features]
+digest = ["dep:digest"]

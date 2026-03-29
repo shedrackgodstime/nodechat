@@ -8,7 +8,7 @@
 
 ### Abstract
 
-This project builds a peer-to-peer (P2P) chat application with end-to-end encryption (E2EE). Unlike traditional chat apps that rely on central servers, NodeChat uses decentralized networking so users communicate directly without a trusted server. The project adapts research from the Artemis P2P framework for secure human communication.
+This project builds a peer-to-peer (P2P) chat application with end-to-end encryption (E2EE) supporting both 1:1 direct communication and Decentralized Group Chat. Unlike traditional chat apps that rely on central servers, NodeChat uses decentralized networking via Iroh and Pkarr so users communicate directly. The system utilizes an Event-Driven Actor Model to decouple the immediate-mode UI from the asynchronous networking and cryptographic and storage operations.
 
 ---
 
@@ -18,57 +18,64 @@ This project builds a peer-to-peer (P2P) chat application with end-to-end encryp
 
 | Crate | Version | Purpose |
 |-------|---------|---------|
-| **iroh** | 0.97.0 | P2P networking, hole punching, encrypted connections |
-| **iroh-gossip** | 0.97.0 | Broadcast messaging to multiple peers |
+| **iroh** | 0.97.0 | P2P networking, hole punching, secure connections |
+| **iroh-gossip** | 0.97.0 | Broadcast messaging across P2P swarms (Group Chats) |
 | **pkarr** | Latest | DNS-based decentralized peer discovery |
-| **x25519-dalek** | 2.0 | X25519 key exchange for E2EE |
-| **chacha20poly1305** | 0.10 | Authenticated encryption (AEAD) |
-| **serde** | 1.0 | Serialization/deserialization |
-| **tokio** | 1.x | Async runtime |
+| **x25519-dalek** | 2.0 | X25519 key exchange for 1:1 E2EE |
+| **chacha20poly1305** | 0.10 | Authenticated encryption (AEAD) for 1:1 and Groups |
+| **sha2** | 0.10 | SHA-256 hash ratcheting for Forward Secrecy |
+| **rusqlite** | 0.31 | Embedded SQLite for robust storage (Queue, History, Contacts) |
+| **tokio** | 1.x | Async runtime and MPSC Channels for Actor Model |
 | **uuid** | 1.x | Unique message IDs |
 | **anyhow** | 1.x | Error handling |
 
 ### 1.2 Frontend (Rust + egui)
 
-Based on **hello_android** project structure:
+Based on **hello_android** project structure for cross-platform support:
 
 | Crate | Version | Purpose |
 |-------|---------|---------|
-| **eframe** | 0.34 | GUI framework (hello_android uses this) |
-| **egui** | 0.34 | UI toolkit |
+| **eframe** | 0.34 | GUI framework |
+| **egui** | 0.34 | Immediate-mode UI toolkit |
 | **egui_extras** | 0.34 | Extra UI components, images |
 
 ### 1.3 Platform Support
 
 - **Desktop:** Windows, Linux, macOS (via eframe)
-- **Mobile:** Android (via cargo-apk, as shown in hello_android)
+- **Mobile:** Android (via cargo-apk, building off hello_android)
 
 ---
 
-## 2. System Architecture
+## 2. System Architecture (Actor Model)
+
+To prevent the application UI from freezing during heavy network operations, cryptographic key exchanges, or database writes, the architecture utilizes a strictly decoupled **Actor Model**. 
+
+The UI (Frontend) never directly touches the Database or Network. It sends `Command` events down a channel to the Backend Worker, and dynamically updates its views based on `AppEvent` responses broadcasted from the worker.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        FRONTEND (egui)                          │
-│    Contact List │ Chat Window │ Settings │ File Transfer       │
-├─────────────────────────────────────────────────────────────────┤
-│                     APPLICATION LAYER                           │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│   │ ContactMgr   │  │ MessageMgr   │  │ SessionMgr   │          │
-│   └──────────────┘  └──────────────┘  └──────────────┘          │
-├─────────────────────────────────────────────────────────────────┤
-│                     CRYPTO LAYER (E2EE)                         │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│   │ X3DH Key     │  │ Double       │  │ Session      │          │
-│   │ Exchange     │  │ Ratchet      │  │ State        │          │
-│   └──────────────┘  └──────────────┘  └──────────────┘          │
-├─────────────────────────────────────────────────────────────────┤
-│                     NETWORK LAYER (P2P)                         │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│   │ Iroh         │  │ Gossip       │  │ Discovery    │          │
-│   │ Endpoint     │  │ (Broadcast) │  │ (Pkarr)     │          │
-│   └──────────────┘  └──────────────┘  └──────────────┘          │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                       EGUI FRONTEND                         │
+│   (Immediate Mode - Draws screen 60fps - Pure Synchronous)  │
+│                                                             │
+│   [Chat UI]   [Contact Book Engine]    [Group Management]   │
+└────────────┬───────────────────────────────────────▲────────┘
+             │                                       │
+  (mpsc::Sender<Command>)                 (mpsc::Receiver<AppEvent>)
+   - SendDirectMessage                     - MessageReceived
+   - CreateGroup                           - PeerOnlineStatus
+   - AddContact                            - QueueFlushed
+             │                                       │
+┌────────────▼───────────────────────────────────────┴────────┐
+│                  TOKIO ASYNC BACKEND CORE                   │
+│   (Asynchronous Event Loop - Manages State and Work IO)     │
+│                                                             │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌───────────────┐  │
+│  │     STORAGE     │ │     CRYPTO      │ │    NETWORK    │  │
+│  │ (rusqlite DB)   │ │  (E2EE X25519)  │ │ (Iroh & Pkarr)│  │
+│  │ - Messages      │ │  - 1:1 Keying   │ │ - Unicast     │  │
+│  │ - Peers / Queues│ │  - Group Keys   │ │ - Gossip      │  │
+│  └─────────────────┘ └─────────────────┘ └───────────────┘  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -77,636 +84,216 @@ Based on **hello_android** project structure:
 
 ### 3.1 Network Layer (`src/p2p/`)
 
-**Purpose:** Handle all P2P communication - adapted from Artemis net.rs
-
-#### Key Components:
+**Purpose:** Manages dual-mode communication. Iroh direct connections for 1:1 chats, and Iroh Gossip swarms for Groups.
 
 ```rust
 // File: src/p2p/mod.rs
 
-/// The main P2P backend that wraps Iroh networking
-pub struct P2PBackend {
-    /// Iroh Endpoint - manages connections
+/// Main networking backend struct
+pub struct NetworkManager {
     endpoint: Endpoint,
-    
-    /// Gossip - for broadcasting to all connected peers
     gossip: GossipApi,
-    
-    /// Our unique NodeId (also serves as username/address)
-    node_id: NodeId,
+    relay_client: reqwest::Client,
 }
 
-/// Topic for global chat (peers subscribe to this topic)
-pub const CHAT_TOPIC: [u8; 32] = [
-    0x6e, 0x6f, 0x64, 0x65, 0x63, 0x68, 0x61, 0x74,
-    0x5f, 0x74, 0x6f, 0x70, 0x69, 0x63, 0x5f, 0x32,
-    0x30, 0x32, 0x36, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-];
-```
-
-**API (to be implemented):**
-```rust
-impl P2PBackend {
-    /// Create new P2P backend with optional secret key
-    pub async fn new(secret_key: Option<SecretKey>) -> Result<Self>;
+impl NetworkManager {
+    /// 1. Direct 1:1 Message (Iroh Unicast)
+    /// Also used for securely transmitting Group asymmetric keys.
+    pub async fn send_direct(&self, target: NodeId, payload: Vec<u8>) -> Result<()>;
     
-    /// Send message to specific peer (unicast)
-    pub async fn send_to(&self, peer: NodeId, data: Vec<u8>) -> Result<()>;
+    /// 2. Group Broadcast (Iroh Gossip)
+    /// Broadcasts encrypted payload to all peers subscribed to the group TopicId.
+    pub async fn broadcast_group(&self, topic: TopicId, payload: Vec<u8>) -> Result<()>;
     
-    /// Send message to all connected peers (broadcast)
-    pub async fn broadcast(&self, data: Vec<u8>) -> Result<()>;
+    /// Join a Gossip swarm for a newly invited/created group
+    pub async fn subscribe_group(&self, topic: TopicId) -> Result<()>;
     
-    /// Send file to peer
-    pub async fn send_file(&self, peer: NodeId, path: PathBuf) -> Result<()>;
-    
-    /// Get next incoming event (message, file, peer join/leave)
-    pub async fn next_event(&self) -> Result<Option<NetworkEvent>>;
-    
-    /// Get our NodeId (used as our "username")
-    pub fn node_id(&self) -> NodeId;
-    
-    /// Gracefully shutdown
-    pub async fn shutdown(&self) -> Result<()>;
+    /// Look up a peer via Pkarr
+    pub async fn discover_peer(&self, pk: PublicKey) -> Result<Option<NodeAddr>>;
 }
 ```
-
-#### Iroh 0.97.0 API Changes (vs old 0.22):
-
-| Old (0.22) | New (0.97) |
-|------------|------------|
-| `Endpoint::builder().discovery_n0()` | `Endpoint::bind(presets::N0)` |
-| `Gossip::builder().spawn()` | `GossipApi::builder().spawn()` |
-| `NodeId` | Same |
-| `Router` | Simplified protocol handling |
 
 ---
 
 ### 3.2 Crypto Layer (`src/crypto/`)
 
-**Purpose:** End-to-end encryption using simplified Signal Protocol
+**Purpose:** End-to-end encryption. Distinct approaches for 1:1 vs Groups.
 
-#### Simplified Design (for student project):
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    CRYPTO MODULE                        │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  User Identity:                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  NodeId (from Iroh)                              │   │
-│  │  Chat Secret Key (X25519)                        │   │
-│  │  Chat Public Key  (X25519)                       │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                          │
-│  Key Bundle (shared via Pkarr for discovery):          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  Public Key                                       │   │
-│  │  Signed Pre-Key (SPK) - rotated weekly            │   │
-│  │  One-Time Pre-Keys (OPK) - 100 keys              │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                          │
-│  Session (per contact):                                 │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  Root Key          (derived from X3DH)            │   │
-│  │  Sending Chain    (for encrypting messages)       │   │
-│  │  Receiving Chain  (for decrypting messages)       │   │
-│  │  Message Counter   (prevents replay attacks)      │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### Implementation:
+*   **1:1 Direct Chat:** We rely on Iroh's native Noise protocol for encrypted transport. For verifiable application-level E2EE (to satisfy academic requirements), we perform a static X25519 Diffie-Hellman Key Exchange to derive an initial ChaCha20-Poly1305 symmetric key. Crucially, after each message is sent or received, we implement a **Hash Ratchet** (hashing the active session key via SHA-256) to guarantee Forward Secrecy—if the device is later compromised, past messages remain mathematically secure.
+*   **Group Chat:** Because Signal-style Sender Keys are highly complex, groups use **Shared Symmetric Keys**. When Alice creates a group, her client generates a random 32-byte key. She invites Bob by sending him the Group `TopicId` and the `Symmetric Key` via a secure **1:1 Direct E2EE message**. Once Bob has the key, he can decrypt Gossip messages heavily distributed across the network.
 
 ```rust
 // File: src/crypto/mod.rs
 
-/// Represents a user's cryptographic identity
-pub struct UserIdentity {
-    /// Our NodeId (also our network address)
+/// The user's cryptographic identity
+pub struct Identity {
     pub node_id: NodeId,
-    
-    /// X25519 key pair for chat encryption
-    pub keypair: x25519_dalek::StaticSecret,
-    pub public_key: x25519_dalek::PublicKey,
-    
-    /// Full key fingerprint (for verification)
-    /// SHA-256 of public key, shown as hex (e.g., "AF3BC92E...")
-    pub fingerprint: String,
-    
-    /// Shortened fingerprint for UI (first 8 chars)
-    pub short_fingerprint: String,
-    
-    /// Signed pre-key for key exchange
-    pub signed_prekey: SignedPreKey,
-    
-    /// One-time pre-keys (used once, then discarded)
-    pub prekeys: Vec<OneTimePreKey>,
+    pub x25519_static: StaticSecret,
 }
-
-/// A session with a specific contact
-pub struct Session {
-    /// Their public key
-    pub remote_public_key: x25519_dalek::PublicKey,
-    
-    /// Root key - base for deriving message keys
-    pub root_key: [u8; 32],
-    
-    /// Sending chain key
-    pub sending_chain_key: [u8; 32],
-    
-    /// Receiving chain key  
-    pub receiving_chain_key: [u8; 32],
-    
-    /// Message counters (for replay protection)
-    pub sending_count: u64,
-    pub receiving_count: u64,
-}
-
-/// Encrypt/decrypt messages
-pub struct CryptoManager;
 
 impl CryptoManager {
-    /// Generate new user identity
-    pub fn generate_identity() -> UserIdentity;
+    // ---- 1:1 CRYPTO ---- 
+    /// Generate a shared secret for 1:1 E2EE using our private key and their public key
+    pub fn derive_direct_key(our_secret: &StaticSecret, their_public: &PublicKey) -> [u8; 32];
     
-    /// Generate key fingerprint from public key
-    /// Returns full hex string and shortened version for UI
-    pub fn generate_fingerprint(public_key: &PublicKey) -> (String, String);
+    /// Advance the session key for Forward Secrecy: next_key = SHA-256(current_key)
+    pub fn ratchet_key(current_key: &mut [u8; 32]);
     
-    /// Start X3DH key exchange with a contact's key bundle
-    pub fn x3dh_initiate(bundle: &KeyBundle) -> Result<(Session, Vec<u8>)>;
+    /// Encrypt a payload intended for a single peer
+    pub fn encrypt_direct(payload: &[u8], shared_key: &[u8; 32]) -> Vec<u8>;
     
-    /// Complete X3DH (called when we receive their response)
-    pub fn x3dh_respond(ephemeral_public: &[u8]) -> Result<Session>;
+    // ---- GROUP CRYPTO ----
+    /// Generate a new symmetric key for a new Group
+    pub fn generate_group_key() -> [u8; 32];
     
-    /// Encrypt a message using the session
-    pub fn encrypt(session: &mut Session, plaintext: &[u8]) -> Result<Vec<u8>>;
-    
-    /// Decrypt a message using the session
-    pub fn decrypt(session: &mut Session, ciphertext: &[u8]) -> Result<Vec<u8>>;
-    
-    /// Serialize session for storage
-    pub fn serialize_session(session: &Session) -> Vec<u8>;
-    
-    /// Deserialize session from storage
-    pub fn deserialize_session(data: &[u8]) -> Result<Session>;
-}
-```
-
-#### Encryption Flow:
-
-```
-SENDER                                                  RECEIVER
-   │                                                        │
-   │  1. Get contact's key bundle (from Pkarr/DHT)          │
-   │                                                        │
-   │  2. X3DH: Generate ephemeral key                      │
-   │     Compute shared secret with their SPK              │
-   │                                                        │
-   │  3. Derive root key from shared secret                │
-   │                                                        │
-   │  4. Derive first message key from root key             │
-   │                                                        │
-   │  5. Encrypt message: ChaCha20-Poly1305                 │
-   │     ciphertext = encrypt(plaintext, message_key)       │
-   │                                                        │
-   │  6. Send: [ephemeral_pk] [ciphertext] ──────────────>   │
-   │                                                        │  7. X3DH: Compute same shared secret
-   │                                                        │  8. Derive root key
-   │                                                        │  9. Derive message key
-   │                                                        │ 10. Decrypt: ChaCha20-Poly1305
-   │                                                        │     plaintext = decrypt(ciphertext, message_key)
-   │                                                        │
-   │  11. For next message: ratchet forward                │
-   │      (both sides update chain keys)                   │
-```
-
----
-
-### 3.3 Protocol Layer (`src/protocol/`)
-
-**Purpose:** Define message formats for chat communication
-
-```rust
-// File: src/protocol/mod.rs
-
-/// All message types in NodeChat
-#[derive(Serialize, Deserialize)]
-pub enum ChatMessage {
-    /// First contact: share our key bundle
-    Handshake {
-        /// Our NodeId
-        node_id: NodeId,
-        /// Our public key for E2EE
-        public_key: PublicKey,
-        /// Signed pre-key
-        signed_prekey: SignedPreKey,
-        /// One-time pre-keys (all of them for initial sync)
-        prekeys: Vec<OneTimePreKey>,
-    },
-    
-    /// Encrypted chat message
-    Encrypted {
-        /// UUID of this message
-        id: Uuid,
-        /// Sender's NodeId
-        sender: NodeId,
-        /// Unix timestamp
-        timestamp: i64,
-        /// The encrypted payload (E2EE)
-        payload: Vec<u8>,
-        /// Message type (text, image, file offer)
-        message_type: MessageType,
-    },
-    
-    /// Request to start a chat (initiates X3DH)
-    ChatRequest {
-        /// Who we want to chat with
-        target: NodeId,
-        /// Our public key
-        public_key: PublicKey,
-    },
-    
-    /// Acknowledge chat request
-    ChatAccept {
-        /// Our public key
-        public_key: PublicKey,
-        /// X3DH response data
-        x3dh_data: Vec<u8>,
-    },
-    
-    /// File transfer offer
-    FileOffer {
-        id: Uuid,
-        filename: String,
-        size: u64,
-        hash: [u8; 32],
-    },
-    
-    /// Request to download file
-    FileRequest {
-        id: Uuid,
-    },
-}
-
-/// Types of messages
-#[derive(Serialize, Deserialize, Clone)]
-pub enum MessageType {
-    Text,
-    Image,
-    File,
-    System,  // "User joined", "User left", etc.
+    /// Encrypt a payload intended for broadcast via Gossip
+    pub fn encrypt_group(payload: &[u8], group_key: &[u8; 32]) -> Vec<u8>;
 }
 ```
 
 ---
 
-### 3.4 Storage Layer (`src/storage/`)
+### 3.3 Storage Layer (`src/storage/`)
 
-**Purpose:** Store messages, sessions, and optional "phonebook" locally
+**Purpose:** A unified SQLite database using `rusqlite`. This completely eliminates the complexity of writing custom JSON queues. If a peer is offline, the message is stored with `status = 'queued'`.
 
-**Note:** In P2P, there's no "contact list" on a server. Just a local phonebook.
+```sql
+-- SQLite Schema
 
-```rust
-// File: src/storage/mod.rs
+CREATE TABLE peers (
+    node_id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    x25519_pubkey TEXT NOT NULL
+);
 
-/// A saved peer (like a phonebook entry - completely optional)
-/// You can message anyone by NodeId directly without adding them here first
-#[derive(Serialize, Deserialize)]
-pub struct SavedPeer {
-    /// Their NodeId (required - this is their "address")
-    pub node_id: NodeId,
-    
-    /// Display name (user-chosen label, not verified)
-    pub display_name: String,
-    
-    /// Last message timestamp (for sorting)
-    pub last_message: Option<i64>,
-}
+CREATE TABLE groups (
+    topic_id TEXT PRIMARY KEY,
+    group_name TEXT NOT NULL,
+    symmetric_key BLOB NOT NULL
+);
 
-/// Chat message history
-#[derive(Serialize, Deserialize)]
-pub struct StoredMessage {
-    pub id: Uuid,
-    pub sender: NodeId,
-    pub recipient: NodeId,
-    pub timestamp: i64,
-    pub content: String,  // Decrypted content
-    pub message_type: MessageType,
-}
-
-/// Storage manager
-pub struct Storage {
-    /// Path to data directory
-    data_dir: PathBuf,
-}
-
-impl Storage {
-    /// Initialize storage
-    pub fn new() -> Result<Self>;
-    
-    /// Save peer to phonebook
-    pub fn save_peer(&self, peer: &SavedPeer) -> Result<()>;
-    
-    /// Load all saved peers
-    pub fn load_peers(&self) -> Result<Vec<SavedPeer>>;
-    
-    /// Remove peer from phonebook
-    pub fn remove_peer(&self, node_id: &NodeId) -> Result<()>;
-    
-    /// Save message
-    pub fn save_message(&self, msg: &StoredMessage) -> Result<()>;
-    
-    /// Load messages for a peer
-    pub fn load_messages(&self, node_id: &NodeId) -> Result<Vec<StoredMessage>>;
-    
-    /// Save session state
-    pub fn save_session(&self, node_id: &NodeId, session: &Session) -> Result<()>;
-    
-    /// Load session state
-    pub fn load_session(&self, node_id: &NodeId) -> Result<Option<Session>>;
-}
+CREATE TABLE messages (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,           -- 'text', 'image', 'file', 'group_invite'
+    target_id TEXT NOT NULL,      -- NodeId OR TopicId
+    sender_id TEXT NOT NULL, 
+    content BLOB NOT NULL,        -- Decrypted plaintext locally OR file path on disk
+    timestamp INTEGER NOT NULL,
+    status TEXT NOT NULL          -- 'queued', 'sent', 'delivered', 'read'
+);
 ```
 
 ---
 
-### 3.5 Application Layer (`src/app/`)
+### 3.4 Core Engine (The Actor Worker) (`src/core/`)
 
-**Purpose:** Tie everything together - handles UI events and coordinates modules
-
-**Key Feature: Message Queueing**
-In P2P, recipients aren't always online. Messages are stored locally until delivered.
-- When sending to offline peer: queue locally
-- When peer comes online: automatically deliver queued messages
-- Show delivery states: `queued` → `sending` → `delivered`
+**Purpose:** Ties Storage, Crypto, and Network together in a single asynchronous event loop.
 
 ```rust
-// File: src/app/mod.rs
+// File: src/core/mod.rs
 
-use std::collections::HashMap;
-
-/// Message delivery state
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum MessageStatus {
-    /// Saved locally, recipient offline
-    Queued,
-    /// Currently attempting to send
-    Sending,
-    /// Message sent to network
-    Sent,
-    /// Confirmed delivered to recipient
-    Delivered,
-    /// Failed to deliver
-    Failed(String),
+/// Commands sent FROM egui TO the Backend Worker
+pub enum Command {
+    SendDirectMessage { target: NodeId, plaintext: String },
+    SendFile { target: NodeId, file_path: PathBuf },
+    NotifyReadReceipt { target: NodeId, message_id: Uuid },
+    CreateGroup { name: String },
+    SendGroupMessage { topic: TopicId, plaintext: String },
+    InviteToGroup { target: NodeId, topic: TopicId },
 }
 
-/// A message with its current delivery status
-pub struct OutgoingMessage {
-    pub message: StoredMessage,
-    pub status: MessageStatus,
-    pub attempts: u32,
+/// Events broadcast FROM the Backend Worker TO egui
+pub enum AppEvent {
+    IncomingMessage { sender: NodeId, plaintext: String },
+    IncomingFile { sender: NodeId, file_name: String, path: PathBuf },
+    MessageStatusUpdate { id: Uuid, status: MessageStatus }, // Read/Delivered
+    IncomingGroupMessage { topic: TopicId, sender: NodeId, plaintext: String },
+    GroupInviteReceived { topic: TopicId, group_name: String },
 }
 
-/// Main application state
-pub struct App {
-    /// P2P networking
-    p2p: P2PBackend,
-    
-    /// Cryptography
+pub struct NodeChatWorker {
+    db: rusqlite::Connection,
+    network: NetworkManager,
     crypto: CryptoManager,
-    
-    /// Our identity (NodeId + keys)
-    identity: UserIdentity,
-    
-    /// Phonebook - saved peers with display names (optional)
-    peers: Vec<SavedPeer>,
-    
-    /// Current chat (selected peer)
-    active_chat: Option<NodeId>,
-    
-    /// Message history (for active chat)
-    messages: Vec<StoredMessage>,
-    
-    /// Pending outgoing messages (queued for offline peers)
-    /// Key: recipient NodeId, Value: messages waiting to be sent
-    pending_queue: HashMap<NodeId, Vec<OutgoingMessage>>,
-    
-    /// Storage
-    storage: Storage,
-    
-    /// Application state
-    state: AppState,
+    rx_commands: mpsc::Receiver<Command>,
+    tx_events: broadcast::Sender<AppEvent>,
 }
 
-#[derive(Default)]
-pub enum AppState {
-    #[default]
-    Starting,
-    LoadingIdentity,
-    Ready,
-    Connecting,    // Connecting to network
-    Error(String),
-}
-
-impl App {
-    /// Initialize the app
-    pub async fn new() -> Result<Self>;
-    
-    /// Process incoming network events
-    pub async fn handle_network_event(&mut self, event: NetworkEvent);
-    
-    /// Send a message to a peer (by NodeId)
-    /// If peer is offline, message is queued and sent when they come online
-    pub async fn send_message(&mut self, node_id: NodeId, content: String) -> Result<()>;
-    
-    /// Process pending message queue - called when peer comes online
-    pub async fn flush_queue(&mut self, node_id: NodeId) -> Result<()>;
-    
-    /// Add peer to phonebook (optional - can message without adding)
-    pub fn add_to_phonebook(&mut self, node_id: NodeId, display_name: String);
-    
-    /// Select a chat
-    pub fn select_chat(&mut self, node_id: NodeId);
-    
-    /// Get our NodeId to share with others
-    pub fn my_node_id(&self) -> NodeId;
-    
-    /// Get number of pending (queued) messages
-    pub fn pending_count(&self, node_id: NodeId) -> usize;
-}
-```
-
----
-
-### 3.6 Frontend (egui)
-
-**Reference:** Based on `hello_android` project structure
-
-```
-hello_android structure:
-├── src/
-│   ├── main.rs        →  Entry point with eframe::run_native
-│   └── lib.rs         →  MyApp struct implementing eframe::App
-│                       
-│   UI uses:
-│   - egui::CentralPanel
-│   - egui::SidePanel (for contacts)
-│   - egui::TextEdit  (for input)
-│   - egui::Button    (for actions)
-```
-
-#### NodeChat UI Layout:
-
-**Key UI Elements:**
-1. **My NodeId** - Display prominently so users can share it
-2. **Key Fingerprint** - Shortened cryptographic fingerprint (e.g., `AF3B...C72E`)
-3. **Network Status** - Show peers connected, relay vs direct
-4. **Enter Peer NodeId** - Text field to start new conversation
-5. **Chat List** - Shows peers + pending message count
-6. **Chat Window** - Messages with delivery status
-
-**Delivery Status Display:**
-- No icon: Message sent locally, waiting to send (offline peer)
-- ⏳ (hourglass): Sending...
-- ✓ Sent: Delivered to network
-- ✓✓ Delivered: Confirmed by recipient
-
-```rust
-// Display a message with status
-fn render_message(ui: &mut egui::Ui, msg: &StoredMessage, status: &MessageStatus) {
-    ui.horizontal(|ui| {
-        ui.label(&msg.content);
-        
-        // Show delivery status icon
-        match status {
-            MessageStatus::Queued => {
-                ui.label("⏳ queued");
-            }
-            MessageStatus::Sending => {
-                ui.label("⏳ sending...");
-            }
-            MessageStatus::Sent => {
-                ui.label("✓");
-            }
-            MessageStatus::Delivered => {
-                ui.label("✓✓");
-            }
-            MessageStatus::Failed(e) => {
-                ui.label(format!("❌ {}", e));
+impl NodeChatWorker {
+    /// Main asynchronous loop running in the background
+    pub async fn run(mut self) {
+        loop {
+            tokio::select! {
+                // 1. Listen for UI Commands
+                Some(cmd) = self.rx_commands.recv() => {
+                    self.handle_command(cmd).await;
+                }
+                // 2. Listen for Network Events (Iroh Unicast or Gossip)
+                event = self.network.next_event() => {
+                    self.handle_network(event).await;
+                }
+                // 3. Periodic tasks (e.g. queue flushing)
+                _ = tokio::time::sleep(Duration::from_secs(10)) => {
+                    self.flush_offline_queue().await;
+                }
             }
         }
-    });
+    }
 }
 ```
+
+---
+
+### 3.5 Frontend GUI (`src/ui/`)
+
+**Purpose:** Synchronous egui renderer. Completely detached from network blocking. Maintained strictly for visual state compilation.
 
 ```rust
 // File: src/ui/mod.rs
 
-use eframe::{egui, App, Frame};
-
 pub struct NodeChatUI {
-    /// The backend app
-    app: App,
+    /// Channel to tell the backend to do things
+    tx_cmd: mpsc::Sender<Command>,
+    /// Channel to hear what the backend did
+    rx_event: broadcast::Receiver<AppEvent>,
     
-    /// Input field for entering peer's NodeId
-    pub add_peer_input: String,
-    
-    /// Input field for message
-    pub message_input: String,
+    // UI State compiled from events
+    active_chat: ActiveChat,
+    messages_view: Vec<UIChatMessage>,
+    contact_book: Vec<UIPeer>,
 }
 
-impl NodeChatUI {
-    pub fn new(app: App) -> Self;
-}
-
-impl App for NodeChatUI {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut Frame) {
-        // Top bar: My NodeId + Network Status
-        egui::TopPanel::top("my_id").show_inside(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label("My ID: ");
-                ui.label(self.app.my_node_id().to_string());
-                if ui.button("Copy").clicked() {
-                    // Copy to clipboard
-                }
-                
-                ui.separator();
-                
-                // Network status
-                ui.label("🟢 3 peers"); // Example: connected to 3 peers
-                ui.label("(direct)");    // or "relay" if using relay
-            });
+impl eframe::App for NodeChatUI {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // 1. Process any incoming events from backend non-blockingly
+        while let Ok(event) = self.rx_event.try_recv() {
+            self.update_state_from_event(event);
+        }
+        
+        // 2. Draw UI
+        egui::SidePanel::left("contacts").show(ctx, |ui| {
+             // Draw contacts/groups
         });
         
-        // Left panel: Peers list + Add peer
-        egui::SidePanel::left("peers")
-            .min_width(200.0)
-            .show_inside(ui, |ui| {
-                ui.heading("Chats");
-                
-                // Add new peer input
-                ui.text_edit_singleline(&mut self.add_peer_input);
-                if ui.button("Start Chat").clicked() {
-                    // Parse NodeId and start chat
-                }
-                ui.separator();
-                
-                // List of peers
-                for peer in &self.app.peers {
-                    let selected = self.app.active_chat == Some(peer.node_id);
-                    if ui.selectable_label(selected, &peer.display_name).clicked() {
-                        self.app.select_chat(peer.node_id);
-                    }
-                }
-            });
-        
-        // Center panel: Chat window
-        egui::CentralPanel::default()
-            .show_inside(ui, |ui| {
-                if let Some(active) = &self.app.active_chat {
-                    // Chat header with peer info
-                    egui::Panel::top("chat_header").show_inside(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("Chatting with: ");
-                            ui.label(self.get_peer_name(active));
-                            
-                            // Show key fingerprint (shortened)
-                            ui.label(" | Key: ");
-                            ui.label(self.get_peer_fingerprint(active));
-                            
-                            // Online status
-                            if self.is_peer_online(active) {
-                                ui.label("🟢 Online");
-                            } else {
-                                ui.label("⚪ Offline");
-                            }
-                        });
-                    });
-                    
-                    // Messages
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        for msg in &self.app.messages {
-                            // Display message (sender vs receiver styling)
-                        }
-                    });
-                    
-                    // Message input at bottom
-                    if ui.text_edit_singleline(&mut self.message_input).lost_focus() 
-                        && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        // Send message
-                    }
-                } else {
-                    ui.centered_and_justified(|ui| {
-                        ui.label("Enter a NodeId to start chatting");
-                    });
-                }
-            });
+        egui::CentralPanel::default().show(ctx, |ui| {
+             // Draw messages
+             if ui.button("Send").clicked() {
+                 let _ = self.tx_cmd.try_send(Command::SendDirectMessage { ... });
+             }
+        });
     }
 }
 ```
+
+---
+
+### 3.6 User Identity & Onboarding
+
+**Purpose:** Handles zero-knowledge identity generation and local security.
+
+*   **Zero-Server Registration:** Upon first launch, the app automatically generates an X25519/Ed25519 keypair. The public key forms the permanent `NodeId`. There is no cloud registration, username, or email required.
+*   **Local Display Name:** The user enters a Display Name locally, which is only used to populate friends' local phonebooks during P2P handshakes.
+*   **Local Password Encryption:** To secure the chat history and identity on the physical device, the SQLite database and Private Key are optionally encrypted at rest. The user decrypts them locally via password upon app startup.
 
 ---
 
@@ -716,168 +303,114 @@ impl App for NodeChatUI {
 nodechat/
 ├── ARCHITECTURE.md           # This file
 ├── README.md                 # Project description
-├── Cargo.toml               # Rust dependencies
-├── SPEC.md                   # Detailed specification
+├── Cargo.toml                # Rust dependencies
 │
 ├── src/
-│   ├── main.rs              # Entry point
-│   ├── lib.rs               # Module exports
+│   ├── main.rs               # Entry point (boots Tokio + egui)
 │   │
-│   ├── p2p/                 # Network layer (adapted from artemis)
-│   │   ├── mod.rs           # P2PBackend definition
-│   │   ├── endpoint.rs      # Iroh Endpoint management
-│   │   ├── gossip.rs        # Broadcast messaging
-│   │   └── discovery.rs     # Pkarr peer discovery
+│   ├── core/                 # Backend Worker (Actor Model loop)
+│   │   ├── mod.rs            
+│   │   └── commands.rs       # Channels interface definitions
 │   │
-│   ├── crypto/              # Encryption layer
-│   │   ├── mod.rs           # CryptoManager, UserIdentity
-│   │   ├── x3dh.rs          # Key exchange
-│   │   ├── ratchet.rs       # Double ratchet
-│   │   └── session.rs       # Session management
+│   ├── p2p/                  # Network layer 
+│   │   ├── mod.rs            # NetworkManager
+│   │   ├── direct.rs         # Iroh Unicast handling
+│   │   └── group.rs          # Iroh Gossip handling
 │   │
-│   ├── protocol/            # Message formats
-│   │   └── mod.rs           # ChatMessage, MessageType
+│   ├── crypto/               # Encryption layer
+│   │   ├── mod.rs            # Keys and Encryption logic
 │   │
-│   ├── storage/             # Local data storage
-│   │   └── mod.rs           # Storage, Contact, StoredMessage
+│   ├── storage/              # Database Layer
+│   │   ├── mod.rs            # SQLite initialization
+│   │   └── queries.rs        # SQL CRUD ops
 │   │
-│   ├── app/                 # Application logic
-│   │   └── mod.rs           # App struct and methods
-│   │
-│   └── ui/                  # Frontend (egui)
-│       ├── mod.rs           # NodeChatUI
-│       └── widgets.rs       # Custom UI components
+│   └── ui/                   # Frontend
+│       ├── mod.rs            # NodeChatUI main loop
+│       └── views.rs          # Specific panel renderers
 │
-└── hello_android/           # Reference for UI (don't modify)
-    ├── src/
-    │   ├── main.rs
-    │   └── lib.rs
-    └── Cargo.toml
+└── hello_android/            # Reference for cross-platform
 ```
 
 ---
 
 ## 5. Implementation Order
 
-### Phase 1: Foundation (Week 1-2)
-- [ ] Set up project structure with Cargo.toml
-- [ ] Implement basic P2P networking with Iroh 0.97
-- [ ] Get peer discovery working (Pkarr)
-- [ ] Test basic send/receive
+### Phase 1: Core Foundation (Week 1-2)
+- Set up Cargo workspace and Actor Model Channels (Tokio <-> Main Thread).
+- Initialize the embedded SQLite Database schema.
+- Implement the basic Tokio background worker scaffolding.
 
-### Phase 2: Encryption (Week 3-4)
-- [ ] Implement X25519 key generation
-- [ ] Implement ChaCha20-Poly1305 encryption
-- [ ] Implement simplified X3DH key exchange
-- [ ] Implement session management
+### Phase 2: Peer-to-Peer 1:1 Networking (Week 3-4)
+- Wire up Iroh Endpoint binding on the backend.
+- Implement Pkarr Discovery.
+- Enable basic Unicast data-streams between two pre-configured NodeIds.
 
-### Phase 3: Chat Protocol (Week 5-6)
-- [ ] Define message types (Handshake, Encrypted, etc.)
-- [ ] Handle contact addition
-- [ ] Handle message send/receive flow
-- [ ] Message history storage
+### Phase 3: Identity & E2EE Crypto (Week 5-6)
+- Implement static X25519 identity generation.
+- Combine the X25519 DH-Exchange with ChaCha20 to encrypt 1:1 payloads.
+- Implement Offline Queue execution flow via SQLite (`status = 'queued'`).
 
-### Phase 4: User Interface (Week 7-8)
-- [ ] Set up eframe (based on hello_android)
-- [ ] Contact list panel
-- [ ] Chat window
-- [ ] Message input
-- [ ] Settings/identity display
+### Phase 4: UI Integration (Week 7-8)
+- Bind the egui frontend to via the `rx`/`tx` channels.
+- Build the Local Phonebook view.
+- Build the 1:1 Direct Chat view showing queue statuses.
 
-### Phase 5: Features (Week 9-10)
-- [ ] File transfer
-- [ ] Online/offline status
-- [ ] Message delivery status
+### Phase 5: Group Chat Expansion (Week 9-10)
+- Add entirely new `iroh-gossip` router to the Network Layer.
+- Implement Symmetric Group Key Generation.
+- Create UI for creating groups and sending secure "Invites" via 1:1 E2EE.
 
-### Phase 6: Testing & Documentation (Week 11-12)
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] README and documentation
-- [ ] Prepare for defense presentation
+### Phase 6: Polish & Testing (Week 11-12)
+- Mobile execution tests (via `cargo-apk`).
+- Final documentation and Presentation/Defense prep.
 
 ---
 
-## 6. Key Differences from Artemis
-
-| Artemis (Research) | NodeChat (Student Project) |
-|--------------------|---------------------------|
-| Stealth/persistence features | Removed - chat app needs no persistence tricks |
-| Machine-to-machine (C2) | Human-to-human (chat) |
-| Transport encryption only | Full E2EE (Signal-style) |
-| Complex anti-analysis | None - legitimate app |
-| Iroh 0.22 | Iroh 0.97.0 (updated API) |
-| No UI | egui frontend |
-
----
-
-## 7. Testing Plan
+## 6. Testing Plan
 
 ### Unit Tests
-- Crypto functions (encrypt/decrypt)
-- Session serialization
-- Message parsing
+- Crypto functions (Ensure ChaCha20 payloads fail on altered bits).
+- SQLite storage tests (Ensuring offline queued messages are reliably written).
 
 ### Integration Tests
-- Two nodes exchanging messages
-- Contact addition flow
-- File transfer
-
-### Manual Tests
-- UI interactions
-- Cross-platform (if time permits)
+- Two isolated Backend Workers exchanging a simulated `Command` event without a UI.
+- Verify node discovery using an isolated Pkarr instance.
 
 ---
 
-## 8. Defense Points
+## 7. Defense Points
 
 When presenting this project, emphasize:
 
-1. **True Decentralization:** No server needed - Pkarr DNS for discovery, direct P2P for messaging
-2. **No Contact System:** Like Bitcoin - just NodeId (wallet address) to send messages
-3. **Offline Message Queueing:** Messages queue locally and deliver when peer comes online
-4. **End-to-End Encryption:** Each message encrypted with unique keys (X25519 + ChaCha20)
-5. **Forward Secrecy:** Simplified ratchet - compromised keys can't decrypt past messages
-6. **Real P2P:** Direct peer-to-peer using Iroh (hole punching, relay fallback)
-7. **Research Foundation:** Built on Artemis P2P research (adapted for chat)
+1. **True Decentralization:** No server needed. Pkarr for discovery, Iroh for transport.
+2. **Actor Model Architecture:** Explicitly decoupled the UI thread from the intense networking and database IO, standard for professional desktop applications.
+3. **Data Sovereignty:** The use of SQLite embedded locally means 100% of user data and contact directories live exclusively on the user's local disk.
+4. **Smart Offline Queueing:** Messages are stored locally via SQL and flush to the network autonomously when peers are discovered online.
+5. **Decentralized Groups:** Solved the complex problem of P2P Group chatting by utilizing Gossip protocols combined with securely distributed symmetric keys.
+6. **Robust NAT Traversal:** Even on highly aggressive university Wi-Fi networks where peer-to-peer UDP hole-punching is blocked, NodeChat falls back to Iroh's native DERP relay servers, ensuring messages always deliver globally.
+7. **Forward Secrecy (Hash Ratcheting):** While the full Signal Protocol is out-of-scope, implementing a SHA-256 key ratchet after every 1:1 message proves cryptographic maturity, ensuring past message payloads remain secure even if current keys are compromised.
 
 ---
 
-## 9. References
+## 8. Design Decisions (Answered)
 
-- [Iroh Documentation](https://docs.iroh.computer/)
-- [Iroh GitHub](https://github.com/n0-computer/iroh)
-- [Signal Protocol](https://signal.org/docs/)
-- [hello_android (UI reference)](../hello_android/)
-- [Artemis P2P research](../artemis/src/)
+### The Contact Model
+**Why no central "Add Friend" system?**
+In a truly decentralized P2P system, there is no central authority to manage friends. Much like Bitcoin, you communicate strictly using a cryptographic identifier (`NodeId`). The "Contacts" feature is intentionally designed as a purely local "Phonebook" mapped via SQLite, simply assigning a human-readable display name to a `NodeId` for user convenience.
 
----
+### The UI Freezing Problem
+**Why the complex Actor Model?**
+If the application uses an Immediate-Mode GUI (`egui`), the UI must redraw entirely up to 60 times a second. If network packets drop, or cryptographic keys take 50ms to generate, executing this on the main thread would freeze the application completely. The Actor Model separates concerns perfectly.
 
-## 10. Design Decisions (Answered)
+### Group E2EE
+**Why Symmetric Keys for Groups instead of Signal's Sender Keys?**
+While 1:1 chat utilizes full Asymmetric Key encryption, Group Chat via a public Gossip swarm poses immense cryptographic coordination challenges in a serverless environment. Sharing a Symmetric AES/ChaCha20 key via a secure 1:1 backend message to group participants avoids immense P2P architectural complexity while fully guaranteeing End-to-End Encryption for the group swarm itself.
 
-### Simplified Contact Model
-
-**Why no complex "contacts"?**
-In a truly decentralized P2P system, you don't need a contact list. Think of Bitcoin - you don't need to "add friends" to send money, just their wallet address.
-
-**NodeChat approach:**
-- No "friend requests" or approval system
-- Enter peer's NodeId directly to message them
-- "Contacts" = just a local phonebook (saved NodeIds with display names) - completely optional
-- You can message anyone if you have their NodeId
-
-### Other Decisions
-
-| Question | Answer |
-|----------|--------|
-| **X3DH vs Simplified** | Simplified (X25519 + ChaCha20) is acceptable for student project |
-| **Group chats** | Skip - focus on 1:1 chat first |
-| **Message storage** | Keep locally forever - user can delete individually |
-| **Safety number verification** | Skip for MVP - adds complex UI work |
+### Decentralized Onboarding
+**How do users login without a server?**
+True decentralization means the user mathematically owns their identity. Instead of a server assigning a user ID, the application generates a cryptographic Keypair on first launch. The public component *is* their identity. To protect the user if their device is stolen, the local database and private keystore are encrypted with an optional local master password, meaning no server is ever required to verify access.
 
 ---
 
 *Last Updated: 2026-03-29*
 *Project: NodeChat - Secure Decentralized Chat*
-
-
-those question are to be answer here as part of the planning not to ask lecturer, she doest decide any, not yet.... even the contact she mentioned, i am still questioning it.. and you add it, my question is what is contact has to do with this application????
