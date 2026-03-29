@@ -192,6 +192,13 @@ pub struct UserIdentity {
     pub keypair: x25519_dalek::StaticSecret,
     pub public_key: x25519_dalek::PublicKey,
     
+    /// Full key fingerprint (for verification)
+    /// SHA-256 of public key, shown as hex (e.g., "AF3BC92E...")
+    pub fingerprint: String,
+    
+    /// Shortened fingerprint for UI (first 8 chars)
+    pub short_fingerprint: String,
+    
     /// Signed pre-key for key exchange
     pub signed_prekey: SignedPreKey,
     
@@ -224,6 +231,10 @@ pub struct CryptoManager;
 impl CryptoManager {
     /// Generate new user identity
     pub fn generate_identity() -> UserIdentity;
+    
+    /// Generate key fingerprint from public key
+    /// Returns full hex string and shortened version for UI
+    pub fn generate_fingerprint(public_key: &PublicKey) -> (String, String);
     
     /// Start X3DH key exchange with a contact's key bundle
     pub fn x3dh_initiate(bundle: &KeyBundle) -> Result<(Session, Vec<u8>)>;
@@ -355,32 +366,25 @@ pub enum MessageType {
 
 ### 3.4 Storage Layer (`src/storage/`)
 
-**Purpose:** Store contacts, messages, and sessions locally
+**Purpose:** Store messages, sessions, and optional "phonebook" locally
+
+**Note:** In P2P, there's no "contact list" on a server. Just a local phonebook.
 
 ```rust
 // File: src/storage/mod.rs
 
-/// Contact information
+/// A saved peer (like a phonebook entry - completely optional)
+/// You can message anyone by NodeId directly without adding them here first
 #[derive(Serialize, Deserialize)]
-pub struct Contact {
-    /// Their NodeId (also their network address)
+pub struct SavedPeer {
+    /// Their NodeId (required - this is their "address")
     pub node_id: NodeId,
     
-    /// Display name (user-chosen, not verified)
+    /// Display name (user-chosen label, not verified)
     pub display_name: String,
     
-    /// Their public key for E2EE
-    pub public_key: PublicKey,
-    
-    /// When we first added this contact
-    pub added_at: i64,
-    
-    /// Last message timestamp
-    pub last_seen: i64,
-    
-    /// Session state (encrypted)
-    #[serde(skip)]
-    pub session: Option<Session>,
+    /// Last message timestamp (for sorting)
+    pub last_message: Option<i64>,
 }
 
 /// Chat message history
@@ -404,17 +408,20 @@ impl Storage {
     /// Initialize storage
     pub fn new() -> Result<Self>;
     
-    /// Save contact
-    pub fn save_contact(&self, contact: &Contact) -> Result<()>;
+    /// Save peer to phonebook
+    pub fn save_peer(&self, peer: &SavedPeer) -> Result<()>;
     
-    /// Load all contacts
-    pub fn load_contacts(&self) -> Result<Vec<Contact>>;
+    /// Load all saved peers
+    pub fn load_peers(&self) -> Result<Vec<SavedPeer>>;
+    
+    /// Remove peer from phonebook
+    pub fn remove_peer(&self, node_id: &NodeId) -> Result<()>;
     
     /// Save message
     pub fn save_message(&self, msg: &StoredMessage) -> Result<()>;
     
-    /// Load messages for a contact
-    pub fn load_messages(&self, contact: &NodeId) -> Result<Vec<StoredMessage>>;
+    /// Load messages for a peer
+    pub fn load_messages(&self, node_id: &NodeId) -> Result<Vec<StoredMessage>>;
     
     /// Save session state
     pub fn save_session(&self, node_id: &NodeId, session: &Session) -> Result<()>;
@@ -430,8 +437,38 @@ impl Storage {
 
 **Purpose:** Tie everything together - handles UI events and coordinates modules
 
+**Key Feature: Message Queueing**
+In P2P, recipients aren't always online. Messages are stored locally until delivered.
+- When sending to offline peer: queue locally
+- When peer comes online: automatically deliver queued messages
+- Show delivery states: `queued` → `sending` → `delivered`
+
 ```rust
 // File: src/app/mod.rs
+
+use std::collections::HashMap;
+
+/// Message delivery state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessageStatus {
+    /// Saved locally, recipient offline
+    Queued,
+    /// Currently attempting to send
+    Sending,
+    /// Message sent to network
+    Sent,
+    /// Confirmed delivered to recipient
+    Delivered,
+    /// Failed to deliver
+    Failed(String),
+}
+
+/// A message with its current delivery status
+pub struct OutgoingMessage {
+    pub message: StoredMessage,
+    pub status: MessageStatus,
+    pub attempts: u32,
+}
 
 /// Main application state
 pub struct App {
@@ -441,17 +478,21 @@ pub struct App {
     /// Cryptography
     crypto: CryptoManager,
     
-    /// Our identity
+    /// Our identity (NodeId + keys)
     identity: UserIdentity,
     
-    /// Contact list
-    contacts: Vec<Contact>,
+    /// Phonebook - saved peers with display names (optional)
+    peers: Vec<SavedPeer>,
     
-    /// Current chat (selected contact)
+    /// Current chat (selected peer)
     active_chat: Option<NodeId>,
     
     /// Message history (for active chat)
     messages: Vec<StoredMessage>,
+    
+    /// Pending outgoing messages (queued for offline peers)
+    /// Key: recipient NodeId, Value: messages waiting to be sent
+    pending_queue: HashMap<NodeId, Vec<OutgoingMessage>>,
     
     /// Storage
     storage: Storage,
@@ -477,14 +518,24 @@ impl App {
     /// Process incoming network events
     pub async fn handle_network_event(&mut self, event: NetworkEvent);
     
-    /// Send a message
-    pub async fn send_message(&mut self, content: String) -> Result<()>;
+    /// Send a message to a peer (by NodeId)
+    /// If peer is offline, message is queued and sent when they come online
+    pub async fn send_message(&mut self, node_id: NodeId, content: String) -> Result<()>;
     
-    /// Add a new contact
-    pub async fn add_contact(&mut self, node_id: NodeId, display_name: String) -> Result<()>;
+    /// Process pending message queue - called when peer comes online
+    pub async fn flush_queue(&mut self, node_id: NodeId) -> Result<()>;
+    
+    /// Add peer to phonebook (optional - can message without adding)
+    pub fn add_to_phonebook(&mut self, node_id: NodeId, display_name: String);
     
     /// Select a chat
     pub fn select_chat(&mut self, node_id: NodeId);
+    
+    /// Get our NodeId to share with others
+    pub fn my_node_id(&self) -> NodeId;
+    
+    /// Get number of pending (queued) messages
+    pub fn pending_count(&self, node_id: NodeId) -> usize;
 }
 ```
 
@@ -509,6 +560,48 @@ hello_android structure:
 
 #### NodeChat UI Layout:
 
+**Key UI Elements:**
+1. **My NodeId** - Display prominently so users can share it
+2. **Key Fingerprint** - Shortened cryptographic fingerprint (e.g., `AF3B...C72E`)
+3. **Network Status** - Show peers connected, relay vs direct
+4. **Enter Peer NodeId** - Text field to start new conversation
+5. **Chat List** - Shows peers + pending message count
+6. **Chat Window** - Messages with delivery status
+
+**Delivery Status Display:**
+- No icon: Message sent locally, waiting to send (offline peer)
+- ⏳ (hourglass): Sending...
+- ✓ Sent: Delivered to network
+- ✓✓ Delivered: Confirmed by recipient
+
+```rust
+// Display a message with status
+fn render_message(ui: &mut egui::Ui, msg: &StoredMessage, status: &MessageStatus) {
+    ui.horizontal(|ui| {
+        ui.label(&msg.content);
+        
+        // Show delivery status icon
+        match status {
+            MessageStatus::Queued => {
+                ui.label("⏳ queued");
+            }
+            MessageStatus::Sending => {
+                ui.label("⏳ sending...");
+            }
+            MessageStatus::Sent => {
+                ui.label("✓");
+            }
+            MessageStatus::Delivered => {
+                ui.label("✓✓");
+            }
+            MessageStatus::Failed(e) => {
+                ui.label(format!("❌ {}", e));
+            }
+        }
+    });
+}
+```
+
 ```rust
 // File: src/ui/mod.rs
 
@@ -517,6 +610,12 @@ use eframe::{egui, App, Frame};
 pub struct NodeChatUI {
     /// The backend app
     app: App,
+    
+    /// Input field for entering peer's NodeId
+    pub add_peer_input: String,
+    
+    /// Input field for message
+    pub message_input: String,
 }
 
 impl NodeChatUI {
@@ -525,17 +624,41 @@ impl NodeChatUI {
 
 impl App for NodeChatUI {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut Frame) {
-        // Left panel: Contact list
-        egui::SidePanel::left("contacts")
-            .min_width(200.0)
-            .show_inside(ui, |ui| {
-                ui.heading("Contacts");
+        // Top bar: My NodeId + Network Status
+        egui::TopPanel::top("my_id").show_inside(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("My ID: ");
+                ui.label(self.app.my_node_id().to_string());
+                if ui.button("Copy").clicked() {
+                    // Copy to clipboard
+                }
+                
                 ui.separator();
                 
-                for contact in &self.app.contacts {
-                    let selected = self.app.active_chat == Some(contact.node_id);
-                    if ui.selectable_label(selected, &contact.display_name).clicked() {
-                        self.app.select_chat(contact.node_id);
+                // Network status
+                ui.label("🟢 3 peers"); // Example: connected to 3 peers
+                ui.label("(direct)");    // or "relay" if using relay
+            });
+        });
+        
+        // Left panel: Peers list + Add peer
+        egui::SidePanel::left("peers")
+            .min_width(200.0)
+            .show_inside(ui, |ui| {
+                ui.heading("Chats");
+                
+                // Add new peer input
+                ui.text_edit_singleline(&mut self.add_peer_input);
+                if ui.button("Start Chat").clicked() {
+                    // Parse NodeId and start chat
+                }
+                ui.separator();
+                
+                // List of peers
+                for peer in &self.app.peers {
+                    let selected = self.app.active_chat == Some(peer.node_id);
+                    if ui.selectable_label(selected, &peer.display_name).clicked() {
+                        self.app.select_chat(peer.node_id);
                     }
                 }
             });
@@ -544,20 +667,40 @@ impl App for NodeChatUI {
         egui::CentralPanel::default()
             .show_inside(ui, |ui| {
                 if let Some(active) = &self.app.active_chat {
+                    // Chat header with peer info
+                    egui::Panel::top("chat_header").show_inside(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Chatting with: ");
+                            ui.label(self.get_peer_name(active));
+                            
+                            // Show key fingerprint (shortened)
+                            ui.label(" | Key: ");
+                            ui.label(self.get_peer_fingerprint(active));
+                            
+                            // Online status
+                            if self.is_peer_online(active) {
+                                ui.label("🟢 Online");
+                            } else {
+                                ui.label("⚪ Offline");
+                            }
+                        });
+                    });
+                    
                     // Messages
                     egui::ScrollArea::vertical().show(ui, |ui| {
                         for msg in &self.app.messages {
-                            // Display message
+                            // Display message (sender vs receiver styling)
                         }
                     });
                     
-                    // Input area at bottom
-                    egui::TextEdit::singleline(&mut self.input)
-                        .hint_text("Type a message...")
-                        .show(ui);
+                    // Message input at bottom
+                    if ui.text_edit_singleline(&mut self.message_input).lost_focus() 
+                        && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        // Send message
+                    }
                 } else {
                     ui.centered_and_justified(|ui| {
-                        ui.label("Select a contact to start chatting");
+                        ui.label("Enter a NodeId to start chatting");
                     });
                 }
             });
@@ -689,11 +832,13 @@ nodechat/
 
 When presenting this project, emphasize:
 
-1. **Decentralization:** No central server - uses Pkarr for peer discovery
-2. **End-to-End Encryption:** Each message is encrypted with unique keys
-3. **Forward Secrecy:** Compromised keys can't decrypt past messages
-4. **Real P2P:** Direct peer-to-peer communication using Iroh
-5. **Research Foundation:** Built on Artemis P2P research
+1. **True Decentralization:** No server needed - Pkarr DNS for discovery, direct P2P for messaging
+2. **No Contact System:** Like Bitcoin - just NodeId (wallet address) to send messages
+3. **Offline Message Queueing:** Messages queue locally and deliver when peer comes online
+4. **End-to-End Encryption:** Each message encrypted with unique keys (X25519 + ChaCha20)
+5. **Forward Secrecy:** Simplified ratchet - compromised keys can't decrypt past messages
+6. **Real P2P:** Direct peer-to-peer using Iroh (hole punching, relay fallback)
+7. **Research Foundation:** Built on Artemis P2P research (adapted for chat)
 
 ---
 
@@ -707,14 +852,32 @@ When presenting this project, emphasize:
 
 ---
 
-## 10. Questions for Supervisor
+## 10. Design Decisions (Answered)
 
-1. Is the simplified X3DH acceptable, or should we implement full X3DH?
-2. Should we include group chats?
-3. What's the expected message storage duration?
-4. Should we include safety number verification UI?
+### Simplified Contact Model
+
+**Why no complex "contacts"?**
+In a truly decentralized P2P system, you don't need a contact list. Think of Bitcoin - you don't need to "add friends" to send money, just their wallet address.
+
+**NodeChat approach:**
+- No "friend requests" or approval system
+- Enter peer's NodeId directly to message them
+- "Contacts" = just a local phonebook (saved NodeIds with display names) - completely optional
+- You can message anyone if you have their NodeId
+
+### Other Decisions
+
+| Question | Answer |
+|----------|--------|
+| **X3DH vs Simplified** | Simplified (X25519 + ChaCha20) is acceptable for student project |
+| **Group chats** | Skip - focus on 1:1 chat first |
+| **Message storage** | Keep locally forever - user can delete individually |
+| **Safety number verification** | Skip for MVP - adds complex UI work |
 
 ---
 
 *Last Updated: 2026-03-29*
 *Project: NodeChat - Secure Decentralized Chat*
+
+
+those question are to be answer here as part of the planning not to ask lecturer, she doest decide any, not yet.... even the contact she mentioned, i am still questioning it.. and you add it, my question is what is contact has to do with this application????
