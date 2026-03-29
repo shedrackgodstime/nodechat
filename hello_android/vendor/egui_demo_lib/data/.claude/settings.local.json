@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(identify /Users/emilk/code/egui/crates/egui_demo_lib/data/icon.png)",
+      "Bash(rsvg-convert -w 16 -h 16 icon.svg -o /tmp/icon16.png)",
+      "Bash(rsvg-convert -w 32 -h 32 icon.svg -o /tmp/icon32.png)",
+      "Bash(rsvg-convert -w 48 -h 48 icon.svg -o /tmp/icon48.png)",
+      "Bash(python3:*)"
+    ]
+  }
+}
