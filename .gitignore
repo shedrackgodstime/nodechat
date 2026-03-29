@@ -1,3 +1,3 @@
 /hello_android/target
-/hello_android/vendor
-
+/target
+/hello_android/vendor/android-activity/target
