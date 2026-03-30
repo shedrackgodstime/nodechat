@@ -1,33 +1,73 @@
 [package]
-name = "NodeChat"
+name = "nodechat"
 version = "0.1.0"
 edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # P2P & Discovery
 iroh = "0.97.0"
 iroh-gossip = "0.97.0"
+iroh-tickets = "0.4.0"
 pkarr = "5.0"
 
 # E2EE Crypto
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 chacha20poly1305 = "0.10"
 sha2 = "0.10.8"
+# UI
+# UI
+eframe = { version = "0.34", default-features = false, features = ["glow", "default_fonts", "wayland", "x11"] }
+egui = "0.34"
+rand = "0.8"
+parking_lot = "0.12"
 
 # Storage
 rusqlite = { version = "0.31", features = ["bundled"] }
 
 # Async Core
-tokio = { version = "1.37", features = ["full", "rt-multi-thread"] }
+tokio = { version = "1.50", features = ["full", "rt-multi-thread"] }
+futures = "0.3"
 uuid = { version = "1.8", features = ["v4", "serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
-
-# UI
-eframe = { version = "0.34", features = ["glow", "default_fonts", "wayland", "x11"] }
-egui = "0.34"
+data-encoding = "2.2"
+hex = "0.4.3"
+log = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 digest = { version = "0.10", optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.15"
+winit = { version = "0.30", features = ["android-native-activity"] }
+android-activity = { path = "hello_android/vendor/android-activity", features = ["native-activity"] }
+eframe = { version = "0.34", default-features = false, features = ["glow", "android-native-activity"] }
 
 [features]
 digest = ["dep:digest"]
+
+[patch.crates-io]
+android-activity = { path = "hello_android/vendor/android-activity" }
+
+[package.metadata.android]
+package = "com.nodechat"
+build_targets = ["aarch64-linux-android", "x86_64-linux-android"]
+[[package.metadata.android.uses_permission]]
+name = "android.permission.INTERNET"
+
+[[package.metadata.android.uses_permission]]
+name = "android.permission.ACCESS_NETWORK_STATE"
+
+[package.metadata.android.sdk]
+min_sdk_version = 23
+target_sdk_version = 24
+
+[package.metadata.android.signing.release]
+alias = "androiddebugkey"
+path = "/home/kristency/.android/debug.keystore"
+keystore_password = "android"
+key_password = "android"
