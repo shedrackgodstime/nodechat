@@ -92,7 +92,8 @@ export component VerifyKeyScreen inherits Rectangle {
                 alignment: center;
                 
                 VerticalLayout {
-                    width: is-desktop ? 640px : root.width;
+                    max-width: 800px;
+                    horizontal-stretch: 1;
                     padding: 16px;
                     padding-top: 24px;
                     spacing: 24px;
