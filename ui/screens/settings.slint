@@ -88,14 +88,16 @@ export component SettingsScreen inherits Rectangle {
             mouse-drag-pan-enabled: true;
 
             HorizontalLayout {
-                alignment: start; // Left-aligned on desktop
+                alignment: center; // Match the ChatView's centered alignment pattern
                 
                 VerticalLayout {
-                    max-width: 800px;
+                    max-width: 1200px;
                     horizontal-stretch: 1;
                     padding: 16px;
+                    padding-left: is-desktop ? 32px : 16px;
+                    padding-right: is-desktop ? 32px : 16px;
                     padding-top: 24px;
-                    spacing: 14px; // Tightened to match chat-view
+                    spacing: 14px;
                     alignment: start;
 
                     // --- PROFILE SPOTLIGHT CARD ---
@@ -129,6 +131,7 @@ export component SettingsScreen inherits Rectangle {
                     VerticalLayout {
                         spacing: 12px;
                         VerticalLayout {
+                            padding-left: 8px;
                             Text { text: "MESSAGING & PRIVACY"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 0.8px; }
                         }
                         
@@ -164,7 +167,14 @@ export component SettingsScreen inherits Rectangle {
                                         VerticalLayout {
                                             horizontal-stretch: 1; alignment: center;
                                             Text { text: "Private Node Identifier"; font-size: 15px; font-weight: 600; color: AppTheme.text-primary; }
-                                            Text { text: node-id; font-size: 11px; color: AppTheme.text-tertiary; font-family: "monospace"; }
+                                            TextInput { 
+                                                text: node-id; 
+                                                font-size: 11px; 
+                                                color: AppTheme.text-tertiary; 
+                                                font-family: "monospace"; 
+                                                read-only: true;
+                                                single-line: true;
+                                            }
                                         }
                                         Text { text: "📋"; font-size: 14px; color: AppTheme.accent; vertical-alignment: center; }
                                     }
@@ -194,6 +204,7 @@ export component SettingsScreen inherits Rectangle {
                     VerticalLayout {
                         spacing: 12px;
                         VerticalLayout {
+                            padding-left: 8px;
                             Text { text: "DANGER ZONE"; font-size: 11px; font-weight: 800; color: AppTheme.accent-danger; letter-spacing: 0.8px; }
                         }
                         
