@@ -1,0 +1,167 @@
+import { AppTheme } from "../theme.slint";
+
+// SetupNameScreen — Pro Decentralized Onboarding
+// Optimized for focus, security, and desktop-adaptive width.
+
+export component SetupNameScreen inherits Rectangle {
+    in-out property <bool>   generating: false;
+    in-out property <string> display-name: "";
+    in property <bool>       is-desktop: false;
+    in property <length>     safe-area-top: 0px;
+
+    callback confirm-name(string);
+    callback go-back();
+
+    background: AppTheme.surface-primary;
+
+    property <bool> valid: display-name.character-count >= 1 && display-name.character-count <= 32;
+
+    VerticalLayout {
+        padding: 0;
+        spacing: 0;
+
+        // --- Pro Immersive Header ──────────────────────────────────
+        Rectangle {
+            height: (is-desktop ? 64px : 72px) + root.safe-area-top;
+            background: AppTheme.surface-secondary;
+            
+            Rectangle {
+                y: parent.height - 1px;
+                width: 100%; height: 1px;
+                background: AppTheme.divider; 
+            }
+
+            HorizontalLayout {
+                y: root.safe-area-top;
+                height: is-desktop ? 64px : 72px;
+                padding-left: 12px;
+                padding-right: 16px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        TouchArea {
+                            width: 32px; height: 32px;
+                            clicked => { root.go-back(); }
+                            Text { text: "←"; font-size: 22px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: "Create Identity";
+                            font-size: 18px; font-weight: 700;
+                            color: AppTheme.text-primary;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Content Area ──────────────────────────────────────────────────
+        HorizontalLayout {
+            alignment: center;
+            
+            if !generating: VerticalLayout {
+                width: is-desktop ? 500px : root.width;
+                padding: 24px;
+                spacing: 24px;
+                alignment: start;
+
+                VerticalLayout {
+                    spacing: 8px;
+                    Text { text: "What's your name?"; font-size: 32px; font-weight: 800; color: AppTheme.text-primary; }
+                    Text { text: "Your identity is stored locally and encrypted on your device."; font-size: 15px; color: AppTheme.text-secondary; wrap: word-wrap; }
+                }
+
+                // Input Card
+                VerticalLayout {
+                    spacing: 10px;
+                    Text { text: "LOCAL DISPLAY NAME"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 0.8px; }
+                    
+                    Rectangle {
+                        height: 60px;
+                        border-radius: 18px;
+                        background: AppTheme.surface-secondary;
+                        border-width: 1px;
+                        border-color: name-input.has-focus ? AppTheme.accent : AppTheme.surface-tertiary;
+                        animate border-color { duration: 150ms; }
+
+                        HorizontalLayout {
+                            padding-left: 18px; padding-right: 18px;
+                            name-input := TextInput {
+                                text <=> root.display-name;
+                                font-size: 18px; color: AppTheme.text-primary;
+                                vertical-alignment: center; single-line: true;
+                                accepted => { if (root.valid) { root.confirm-name(self.text); } }
+                            }
+                        }
+
+                        if name-input.text == "": Text {
+                            padding-left: 18px; height: parent.height;
+                            text: "e.g. Satoshi Nakamoto"; font-size: 18px;
+                            color: AppTheme.text-tertiary; vertical-alignment: center; opacity: 0.5;
+                        }
+                    }
+                    Text { text: "This name is private and only shared during P2P handshakes."; font-size: 11px; color: AppTheme.text-tertiary; }
+                }
+
+                Rectangle { vertical-stretch: 1; }
+
+                // CTA
+                Rectangle {
+                    height: 56px; border-radius: 18px;
+                    background: valid ? AppTheme.accent : AppTheme.surface-tertiary;
+                    animate background { duration: 150ms; }
+
+                    TouchArea {
+                        enabled: root.valid;
+                        clicked => { root.confirm-name(root.display-name); }
+                        Text {
+                            text: "Generate Private Vault";
+                            font-size: 17px; font-weight: 700;
+                            color: root.valid ? #FFFFFF : AppTheme.text-tertiary;
+                            horizontal-alignment: center; vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            // --- LOADING STATE ---
+            if generating: VerticalLayout {
+                width: is-desktop ? 500px : root.width;
+                alignment: center;
+                spacing: 32px;
+                padding: 24px;
+
+                Rectangle {
+                    width: 72px; height: 72px;
+                    border-radius: 36px;
+                    background: AppTheme.surface-secondary;
+                    Text { text: "🔑"; font-size: 32px; horizontal-alignment: center; vertical-alignment: center; }
+                    
+                    // Simple progress ring
+                    Rectangle {
+                        width: 100%; height: 100%;
+                        border-radius: 36px;
+                        border-width: 3px;
+                        border-color: AppTheme.accent;
+                        opacity: 0.6;
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 8px;
+                    Text { text: "Creating Identity..."; font-size: 24px; font-weight: 800; color: AppTheme.text-primary; horizontal-alignment: center; }
+                    Text { text: "Generating Ed25519 and X25519 keypairs for decentralized E2EE."; font-size: 14px; color: AppTheme.text-secondary; horizontal-alignment: center; wrap: word-wrap; }
+                }
+            }
+        }
+    }
+}

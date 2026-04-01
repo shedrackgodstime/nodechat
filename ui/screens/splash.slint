@@ -1,0 +1,58 @@
+import { AppTheme } from "../theme.slint";
+
+export component SplashScreen inherits Rectangle {
+    background: AppTheme.surface-primary;
+    
+    // Callback to trigger transition after "loading"
+    callback finished();
+
+    // Auto-transition after 2 seconds for UI flow
+    // In a production app, the backend would trigger this.
+    timer := Timer {
+        interval: 2500ms;
+        triggered => {
+            root.finished();
+        }
+    }
+
+    VerticalLayout {
+        alignment: center; // Vertical centering
+        spacing: AppTheme.sp-lg;
+
+        // Horizontally center the image
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../../assets/icons/app_logo_with_name_transparent_bg.png");
+                width: 280px;
+                height: 280px;
+                image-fit: contain;
+            }
+        }
+
+        // Horizontally center the loading bar
+        HorizontalLayout {
+            alignment: center;
+            Rectangle {
+                height: 6px;
+                width: 140px;
+                background: AppTheme.surface-secondary;
+                border-radius: 3px;
+                Rectangle {
+                    x: 0;
+                    height: 100%;
+                    width: 50px;
+                    background: AppTheme.accent;
+                    border_radius: 3px;
+                    
+                    // Simple animation for the loading bar
+                    animate width {
+                        duration: 1500ms;
+                        easing: ease-in-out;
+                        iteration-count: -1;
+                    }
+                }
+            }
+        }
+    }
+}

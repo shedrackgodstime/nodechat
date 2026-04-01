@@ -1,0 +1,161 @@
+import { AppTheme } from "../theme.slint";
+
+export component IdentityCardScreen inherits Rectangle {
+    in property <string> display-name: "";
+    in property <string> node-id: "";
+
+    callback go-to-chats();
+    callback copy-node-id();
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        padding: AppTheme.sp-lg;
+        spacing: AppTheme.sp-lg;
+        alignment: center;
+
+        // --- Success Branding ---
+        VerticalLayout {
+            spacing: AppTheme.sp-sm;
+            Text {
+                text: "Hi, " + display-name + "!";
+                font-size: 34px;
+                font-weight: 800;
+                color: AppTheme.text-primary;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: "Your decentralized identity is ready.";
+                font-size: 17px;
+                color: AppTheme.text-secondary;
+                horizontal-alignment: center;
+            }
+        }
+
+        Rectangle { height: AppTheme.sp-lg; }
+
+        // --- Card-like Identity Container ---
+        Rectangle {
+            width: 320px;
+            background: AppTheme.surface-secondary;
+            border-radius: 24px;
+            border-width: 1px;
+            border-color: AppTheme.surface-tertiary;
+
+            VerticalLayout {
+                spacing: AppTheme.sp-md;
+                padding: AppTheme.sp-lg; // Moved here from Rectangle
+
+                // QR Code Area
+                Rectangle {
+                    height: 200px;
+                    width: 200px;
+                    border-radius: AppTheme.radius-md;
+                    background: #FFFFFF;
+                    // Centering
+                    x: (parent.width - self.width) / 2;
+
+                    // Mock QR styling
+                    Rectangle {
+                        width: 170px; height: 170px;
+                        background: #F0F0F0;
+                        border-radius: 4px;
+                        
+                        Text {
+                            text: "QR";
+                            font-size: 40px;
+                            font-weight: 700;
+                            color: #222222;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Node ID Display
+                VerticalLayout {
+                    spacing: AppTheme.sp-xs;
+                    Text {
+                        text: "PUBLIC NODE ID";
+                        font-size: 11px;
+                        font-weight: 700;
+                        color: AppTheme.text-tertiary;
+                        letter-spacing: 0.5px;
+                    }
+                    
+                    Rectangle {
+                        height: 48px;
+                        border-radius: 12px;
+                        background: AppTheme.surface-tertiary;
+
+                        HorizontalLayout {
+                            padding-left: AppTheme.sp-md;
+                            padding-right: 8px;
+                            alignment: center;
+
+                            Text {
+                                text: node-id; // Rust delivers truncated or full
+                                font-size: 13px;
+                                font-family: "monospace";
+                                color: AppTheme.text-secondary;
+                                horizontal-stretch: 1;
+                                overflow: elide;
+                                vertical-alignment: center;
+                            }
+
+                            // Compact Copy Button
+                            Rectangle {
+                                width: 56px; height: 32px;
+                                border-radius: 8px;
+                                background: AppTheme.accent;
+
+                                TouchArea {
+                                    clicked => { root.copy-node-id(); }
+                                    Text {
+                                        text: "Copy";
+                                        font-size: 13px;
+                                        font-weight: 600;
+                                        color: #FFFFFF;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Text {
+            text: "Share your ID or QR code with friends to start chatting securely and privately.";
+            font-size: 13px;
+            color: AppTheme.text-tertiary;
+            horizontal-alignment: center;
+            width: 300px;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        // --- Main CTA ---
+        Rectangle {
+            width: 320px;
+            height: 56px;
+            border-radius: 18px;
+            background: AppTheme.accent;
+
+            TouchArea {
+                clicked => { root.go-to-chats(); }
+                Text {
+                    text: "Launch Chats";
+                    font-size: 17px;
+                    font-weight: 700;
+                    color: #FFFFFF;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

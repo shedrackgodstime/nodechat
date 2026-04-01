@@ -1,7 +1,7 @@
 # NodeChat — UX Flow & Interface Design
 
-**Document Type:** UX Flow Reference  
-**Project:** NodeChat — Secure Decentralized Chat  
+**Document Type:** UX Flow Reference
+**Project:** NodeChat — Secure Decentralized Chat
 **Covers:** First Launch · Returning User · Mobile Layout · Desktop Layout · All Screens
 
 ---
@@ -15,7 +15,8 @@
 5. [Desktop Layout & Navigation](#5-desktop-layout--navigation)
 6. [Screen-by-Screen Reference](#6-screen-by-screen-reference)
 7. [Shared UI Components](#7-shared-ui-components)
-8. [UX Decisions & Rationale](#8-ux-decisions--rationale)
+8. [Slint Implementation Notes](#8-slint-implementation-notes)
+9. [UX Decisions & Rationale](#9-ux-decisions--rationale)
 
 ---
 
@@ -25,11 +26,11 @@ NodeChat's visual design follows three principles:
 
 **1. Honest UI.** The interface never lies about delivery state, connection health, or encryption status. If a message is queued because a peer is offline, it says "queued." If the node is connected through a relay instead of directly, it says so. Users are treated as adults who can handle reality.
 
-**2. Familiar shell, different guts.** The surface layout intentionally resembles WhatsApp/Telegram — left panel contacts, right panel messages, input bar at the bottom. The difference is what's *under* that shell: no phone number, no account, no central server. Familiarity lowers the learning curve. The cryptographic reality surfaces only when relevant.
+**2. Familiar shell, different guts.** The surface layout intentionally resembles WhatsApp/Telegram — left panel contacts, right panel messages, input bar at the bottom. The difference is what's under that shell: no phone number, no account, no central server. Familiarity lowers the learning curve. The cryptographic reality surfaces only when relevant.
 
-**3. Mobile-first, desktop-enhanced.** The core chat experience is designed for mobile first. The desktop layout takes the same flows and adds a persistent two-panel or three-panel layout because screen space allows it — not because desktop gets different features.
+**3. Mobile-first, desktop-enhanced.** The core chat experience is designed for mobile first. The desktop layout takes the same flows and adds a persistent two-panel layout because screen space allows it — not because desktop gets different features.
 
-### Colour Tokens (both platforms)
+### Colour Tokens (defined once in `ui/app.slint`, used everywhere)
 
 | Token | Light | Dark | Usage |
 |---|---|---|---|
@@ -45,6 +46,8 @@ NodeChat's visual design follows three principles:
 | `text-tertiary` | `#AEAEB2` | `#636366` | Placeholders, disabled |
 | `bubble-out` | `#1A5FA8` | `#1A5FA8` | Outgoing message bubbles |
 | `bubble-in` | `#FFFFFF` | `#2C2C2E` | Incoming message bubbles |
+
+These tokens are declared as global properties in `ui/app.slint` and referenced by name across all component files — never hardcoded.
 
 ---
 
@@ -75,14 +78,11 @@ The first-launch flow runs exactly once. After completion, it never appears agai
 └─────────────────────────────────┘
 ```
 
-**What it shows:**
-- App name and tagline
-- Single primary CTA: "Get Started"
-- One-liner below reassuring users nothing personal is collected
+**What it shows:** App name, tagline, single "Get Started" CTA, one-liner reassurance.
 
-**What happens in the background:**
-- Nothing yet. The keypair is NOT generated here. We wait until the user confirms their name so identity generation feels intentional.
+**Background:** Nothing. The keypair is NOT generated here — we wait until the user confirms their name so identity generation feels intentional.
 
+**Slint file:** `ui/screens/welcome.slint`
 **Transitions to:** Screen 2.2
 
 ---
@@ -104,23 +104,17 @@ The first-launch flow runs exactly once. After completion, it never appears agai
 │  with people you contact.       │
 │  It is never sent to any server.│
 │                                 │
-│  ┌──────────────────────────┐   │
-│  │  You can change this     │   │
-│  │  anytime in Settings.    │   │
-│  └──────────────────────────┘   │
-│                                 │
 │   ┌─────────────────────────┐   │
-│   │       Continue          │   │
+│   │       Continue          │   │  ← disabled until valid input
 │   └─────────────────────────┘   │
 │                                 │
 └─────────────────────────────────┘
 ```
 
-**Validation:**
-- Name must be 1–32 characters
-- No special characters that break display (limit to Unicode letters, numbers, spaces, basic punctuation)
-- "Continue" button is disabled until valid input is provided
+**Validation:** 1–32 characters. Unicode letters, numbers, spaces, basic punctuation only.
+"Continue" is disabled until valid input is provided — enforced via a Slint `enabled:` binding on the button.
 
+**Slint file:** `ui/screens/setup_name.slint`
 **Transitions to:** Screen 2.3
 
 ---
@@ -129,7 +123,6 @@ The first-launch flow runs exactly once. After completion, it never appears agai
 
 ```
 ┌─────────────────────────────────┐
-│                                 │
 │                                 │
 │                                 │
 │        [Spinner / Progress]     │
@@ -142,19 +135,19 @@ The first-launch flow runs exactly once. After completion, it never appears agai
 │   device, entirely offline.     │
 │                                 │
 │                                 │
-│                                 │
 └─────────────────────────────────┘
 ```
 
-**What happens here (backend):**
-1. X25519/Ed25519 keypair is generated
-2. Public key is derived → becomes the `NodeId`
-3. Identity is written to local SQLite (encrypted if password was set)
+**Backend sequence:**
+1. X25519/Ed25519 keypair generated
+2. Public key derived → becomes `NodeId`
+3. Identity written to local SQLite
 4. Iroh endpoint binds and begins listening
 5. Pkarr publishes the user's NodeAddr
 
-**Duration:** Typically under 1 second on modern hardware. The screen is shown for a minimum of 1.5 seconds regardless — long enough for the user to read it, short enough to not feel like a problem.
+**Duration:** Minimum 1.5 seconds shown regardless of actual time — long enough to read, short enough to not feel broken.
 
+**Slint file:** `ui/screens/setup_name.slint` (loading state variant via `in-out property <bool> generating`)
 **Transitions to:** Screen 2.4
 
 ---
@@ -181,8 +174,7 @@ The first-launch flow runs exactly once. After completion, it never appears agai
 │  └─────────────────────────┘    │
 │                                 │
 │  Share this with anyone you     │
-│  want to chat with. They add    │
-│  you using this ID.             │
+│  want to chat with.             │
 │                                 │
 │   ┌─────────────────────────┐   │
 │   │      Go to Chats        │   │
@@ -191,16 +183,8 @@ The first-launch flow runs exactly once. After completion, it never appears agai
 └─────────────────────────────────┘
 ```
 
-**What it shows:**
-- User's display name in a greeting
-- QR code encoding their full NodeId (for easy in-person sharing)
-- Truncated NodeId with a copy button
-- Brief explanation of how contacts work
-- "Go to Chats" CTA to enter the main app
-
-**Key UX decision:** We show the NodeId immediately. The user hasn't added anyone yet, so teaching them how contact-sharing works here — when they're curious — is the right moment.
-
-**Transitions to:** Screen 2.5 (optional password) OR directly to Main App
+**Slint file:** `ui/screens/identity_card.slint`
+**Transitions to:** Screen 2.5 (optional password) OR Main App
 
 ---
 
@@ -234,28 +218,21 @@ The first-launch flow runs exactly once. After completion, it never appears agai
 └─────────────────────────────────┘
 ```
 
-**Notes:**
-- Skipping is explicitly allowed — not everyone needs this for a demo context
-- If set, password is used to derive a key that encrypts the SQLite file and private key on disk
-- This screen is shown once and can be configured again in Settings later
-- Password is never transmitted anywhere
+**Notes:** Skipping is explicitly allowed. Password encrypts the SQLite file and private key on disk. Never transmitted anywhere. Configurable again in Settings.
 
-**Transitions to:** Main App (Contacts / Chat Home)
+**Slint file:** `ui/screens/settings.slint` (onboarding variant)
+**Transitions to:** Main App
 
 ---
 
 ## 3. Returning User Flow (Both Platforms)
-
-Every subsequent launch follows this path.
 
 ### Screen 3.1A — Password Gate (if password was set)
 
 ```
 ┌─────────────────────────────────┐
 │                                 │
-│                                 │
 │           [App Icon]            │
-│                                 │
 │           NodeChat              │
 │                                 │
 │  ┌─────────────────────────┐    │
@@ -266,49 +243,42 @@ Every subsequent launch follows this path.
 │   │         Unlock          │   │
 │   └─────────────────────────┘   │
 │                                 │
-│   Use biometrics instead  →     │  ← mobile only, if device supports it
+│   Use biometrics instead  →     │  ← mobile only
 │                                 │
 └─────────────────────────────────┘
 ```
 
 **Behaviour:**
-- Wrong password: shake animation, "Incorrect password" below the field, clear the input
-- 5 consecutive wrong attempts: 30-second cooldown with a visible countdown
-- Correct password: SQLite decrypts, private key loads, proceed to main app
+- Wrong password: shake animation on input field (Slint `@keyframe` animation), "Incorrect password" label appears, input clears
+- 5 consecutive wrong attempts: 30-second cooldown with a visible countdown timer
+- Correct password: SQLite decrypts, private key loads, Iroh endpoint binds, Pkarr re-publishes, queued messages begin flushing
 
-**What happens in the background on successful unlock:**
-1. SQLite database decrypts
-2. Private key loads into memory
-3. Iroh endpoint binds
-4. Pkarr re-publishes NodeAddr (in case IP changed since last session)
-5. Backend worker starts flushing any queued messages immediately
+**Slint file:** `ui/screens/welcome.slint` (locked state variant)
 
-### Screen 3.1B — Direct Launch (no password set)
+### Screen 3.1B — Direct Launch (no password)
 
-No password screen. App loads directly. The same background steps fire, but faster since there's no decryption step.
+App loads directly into the main UI. Same backend bootstrap fires without the decryption step.
 
-### Screen 3.2 — Reconnecting State (Brief)
+### Screen 3.2 — Reconnecting State
 
-On both 3.1A and 3.1B, there is a brief moment (under 2 seconds typical) where the backend is bootstrapping. During this time:
+- Main UI loads immediately with cached SQLite state
+- Subtle "Connecting…" label in the status bar
+- Peer online indicators update live as connections are established
+- Queued messages flush silently in the background
 
-- The main UI loads and renders immediately with cached state from SQLite
-- A subtle status bar indicator shows "Connecting…"
-- As each peer reconnects, their online indicator updates live
-- Any queued messages begin flushing in the background without the user doing anything
-
-The user does not see a loading screen. They see their chats immediately, with status indicators that update as connectivity is established.
+No loading screen. The user sees their chats immediately.
 
 ---
 
 ## 4. Mobile Layout & Navigation
 
-Mobile uses a **stack-based navigation model** — one screen at a time, with a back button. No persistent side panels. This matches what Android users already expect from every messaging app they've ever used.
+Mobile uses a **stack-based navigation model** — one screen at a time, back button to go up. No persistent side panels. This matches the navigation pattern Android users expect from every messaging app.
 
 ### 4.1 Mobile Home Screen (Chat List)
 
 ```
 ┌───────────────────────────────────┐
-│  NodeChat          [•] [+] [≡]   │  ← status dot, new chat, menu
+│  NodeChat          [•] [+] [≡]   │
 │───────────────────────────────────│
 │  🔍  Search chats…                │
 │───────────────────────────────────│
@@ -320,7 +290,7 @@ Mobile uses a **stack-based navigation model** — one screen at a time, with a 
 │                                   │
 │  ┌───────────────────────────┐    │
 │  │ [AV]  Mama           09:12│   │
-│  │       ⏳ 2 msgs queued    │   │  ← offline queue indicator
+│  │       ⏳ 2 msgs queued    │   │
 │  └───────────────────────────┘    │
 │                                   │
 │  ┌───────────────────────────┐    │
@@ -329,37 +299,25 @@ Mobile uses a **stack-based navigation model** — one screen at a time, with a 
 │  └───────────────────────────┘    │
 │                                   │
 │  ┌───────────────────────────┐    │
-│  │ [AV]  Anon 4f7c…     Mon │   │  ← unverified contact
+│  │ [AV]  Anon 4f7c…     Mon │   │
 │  │ ⚠️    Key not verified    │   │
 │  └───────────────────────────┘    │
 │                                   │
 └───────────────────────────────────┘
-│  [Chats]   [Contacts]  [Settings] │  ← bottom tab bar
+│  [Chats]   [Contacts]  [Settings] │
 └───────────────────────────────────┘
 ```
 
-**Elements explained:**
+**`[•]` Network status dot:**
+- Green: direct P2P connected
+- Amber: connected via relay (reduced privacy)
+- Red: offline — all messages queuing
 
-`[•]` — Network status dot in the header. Tap to see detailed peer/relay info.
-- Green: connected, direct P2P to most peers
-- Amber: connected, but using relay for one or more peers
-- Red: no network, fully offline
+**Chat row:** Avatar (initials), display name, timestamp, last message preview or queue status, delivery ticks, unread count badge.
 
-`[+]` — Start new chat. Opens Add Contact flow.
+**Tab bar:** Chats (default) · Contacts · Settings
 
-`[≡]` — App menu: Settings, Your NodeId, About.
-
-**Chat row anatomy:**
-- Avatar circle with initials (no profile photos for privacy — initials only)
-- Display name + timestamp of last message
-- Last message preview, OR status indicator if no message received yet
-- `✓✓` = delivered, `✓` = sent, `⏳ 2 msgs queued` = offline
-- Unread count badge on the right when messages are unread
-
-**Tab bar (bottom):**
-- **Chats** — conversation list (default tab)
-- **Contacts** — phonebook of known NodeIds
-- **Settings** — profile, password, NodeId, app preferences
+**Slint files:** `ui/screens/chat_list.slint`, `ui/components/contact_row.slint`
 
 ---
 
@@ -368,69 +326,52 @@ Mobile uses a **stack-based navigation model** — one screen at a time, with a 
 ```
 ┌───────────────────────────────────┐
 │  ←  [AV]  Eric O.          [···] │
-│       0xAF3B…C72E · direct · 🔒  │  ← key fingerprint, connection mode, lock
+│       0xAF3B…C72E · direct · 🔒  │
 │───────────────────────────────────│
 │                                   │
-│          Tuesday, 29 Mar          │  ← date separator
+│          Tuesday, 29 Mar          │
 │                                   │
 │  ┌─────────────────────────┐      │
-│  │ yo I pushed the ref doc │      │  ← incoming bubble (left)
+│  │ yo I pushed the ref doc │      │
 │  │ to the repo             │      │
 │  │                   12:38 │      │
 │  └─────────────────────────┘      │
 │                                   │
 │      ┌─────────────────────────┐  │
-│      │ received it, reviewing  │  │  ← outgoing bubble (right)
+│      │ received it, reviewing  │  │
 │      │ phase 2 now             │  │
-│      │ 12:40              ✓✓   │  │
+│      │ 12:40              ✓✓  │  │
 │      └─────────────────────────┘  │
 │                                   │
 │      ┌─────────────────────────┐  │
-│      │ ⏱ disappears in 24h    │  │  ← ephemeral tag inside bubble
-│      │ what do you think about │  │
-│      │ adding supabase?        │  │
-│      │ 12:41           routing…│  │  ← delivery state
+│      │ ⏱ disappears in 24h    │  │
+│      │ what about adding       │  │
+│      │ supabase?               │  │
+│      │ 12:41           routing…│  │
 │      └─────────────────────────┘  │
 │                                   │
-│  --- Key ratcheted · session #85  │  ← system event, muted
+│  --- Key ratcheted · session #85  │
 │                                   │
 │───────────────────────────────────│
 │  [📎]  Type a message…    [Send]  │
 └───────────────────────────────────┘
 ```
 
-**Header:**
-- Back arrow → returns to chat list
-- Avatar + display name (tappable → opens contact info sheet)
-- Key fingerprint (truncated). Connection mode: `direct` or `via relay`
-- Lock icon (🔒) → opens E2EE info sheet explaining the encryption in plain language
-- `[···]` → chat options: view key, set ephemeral timer, clear history, verify contact
+**Header:** Back · Avatar (tappable → contact info) · Key fingerprint · Connection mode · 🔒 (tappable → E2EE info sheet) · `[···]` (options menu)
 
-**Message bubbles:**
-- Outgoing: right-aligned, `accent` colour
-- Incoming: left-aligned, `surface-secondary` colour
-- Timestamp inside the bubble, bottom-right
-- Delivery states shown as text on outgoing messages:
-  - `sending…` — being encrypted and dispatched
-  - `routing…` — propagating through network
-  - `✓` — sent from this device
-  - `✓✓` — confirmed received by recipient node
-  - `queued` — recipient offline, stored locally
+**Delivery states on outgoing bubbles:**
+- `sending…` — encrypting and dispatching
+- `routing…` — propagating through network
+- `✓` — sent from this device
+- `✓✓` — confirmed received by recipient node
+- `⏳ queued` — recipient offline, stored locally
 
-**Ephemeral messages:**
-- Tagged at the top of the bubble: `⏱ disappears in 24h`
-- Timer is agreed when the user sets it in chat options
-- Ephemeral messages show a visible countdown in their bubble when under 1 hour remaining
-
-**System events (muted, centered):**
+**System event rows (muted, centered):**
 - `--- Session started · Forward Secrecy active ---`
 - `--- Key ratcheted · session #85 ---`
 - `--- Eric verified your key ---`
 
-**Input bar:**
-- `📎` → attachment: file picker only. No camera (for scope). Files are sent P2P.
-- Text input expands vertically for long messages (max 4 lines before scrolling inside input)
-- Send button becomes active when input is non-empty
+**Slint files:** `ui/screens/chat_view.slint`, `ui/components/message_bubble.slint`, `ui/components/chat_input.slint`
 
 ---
 
@@ -443,16 +384,9 @@ Mobile uses a **stack-based navigation model** — one screen at a time, with a 
 │───────────────────────────────────│
 │                                   │
 │  ┌─────────────────────────┐      │
-│  │ Eric O.                 │      │  ← sender name above bubble (group only)
-│  │ pushed the build, check │      │
-│  │ the repo                │      │
+│  │ Eric O.                 │      │
+│  │ pushed the build        │      │
 │  │                   15:02 │      │
-│  └─────────────────────────┘      │
-│                                   │
-│  ┌─────────────────────────┐      │
-│  │ Shedrack G.             │      │
-│  │ on it, building now     │      │
-│  │                   15:04 │      │
 │  └─────────────────────────┘      │
 │                                   │
 │      ┌─────────────────────────┐  │
@@ -465,24 +399,18 @@ Mobile uses a **stack-based navigation model** — one screen at a time, with a 
 └───────────────────────────────────┘
 ```
 
-**Differences from 1:1:**
-- Sender name shown above each incoming bubble (since multiple senders)
-- Header shows member count and transport mode (`gossip swarm`)
-- No per-message delivery receipts for group (gossip is broadcast — no per-recipient ACK)
-- `[···]` → Group options: member list, your key in this group, leave group, invite member
+**Differences from 1:1:** Sender name above each incoming bubble. Header shows member count and `gossip swarm`. No per-message delivery receipts — gossip is broadcast with no per-recipient ACK.
+
+**Slint file:** `ui/screens/group_view.slint`
 
 ---
 
 ### 4.4 Mobile Add Contact Flow
 
-Triggered by tapping `[+]` on the chat list.
-
 ```
 ┌───────────────────────────────────┐
 │  ←   Add Contact                  │
 │───────────────────────────────────│
-│                                   │
-│   How do you want to add them?    │
 │                                   │
 │  ┌───────────────────────────┐    │
 │  │    📷  Scan their QR code │    │
@@ -495,40 +423,15 @@ Triggered by tapping `[+]` on the chat list.
 └───────────────────────────────────┘
 ```
 
-**QR scan path:** Opens camera, scans NodeId QR, previews "Add Shedrack G.?" → confirm → added to local phonebook, connection attempt begins.
+**QR path:** Camera opens → scans NodeId → "Add Shedrack G.?" confirmation → added to phonebook, connection attempt fires.
 
-**Manual Node ID path:**
+**Manual path:** Paste NodeId → assign local name → Add Contact → immediate connection attempt.
 
-```
-┌───────────────────────────────────┐
-│  ←   Enter Node ID                │
-│───────────────────────────────────│
-│                                   │
-│  Paste their Node ID below:       │
-│                                   │
-│  ┌───────────────────────────┐    │
-│  │  nBq3...Kx7R         [📋] │    │
-│  └───────────────────────────┘    │
-│                                   │
-│  Give them a name (local only):   │
-│  ┌───────────────────────────┐    │
-│  │  e.g. Eric               │    │
-│  └───────────────────────────┘    │
-│                                   │
-│  ┌───────────────────────────┐    │
-│  │       Add Contact         │    │
-│  └───────────────────────────┘    │
-│                                   │
-└───────────────────────────────────┘
-```
-
-After adding: a connection attempt fires immediately. If the peer is online, a handshake completes and they appear with a green online indicator. If offline, they appear in the contact list grayed out with "Offline" until their node is discovered via Pkarr.
+**Slint file:** `ui/screens/add_contact.slint`
 
 ---
 
 ### 4.5 Mobile Key Verification Screen
-
-Accessible from chat `[···]` → "Verify contact's key"
 
 ```
 ┌───────────────────────────────────┐
@@ -537,9 +440,6 @@ Accessible from chat `[···]` → "Verify contact's key"
 │                                   │
 │  Compare these numbers with Eric  │
 │  in person or via another channel.│
-│                                   │
-│  If they match, your conversation │
-│  is secure and unmodified.        │
 │                                   │
 │  ┌────────┬────────┬────────┐     │
 │  │ 47821  │ 90134  │ 22871  │     │
@@ -556,15 +456,15 @@ Accessible from chat `[···]` → "Verify contact's key"
 │  └─────────────────────────────┘  │
 │                                   │
 │       Numbers don't match?        │
-│  Someone may be intercepting this │
-│  conversation. Do not continue.   │
+│  Someone may be intercepting.     │
+│  Do not continue.                 │
 │                                   │
 └───────────────────────────────────┘
 ```
 
-Once marked verified:
-- Contact gets a green `Verified` badge in chat header and contact list
-- System message appears in the chat: `--- You verified Eric's identity ---`
+On verification: green `Verified` badge in chat header and contact list. System message in chat: `--- You verified Eric's identity ---`.
+
+**Slint file:** `ui/screens/verify_key.slint`
 
 ---
 
@@ -574,189 +474,147 @@ Once marked verified:
 ┌───────────────────────────────────┐
 │  ←   Settings                     │
 │───────────────────────────────────│
-│                                   │
 │  IDENTITY                         │
-│  ┌───────────────────────────┐    │
-│  │  Display Name: Shedrack G.│    │
-│  │  Node ID: nBq3…Kx7R  [↗] │    │
-│  │  Show QR Code             │    │
-│  └───────────────────────────┘    │
+│  Display Name: Shedrack G.        │
+│  Node ID: nBq3…Kx7R  [↗] [QR]   │
 │                                   │
 │  SECURITY                         │
-│  ┌───────────────────────────┐    │
-│  │  App Password         [>] │    │
-│  │  Biometric Unlock     [>] │    │
-│  └───────────────────────────┘    │
+│  App Password                 [>] │
+│  Biometric Unlock             [>] │
 │                                   │
 │  PRIVACY                          │
-│  ┌───────────────────────────┐    │
-│  │  Default ephemeral timer  │    │
-│  │  [Off ▾]                  │    │
-│  │  Read receipts    [ON  ●] │    │
-│  └───────────────────────────┘    │
+│  Default ephemeral timer  [Off ▾] │
+│  Read receipts         [ON ●]     │
 │                                   │
 │  NETWORK                          │
-│  ┌───────────────────────────┐    │
-│  │  Connection status        │    │
-│  │  8 peers · 1 via relay    │    │
-│  │  Node address: [View]     │    │
-│  └───────────────────────────┘    │
+│  8 peers · 1 via relay            │
+│  Node address: [View]             │
 │                                   │
 │  DANGER ZONE                      │
-│  ┌───────────────────────────┐    │
-│  │  Clear all messages   [>] │    │
-│  │  Delete identity      [>] │    │
-│  └───────────────────────────┘    │
+│  Clear all messages           [>] │
+│  Delete identity              [>] │
 │                                   │
 └───────────────────────────────────┘
 ```
+
+**Slint file:** `ui/screens/settings.slint`
 
 ---
 
 ## 5. Desktop Layout & Navigation
 
-Desktop uses a **persistent multi-panel layout**. The user can see contacts AND active chat simultaneously because the screen has the space for it. There is no navigation stack — panels update in place.
+Desktop uses a **persistent two-panel layout**. Contacts panel always visible on the left. Active chat fills the right panel. No navigation stack — panels update in place.
 
-### 5.1 Desktop Layout Overview (Two-Panel)
+### 5.1 Desktop — Empty State
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  NodeChat    [•] Connected · 8 peers · 1 relay      [≡] Settings │
 ├──────────────┬───────────────────────────────────────────────────┤
-│  CONTACTS    │                                                   │
-│  ─────────── │                                                   │
 │  🔍 Search…  │                                                   │
-│              │            Select a chat                          │
-│  Eric O.     │            to start messaging.                    │
-│  ✓ Verified  │                                                   │
-│  12:41 ✓✓   │                                                   │
+│──────────────│         Select a chat to start messaging.         │
+│  Eric O.     │                                                   │
+│  ✓  12:41 ✓✓│                                                   │
 │              │                                                   │
 │  Mama        │                                                   │
 │  ⏳ Queued   │                                                   │
-│  09:12       │                                                   │
 │              │                                                   │
-│  [Group]     │                                                   │
 │  Project Grp │                                                   │
 │  15:04       │                                                   │
-│              │                                                   │
-│  ──────────  │                                                   │
+│──────────────│                                                   │
 │  [+] New     │                                                   │
 │  [⊕] Group   │                                                   │
 └──────────────┴───────────────────────────────────────────────────┘
 ```
 
-**Left panel (fixed, ~260px):**
-- App title and global network status in the top bar
-- Search input at the top
-- Scrollable contact list: 1:1 contacts and groups mixed, sorted by last activity
-- `[+] New chat` and `[⊕] New group` at the bottom
-- `[≡] Settings` in the top-right corner of the bar
+**Left panel (~260px fixed):** App title bar with global network status. Search. Scrollable contact + group list sorted by last activity. New chat and new group buttons at the bottom.
 
-**Right panel (fills remaining width):**
-- Empty state with prompt when no chat is selected
-- Active chat when a contact is selected
+**Right panel (fills remaining width):** Empty state until a chat is selected.
 
 ---
 
-### 5.2 Desktop Active Chat (1:1)
+### 5.2 Desktop — Active Chat (1:1)
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  NodeChat    [•] Connected · 8 peers · 1 relay      [≡] Settings │
 ├──────────────┬───────────────────────────────────────────────────┤
-│  CONTACTS    │  [AV] Eric O.                 [Verify] [···]      │
-│  ─────────── │  0xAF3B…C72E · direct · 🔒                        │
-│  🔍 Search…  │  ─────────────────────────────────────────────────│
-│              │                                                   │
-│  ► Eric O.   │           Tuesday, 29 Mar                         │
-│  ✓ 12:41 ✓✓ │                                                   │
+│  🔍 Search…  │  [AV] Eric O.                 [Verify] [···]      │
+│──────────────│  0xAF3B…C72E · direct · 🔒                        │
+│  ► Eric O.   │  ─────────────────────────────────────────────────│
+│  ✓  12:41 ✓✓│                                                   │
 │              │  ┌────────────────────────────┐                   │
 │  Mama        │  │ yo I pushed the ref doc    │                   │
-│  ⏳ Queued   │  │ to the repo                │                   │
-│  09:12       │  │                      12:38 │                   │
+│  ⏳ Queued   │  │                      12:38 │                   │
 │              │  └────────────────────────────┘                   │
 │  Project Grp │                                                   │
 │  15:04       │          ┌────────────────────────────┐           │
 │              │          │ received it, reviewing     │           │
-│              │          │ phase 2 now                │           │
 │              │          │ 12:40                  ✓✓ │           │
 │              │          └────────────────────────────┘           │
 │              │                                                   │
 │              │  --- Key ratcheted · session #85 ---              │
-│              │                                                   │
 │              │  ─────────────────────────────────────────────────│
 │  [+] New     │  [📎]  Type a message…                    [Send]  │
 │  [⊕] Group   │                                                   │
 └──────────────┴───────────────────────────────────────────────────┘
 ```
 
-**Desktop-specific additions:**
-- `[Verify]` button is always visible in the chat header (not buried in a menu) because screen space allows it
-- Right panel header shows full fingerprint and connection mode persistently
-- The left panel highlights the active chat with a subtle background accent
-- Keyboard shortcut: `Enter` sends, `Shift+Enter` for newlines
-- `Ctrl+K` opens search (focuses the search box in the left panel)
+**Desktop-only additions:**
+- `[Verify]` button always visible in the chat header (not buried in a menu)
+- Full key fingerprint and connection mode persistent in the subheader
+- `Enter` sends. `Shift+Enter` for newlines.
+- `Ctrl+K` focuses the search box in the left panel
 
 ---
 
-### 5.3 Desktop Settings (Right-Panel Modal)
+### 5.3 Desktop — Settings Panel
 
-On desktop, settings open as a right-side panel replacing the chat panel rather than a separate screen. This keeps the contact list visible.
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  NodeChat    [•] Connected · 8 peers · 1 relay      [≡] Settings │
-├──────────────┬───────────────────────────────────────────────────┤
-│  CONTACTS    │  Settings                              [✕ Close]  │
-│  ─────────── │  ─────────────────────────────────────────────────│
-│  🔍 Search…  │                                                   │
-│              │  IDENTITY                                         │
-│  Eric O.     │  ┌───────────────────────────────────────┐        │
-│  Mama        │  │  Display Name    Shedrack G.    [Edit] │        │
-│  Project Grp │  │  Node ID         nBq3…Kx7R      [Copy] │       │
-│              │  │                                [Show QR]│       │
-│              │  └───────────────────────────────────────┘        │
-│              │                                                   │
-│              │  SECURITY                                         │
-│              │  ┌───────────────────────────────────────┐        │
-│              │  │  App Password                  [Change]│        │
-│              │  └───────────────────────────────────────┘        │
-│              │                                                   │
-│              │  PRIVACY                                          │
-│              │  ┌───────────────────────────────────────┐        │
-│              │  │  Default ephemeral timer      [Off  ▾] │       │
-│              │  │  Read receipts              [●──── ON] │       │
-│              │  └───────────────────────────────────────┘        │
-│              │                                                   │
-│              │  NETWORK STATUS                                   │
-│              │  ┌───────────────────────────────────────┐        │
-│              │  │  Peers: 8 direct · 1 via relay        │        │
-│              │  │  Health: ████████░░ 80%               │        │
-│              │  │  Your node address: [View full]       │        │
-│              │  └───────────────────────────────────────┘        │
-│              │                                                   │
-│  [+] New     │  ─────────────────────────────────────────────────│
-│  [⊕] Group   │  DANGER ZONE   [Clear messages] [Delete identity] │
-└──────────────┴───────────────────────────────────────────────────┘
-```
-
----
-
-### 5.4 Desktop Add Contact / New Group
-
-Also opens as a right-panel overlay, not a modal popup that blocks the whole window.
+Settings open as the right panel replacing the chat view. Contact list stays visible.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  NodeChat    [•] Connected                          [≡] Settings │
 ├──────────────┬───────────────────────────────────────────────────┤
-│  CONTACTS    │  Add Contact                           [✕ Close]  │
-│  ─────────── │  ─────────────────────────────────────────────────│
-│  🔍 Search…  │                                                   │
-│              │  Paste their Node ID:                             │
-│  Eric O.     │  ┌──────────────────────────────────────────┐     │
-│  Mama        │  │  nBq3...Kx7R                        [📋] │     │
-│  Project Grp │  └──────────────────────────────────────────┘     │
+│  🔍 Search…  │  Settings                              [✕ Close]  │
+│──────────────│  ─────────────────────────────────────────────────│
+│  Eric O.     │  IDENTITY                                         │
+│  Mama        │  Display Name    Shedrack G.            [Edit]    │
+│  Project Grp │  Node ID         nBq3…Kx7R    [Copy] [Show QR]   │
+│              │                                                   │
+│              │  SECURITY                                         │
+│              │  App Password                          [Change]   │
+│              │                                                   │
+│              │  PRIVACY                                          │
+│              │  Default ephemeral timer            [Off     ▾]   │
+│              │  Read receipts                    [●────── ON]    │
+│              │                                                   │
+│              │  NETWORK STATUS                                   │
+│              │  Peers: 8 direct · 1 via relay                    │
+│              │  Health: ████████░░ 80%                           │
+│              │  Your node address: [View full]                   │
+│              │                                                   │
+│  [+] New     │  ─────────────────────────────────────────────────│
+│  [⊕] Group   │  DANGER ZONE  [Clear messages]  [Delete identity] │
+└──────────────┴───────────────────────────────────────────────────┘
+```
+
+---
+
+### 5.4 Desktop — Add Contact Panel
+
+Opens as the right panel, not a blocking modal.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  NodeChat    [•] Connected                          [≡] Settings │
+├──────────────┬───────────────────────────────────────────────────┤
+│  🔍 Search…  │  Add Contact                           [✕ Close]  │
+│──────────────│                                                   │
+│  Eric O.     │  Paste their Node ID:                             │
+│  Mama        │  ┌──────────────────────────────────────────┐     │
+│  Project Grp │  │  nBq3...Kx7R                        [📋] │     │
+│              │  └──────────────────────────────────────────┘     │
 │              │                                                   │
 │              │  Give them a local name:                          │
 │              │  ┌──────────────────────────────────────────┐     │
@@ -772,7 +630,6 @@ Also opens as a right-panel overlay, not a modal popup that blocks the whole win
 │              │  ┌──────────────────────────────────────────┐     │
 │              │  │            Add Contact                   │     │
 │              │  └──────────────────────────────────────────┘     │
-│              │                                                   │
 │  [+] New     │                                                   │
 │  [⊕] Group   │                                                   │
 └──────────────┴───────────────────────────────────────────────────┘
@@ -782,95 +639,84 @@ Also opens as a right-panel overlay, not a modal popup that blocks the whole win
 
 ## 6. Screen-by-Screen Reference
 
-A complete map of every screen in the application.
-
 ### First Launch Screens (run once)
-| ID | Screen | Trigger |
-|---|---|---|
-| FL-01 | Welcome | App first install |
-| FL-02 | Set Display Name | After FL-01 |
-| FL-03 | Generating Identity | After FL-02 confirmed |
-| FL-04 | Your NodeId / QR | After keypair generated |
-| FL-05 | Set Local Password (optional) | After FL-04 |
+| ID | Screen | Slint File | Trigger |
+|---|---|---|---|
+| FL-01 | Welcome | `screens/welcome.slint` | App first install |
+| FL-02 | Set Display Name | `screens/setup_name.slint` | After FL-01 |
+| FL-03 | Generating Identity | `screens/setup_name.slint` (loading state) | After FL-02 confirmed |
+| FL-04 | Your NodeId / QR | `screens/identity_card.slint` | After keypair generated |
+| FL-05 | Set Local Password (optional) | `screens/settings.slint` (onboarding state) | After FL-04 |
 
 ### Returning User Screens
-| ID | Screen | Trigger |
-|---|---|---|
-| RU-01 | Password Gate | App launch, if password set |
-| RU-01B | Direct Load | App launch, no password |
+| ID | Screen | Slint File | Trigger |
+|---|---|---|---|
+| RU-01 | Password Gate | `screens/welcome.slint` (locked state) | App launch, password set |
+| RU-01B | Direct Load | — | App launch, no password |
 
 ### Main Navigation
-| ID | Screen | Platform |
-|---|---|---|
-| MN-01 | Chat List | Mobile (home tab) |
-| MN-02 | Contacts List | Mobile (contacts tab) / Desktop (left panel) |
-| MN-03 | Settings | Mobile (settings tab) / Desktop (right panel) |
+| ID | Screen | Slint File | Platform |
+|---|---|---|---|
+| MN-01 | Chat List | `screens/chat_list.slint` | Mobile (home tab) |
+| MN-02 | Contacts List | `screens/contacts.slint` | Mobile (contacts tab) / Desktop (left panel) |
+| MN-03 | Settings | `screens/settings.slint` | Mobile (settings tab) / Desktop (right panel) |
 
 ### Chat Screens
-| ID | Screen | Trigger |
-|---|---|---|
-| CH-01 | 1:1 Chat | Tap a direct contact |
-| CH-02 | Group Chat | Tap a group |
-| CH-03 | Chat Options Sheet | Tap `[···]` in any chat |
-| CH-04 | Key Verification | Chat options → Verify |
-| CH-05 | File Transfer | Attach and send a file |
-| CH-06 | Ephemeral Timer Config | Chat options → Set timer |
+| ID | Screen | Slint File | Trigger |
+|---|---|---|---|
+| CH-01 | 1:1 Chat | `screens/chat_view.slint` | Tap a direct contact |
+| CH-02 | Group Chat | `screens/group_view.slint` | Tap a group |
+| CH-03 | Chat Options Sheet | inline component in `chat_view.slint` | Tap `[···]` |
+| CH-04 | Key Verification | `screens/verify_key.slint` | Chat options → Verify |
+| CH-05 | File Transfer | inline in `chat_view.slint` | Tap `[📎]` |
+| CH-06 | Ephemeral Timer Config | inline popup in `chat_view.slint` | Chat options → Set timer |
 
 ### Contact Screens
-| ID | Screen | Trigger |
-|---|---|---|
-| CO-01 | Add Contact | Tap `[+]` |
-| CO-02 | Contact Info Sheet | Tap contact avatar in chat |
-| CO-03 | New Group | Tap `[⊕]` |
-| CO-04 | Group Info / Members | Chat options → Members |
-| CO-05 | Invite to Group | Group info → Invite |
+| ID | Screen | Slint File | Trigger |
+|---|---|---|---|
+| CO-01 | Add Contact | `screens/add_contact.slint` | Tap `[+]` |
+| CO-02 | Contact Info Sheet | inline popup in `chat_view.slint` | Tap avatar in chat |
+| CO-03 | New Group | inline in `contacts.slint` | Tap `[⊕]` |
+| CO-04 | Group Info / Members | inline popup in `group_view.slint` | Chat options → Members |
+| CO-05 | Invite to Group | inline in `group_view.slint` | Group info → Invite |
 
 ### System Screens
-| ID | Screen | Trigger |
-|---|---|---|
-| SY-01 | Network Status Detail | Tap the status dot |
-| SY-02 | E2EE Info Sheet | Tap the lock icon in chat |
-| SY-03 | Danger Zone Confirm | Settings → Delete identity |
+| ID | Screen | Slint File | Trigger |
+|---|---|---|---|
+| SY-01 | Network Status Detail | `components/status_dot.slint` popup | Tap status dot |
+| SY-02 | E2EE Info Sheet | inline popup in `chat_view.slint` | Tap 🔒 |
+| SY-03 | Danger Zone Confirm | inline dialog in `settings.slint` | Settings → destructive action |
 
 ---
 
 ## 7. Shared UI Components
 
-These components appear across both mobile and desktop and must behave identically.
-
-### 7.1 Message Bubble
+### 7.1 Message Bubble (`ui/components/message_bubble.slint`)
 
 | State | Visual |
 |---|---|
-| Sending | Bubble renders immediately, faded slightly, `sending…` in place of timestamp |
-| Routing | Full opacity, `routing…` italic beside timestamp |
-| Sent | Single tick `✓` |
-| Delivered | Double tick `✓✓` |
-| Queued | `⏳ queued` shown as subtle tag, amber colour |
-| Ephemeral | Timer tag at top of bubble; turns red when < 1 hour remaining |
+| Sending | Bubble visible, reduced opacity, `sending…` in place of timestamp |
+| Routing | Full opacity, `routing…` italic |
+| Sent | `✓` |
+| Delivered | `✓✓` |
+| Queued | `⏳ queued` amber tag |
+| Ephemeral | `⏱` timer tag at top; red when < 1 hour remaining |
 
-### 7.2 Contact Row
+Slint properties: `in property <string> text`, `in property <bool> is-mine`, `in property <string> status`, `in property <bool> is-ephemeral`, `in property <int> ttl-seconds`.
 
-Always shows:
-- Avatar (initials, coloured deterministically from NodeId hash — same contact always has same colour)
-- Display name
-- Verification badge: `✓ Verified` (green) or `⚠ Unverified` (amber) or nothing
-- Last message preview or queue status
-- Timestamp of last activity
-- Unread count badge (if applicable)
-- Online indicator dot: green (direct), amber (relay), gray (offline)
+### 7.2 Contact Row (`ui/components/contact_row.slint`)
 
-### 7.3 Network Status Dot
+Always shows: Avatar (initials, background colour derived deterministically from NodeId). Display name. Verification badge (`✓ Verified` green / `⚠ Unverified` amber). Last message preview or queue status. Timestamp. Unread count badge. Online indicator dot (green direct / amber relay / gray offline).
 
-Three states only:
-- 🟢 Green: at least one direct peer connected
-- 🟡 Amber: connected, but all peers via relay (reduced privacy)
-- 🔴 Red: no network, all messages will queue
+### 7.3 Network Status Dot (`ui/components/status_dot.slint`)
 
-Tapping the dot on either platform opens a detail sheet showing:
+Three states:
+- Green: at least one direct peer
+- Amber: all peers via relay (reduced privacy)
+- Red: offline
+
+Tap/click opens a popup:
 ```
-Network Status
-───────────────
 Direct peers:     7
 Relay peers:      1  (reduced privacy)
 Queued messages:  2
@@ -878,70 +724,88 @@ Node uptime:      4m 32s
 Your address:     [View full NodeAddr]
 ```
 
-### 7.4 System Event Row (In Chat)
+### 7.4 System Event Row (inline in `chat_view.slint`)
 
 ```
 ─────  Session started · Forward Secrecy active  ─────
 ```
+Centered, `text-tertiary` colour, no interaction, no avatar, no timestamp.
 
-- Centered, muted text colour
-- No avatar, no timestamp, no interaction
-- Used for: session start, key ratchet events, key verification, member join/leave (groups)
-
-### 7.5 E2EE Info Sheet
-
-Appears when user taps the 🔒 lock icon in any chat header.
+### 7.5 E2EE Info Sheet (inline popup in `chat_view.slint`)
 
 ```
-┌──────────────────────────────────┐
-│  🔒  End-to-End Encrypted         │
-│──────────────────────────────────│
-│                                  │
-│  Messages in this chat are       │
-│  encrypted before leaving your   │
-│  device. Only you and Eric can   │
-│  read them.                      │
-│                                  │
-│  Encryption:  ChaCha20-Poly1305  │
-│  Key exchange: X25519 DH         │
-│  Forward secrecy: Hash ratchet   │
-│  Connection:  Direct P2P         │
-│                                  │
-│  Eric's key fingerprint:         │
-│  0xAF3B C72E 991D 04F2 ...       │
-│                                  │
-│  [ Verify key with Eric → ]      │
-│                                  │
-└──────────────────────────────────┘
+🔒  End-to-End Encrypted
+
+Messages are encrypted before leaving your device.
+Only you and Eric can read them.
+
+Encryption:       ChaCha20-Poly1305
+Key exchange:     X25519 DH
+Forward secrecy:  Hash ratchet
+Connection:       Direct P2P
+
+Eric's fingerprint: 0xAF3B C72E 991D 04F2 ...
+
+[ Verify key with Eric → ]
 ```
 
 ---
 
-## 8. UX Decisions & Rationale
+## 8. Slint Implementation Notes
+
+These notes apply to everyone writing `.slint` files in `ui/`.
+
+**SL-01. Colour tokens are global constants in `ui/app.slint`.**
+Never hardcode hex values in component files. Always reference the global tokens: `AppTheme.accent`, `AppTheme.surface-primary`, etc.
+
+**SL-02. Every screen is a separate `.slint` component file.**
+One screen = one file in `ui/screens/`. Every reusable piece = one file in `ui/components/`. `ui/app.slint` imports them all and routes between them via a `current-screen` property.
+
+**SL-03. Screen routing is controlled from Rust.**
+The `.slint` root defines an `in-out property <int> current-screen` (or an enum equivalent). Rust code in `src/ui/mod.rs` sets this property to navigate. `.slint` files do not navigate themselves.
+
+**SL-04. Callbacks are named clearly and documented in the `.slint` file.**
+Every `callback` in a `.slint` file has a comment explaining when it fires and what the Rust side is expected to do with it.
+
+```slint
+// Fired when the user presses Send or hits Enter in the text input.
+// Rust: sends Command::SendDirectMessage to the backend worker.
+callback send-message(string);
+```
+
+**SL-05. ListView is used for all scrollable message lists.**
+Slint's `ListView` with a `StandardListView`-style model handles virtualization correctly for long chat histories. Do not use a `for` loop over a `VerticalBox` for message lists — it does not virtualize and will degrade with long histories.
+
+**SL-06. Animations use Slint's built-in `animate` keyword.**
+Do not use manual timer-based animation. Use `animate property { duration: 200ms; easing: ease-in-out; }` on state transitions.
+
+---
+
+## 9. UX Decisions & Rationale
+
+### Why Slint over egui for this UX?
+Slint's declarative `.slint` markup produces genuinely polished, consumer-grade interfaces with far less code than egui's immediate-mode API. Chat bubble layout, list scrolling, and state-driven animations are natural in Slint. The separation between `.slint` (what it looks like) and `src/ui/` (how it connects) also enforces clean separation of concerns — the UX designer and the Rust engineer can work in parallel without stepping on each other.
 
 ### Why no profile photos?
-Profile photos require either: (a) a central server to host them, or (b) P2P file transfer on every contact add. Both are complexity the project doesn't need. Deterministic avatar colours (derived from the NodeId hash) give visual identity without storage overhead.
+Profile photos require either: (a) a central server to host them, or (b) P2P file transfer on every contact add. Both are unnecessary complexity. Deterministic avatar colours (derived from NodeId hash) give visual identity without storage overhead.
 
-### Why show the key fingerprint in the chat header?
-Users should be able to verify they are talking to who they think they are without hunting through menus. Showing the truncated fingerprint persistently — and making full verification one tap away — normalises security practices rather than hiding them.
+### Why show the key fingerprint in the chat header persistently?
+Users should be able to verify who they are talking to without hunting through menus. Showing the truncated fingerprint in the header — and making full verification one tap away — normalises security practices rather than hiding them.
 
-### Why the "queued" state is visible and explicit?
-A message that is silently "stuck" feels like a broken app. A message that clearly says `⏳ queued · will send when Eric is online` feels like a trustworthy system doing its job. The honesty builds confidence in the product rather than eroding it.
+### Why is the "queued" state visible and explicit?
+A message that is silently stuck feels like a broken app. A message that clearly says `⏳ queued · will send when Eric is online` feels like a trustworthy system doing its job. The honesty builds confidence in the product.
 
-### Why no camera for file attachments on mobile (in scope)?
-The camera integration requires `cargo-apk` permission handling and Android media APIs that add significant complexity. File picker (documents, images from gallery) achieves the same result with far less risk. Camera is a documented future extension.
+### Why no camera for file attachments?
+Camera integration requires platform permission handling and media APIs that add significant complexity. File picker (documents, images from gallery) achieves the same result with far less risk. Camera is a documented future extension.
 
-### Why immediate-mode UI doesn't show loading spinners everywhere?
-egui's immediate-mode model means the UI is always rendering from local state. When the backend fetches something, the cached state is shown immediately and updates when the event arrives — this is inherently more responsive than a loading spinner pattern. The only spinners used are for first-launch identity generation and the password gate, both of which are genuine blocking operations.
+### Why is the desktop left panel fixed-width?
+A resizable panel adds drag-state, min/max constraints, and persistence complexity not worth the effort for a project demonstrating networking and cryptographic architecture. Fixed-width keeps the Slint layout predictable.
 
-### Why the desktop left panel is fixed-width not resizable?
-A resizable panel adds implementation complexity (drag state, min/max constraints, persistence) that is not worth the effort for a project that is primarily demonstrating networking and cryptographic architecture. Fixed-width keeps the egui layout code simple and predictable.
-
-### Why groups have no per-message delivery receipts?
-Gossip protocol is broadcast — there is no per-recipient acknowledgment at the application level without implementing a complex ACK layer on top of gossip. Single-chat delivery receipts work because there is one recipient. For groups, "sent to swarm" is the meaningful state. Showing false `✓✓` marks that might mean "one person got it" would be dishonest.
+### Why no per-message delivery receipts for groups?
+Gossip protocol is broadcast — there is no per-recipient ACK at the application level without implementing a complex separate ACK layer over gossip. For groups, "broadcast to swarm" is the meaningful delivery state. Showing `✓✓` that might mean "one person got it" would be dishonest.
 
 ---
 
-*Last Updated: 2026-03-30*  
-*Project: NodeChat — Secure Decentralized Chat*  
-*Document: UX Flow & Interface Design v1.0*
+*Last Updated: 2026-03-30*
+*Project: NodeChat — Secure Decentralized Chat*
+*Document: UX Flow & Interface Design v1.2 — Latest Crate Versions*

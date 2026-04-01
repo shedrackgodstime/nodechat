@@ -1,0 +1,230 @@
+import { AppTheme } from "../theme.slint";
+import { ScrollView } from "std-widgets.slint";
+
+// AddContactScreen — Clean Discovery UI
+// Simplified for better focus and vertically centered QR actions.
+
+export component AddContactScreen inherits Rectangle {
+    in-out property <string> node-id-input: "";
+    in-out property <string> display-name-input: "";
+    in property <bool> is-desktop: false;
+    in property <length> safe-area-top: 0px;
+
+    callback add-contact(string, string);
+    callback go-back();
+    callback scan-qr();
+
+    background: AppTheme.surface-primary;
+
+    property <bool> can-add: node-id-input.character-count > 8 && display-name-input.character-count >= 1;
+
+    VerticalLayout {
+        padding: 0;
+        spacing: 0;
+
+        // --- Clean Header ──────────────────────────────────
+        Rectangle {
+            height: (is-desktop ? 64px : 72px) + root.safe-area-top;
+            background: AppTheme.surface-secondary;
+            
+            Rectangle {
+                y: parent.height - 1px;
+                width: 100%; height: 1px;
+                background: AppTheme.divider; 
+            }
+
+            HorizontalLayout {
+                y: root.safe-area-top;
+                height: is-desktop ? 64px : 72px;
+                padding-left: 12px;
+                padding-right: 16px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+
+                    if !is-desktop: VerticalLayout {
+                        alignment: center;
+                        TouchArea {
+                            width: 32px; height: 32px;
+                            clicked => { root.go-back(); }
+                            Text { text: "←"; font-size: 22px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: "Add Contact";
+                            font-size: 18px; font-weight: 700;
+                            color: AppTheme.text-primary;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                if is-desktop: VerticalLayout {
+                    alignment: center;
+                    TouchArea {
+                        width: 44px; height: 44px;
+                        clicked => { root.go-back(); }
+                        Text { text: "✕"; font-size: 20px; color: AppTheme.text-secondary; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
+
+        // --- Simplified Body ──────────────────────────────────────────
+        ScrollView {
+            vertical-stretch: 1;
+            mouse-drag-pan-enabled: true;
+
+            HorizontalLayout {
+                alignment: start; // Standardized Left Align
+                
+                VerticalLayout {
+                    max-width: 600px;
+                    horizontal-stretch: 1;
+                    padding: 16px;
+                    padding-top: 24px;
+                    spacing: 16px; 
+                    alignment: start;
+
+                    // --- SECTION: IDENTITY SCAN ---
+                    VerticalLayout {
+                        spacing: 10px;
+                        Text { text: "PEER DISCOVERY"; font-size: 11px; font-weight: 700; color: AppTheme.text-tertiary; letter-spacing: 0.5px; }
+                        
+                        Rectangle {
+                            border-radius: 18px;
+                            background: AppTheme.surface-secondary;
+                            
+                            VerticalLayout {
+                                padding: 16px;
+                                spacing: 16px;
+
+                                // QR Scanner CTA
+                                TouchArea {
+                                    height: 56px;
+                                    clicked => { root.scan-qr(); }
+                                    Rectangle {
+                                        border-radius: 14px;
+                                        background: AppTheme.surface-tertiary;
+                                        HorizontalLayout {
+                                            alignment: center;
+                                            spacing: 12px;
+                                            Text { text: "📸"; font-size: 18px; vertical-alignment: center; }
+                                            Text {
+                                                text: is-desktop ? "Open Webcam Scanner" : "Scan QR Code";
+                                                font-size: 16px; font-weight: 700; color: AppTheme.accent;
+                                                vertical-alignment: center; // FIXED: Centered text
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text { text: "OR ENTER NODE ID"; font-size: 10px; font-weight: 800; color: AppTheme.text-tertiary; horizontal-alignment: center; }
+
+                                // Node ID Input
+                                Rectangle {
+                                    height: 52px;
+                                    border-radius: 12px;
+                                    background: AppTheme.surface-tertiary;
+                                    border-width: 1px;
+                                    border-color: id-input.has-focus ? AppTheme.accent : transparent;
+
+                                    HorizontalLayout {
+                                        padding-left: 14px; padding-right: 14px;
+                                        id-input := TextInput {
+                                            text <=> root.node-id-input;
+                                            font-size: 14px; color: AppTheme.text-primary;
+                                            vertical-alignment: center; single-line: true; font-family: "monospace";
+                                        }
+                                    }
+
+                                    if id-input.text == "": Text {
+                                        padding-left: 14px; height: parent.height;
+                                        text: "nBq3p...Kx7R"; font-size: 14px;
+                                        color: AppTheme.text-tertiary; vertical-alignment: center; opacity: 0.4;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // --- SECTION: LOCAL SETTINGS ---
+                    VerticalLayout {
+                        spacing: 10px;
+                        Text { text: "LOCAL SETTINGS"; font-size: 11px; font-weight: 700; color: AppTheme.text-tertiary; letter-spacing: 0.5px; }
+
+                        Rectangle {
+                            border-radius: 18px;
+                            background: AppTheme.surface-secondary;
+                            
+                            VerticalLayout {
+                                padding: 16px;
+                                spacing: 12px;
+                                
+                                Rectangle {
+                                    height: 52px;
+                                    border-radius: 12px;
+                                    background: AppTheme.surface-tertiary;
+                                    border-width: 1px;
+                                    border-color: name-input.has-focus ? AppTheme.accent : transparent;
+
+                                    HorizontalLayout {
+                                        padding-left: 14px; padding-right: 14px;
+                                        name-input := TextInput {
+                                            text <=> root.display-name-input;
+                                            font-size: 16px; color: AppTheme.text-primary;
+                                            vertical-alignment: center; single-line: true;
+                                        }
+                                    }
+
+                                    if name-input.text == "": Text {
+                                        padding-left: 14px; height: parent.height;
+                                        text: "Friend's name (e.g. Satoshi)"; font-size: 15px;
+                                        color: AppTheme.text-tertiary; vertical-alignment: center; opacity: 0.4;
+                                    }
+                                }
+                                
+                                Text { 
+                                    text: "Private name, stored locally only."; 
+                                    font-size: 10px; color: AppTheme.text-tertiary; horizontal-alignment: right;
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle { vertical-stretch: 1; }
+
+                    // --- FINAL ACTION ---
+                    Rectangle {
+                        height: 60px;
+                        border-radius: 20px;
+                        background: can-add ? AppTheme.accent : AppTheme.surface-tertiary;
+
+                        TouchArea {
+                            enabled: root.can-add;
+                            clicked => { root.add-contact(root.node-id-input, root.display-name-input); }
+                            Text {
+                                text: "Add Peer to Phonebook";
+                                font-size: 17px; font-weight: 700;
+                                color: root.can-add ? #FFFFFF : AppTheme.text-tertiary;
+                                horizontal-alignment: center; vertical-alignment: center;
+                            }
+                        }
+                    }
+                    
+                    Text {
+                        text: "Added peers are verified via Pkarr.";
+                        font-size: 11px; color: AppTheme.text-tertiary; horizontal-alignment: center;
+                    }
+                    
+                    Rectangle { height: 16px; }
+                }
+            }
+        }
+    }
+}

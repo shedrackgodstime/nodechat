@@ -1,0 +1,87 @@
+import { AppTheme } from "../theme.slint";
+
+export component StatusDot {
+    in property <int>  direct-peers: 0;
+    in property <int>  relay-peers: 0;
+    in property <bool> is-offline: false;
+    in property <int>  queued-messages: 0;
+
+    property <bool> popup-open: false;
+
+    width: 32px;
+    height: 32px;
+
+    Rectangle {
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        background: AppTheme.surface-secondary; // Outer ring
+        
+        Rectangle {
+            width: 10px; height: 10px;
+            x: 2px; y: 2px;
+            border-radius: 5px;
+            background:
+                is-offline             ? AppTheme.accent-danger   :
+                direct-peers > 0       ? AppTheme.accent-success  :
+                relay-peers  > 0       ? AppTheme.accent-warning  :
+                AppTheme.accent-danger;
+
+            animate background { duration: 300ms; }
+        }
+    }
+
+    TouchArea {
+        clicked => { popup-open = !popup-open; }
+    }
+
+    // Modern Modal-like Status Popup
+    if popup-open: Rectangle {
+        x: -(240px - parent.width); 
+        y: parent.height + 8px;
+        width: 240px;
+        background: AppTheme.surface-tertiary;
+        border-radius: 16px;
+        border-width: 1px;
+        border-color: AppTheme.divider;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #000000A0;
+
+        VerticalLayout {
+            padding: AppTheme.sp-md;
+            spacing: AppTheme.sp-md;
+
+            Text {
+                text: "NETWORK STATUS";
+                font-size: 11px;
+                font-weight: 800;
+                color: AppTheme.text-tertiary;
+                letter-spacing: 0.5px;
+            }
+
+            VerticalLayout {
+                spacing: AppTheme.sp-sm;
+                
+                HorizontalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "Direct Peers"; font-size: 14px; color: AppTheme.text-secondary; horizontal-stretch: 1; }
+                    Text { text: direct-peers; font-size: 14px; color: AppTheme.text-primary; font-weight: 700; }
+                }
+                
+                HorizontalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "Relay Mode"; font-size: 14px; color: AppTheme.text-secondary; horizontal-stretch: 1; }
+                    Text { text: relay-peers; font-size: 14px; color: AppTheme.accent-warning; font-weight: 700; }
+                }
+
+                Rectangle { height: 1px; background: AppTheme.divider; opacity: 0.3; }
+
+                HorizontalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "Outbox Queue"; font-size: 14px; color: AppTheme.text-secondary; horizontal-stretch: 1; }
+                    Text { text: queued-messages; font-size: 14px; color: queued-messages > 0 ? AppTheme.accent-warning : AppTheme.text-primary; font-weight: 700; }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,268 @@
+// NodeChat — Root Application Window
+// Implements UX_FLOW section 5 (Desktop: two-panel) and 4 (Mobile: stack navigation).
+// Screen routing is controlled via current-screen property (set by Rust via src/ui/mod.rs).
+//
+// Screen IDs:
+//   0 = Splash (Logo + Loading)
+//   1 = Welcome / Unlock
+//   2 = SetupName
+//   3 = IdentityCard
+//   4 = ChatList (mobile home / desktop left panel)
+//   5 = ChatView (1:1)
+//   6 = GroupView
+//   7 = AddContact
+//   8 = VerifyKey
+//   9 = Settings
+//   10 = Contacts
+//   11 = SelectMembers
+//   12 = CreateGroup
+
+import { AppTheme } from "./theme.slint";
+import { SplashScreen }      from "./screens/splash.slint";
+import { WelcomeScreen }     from "./screens/welcome.slint";
+import { SetupNameScreen }    from "./screens/setup_name.slint";
+import { IdentityCardScreen } from "./screens/identity_card.slint";
+import { ChatListScreen }     from "./screens/chat_list.slint";
+import { ChatViewScreen }     from "./screens/chat_view.slint";
+import { GroupViewScreen }    from "./screens/group_view.slint";
+import { AddContactScreen }   from "./screens/add_contact.slint";
+import { VerifyKeyScreen }    from "./screens/verify_key.slint";
+import { SettingsScreen }     from "./screens/settings.slint";
+import { ContactsScreen }     from "./screens/contacts.slint";
+import { SelectMembersScreen } from "./screens/select_members.slint";
+import { CreateGroupScreen }  from "./screens/create_group.slint";
+
+export component AppWindow inherits Window {
+    title: "NodeChat — Secure Decentralized Chat";
+    min-width: 360px;
+    min-height: 560px;
+    preferred-width: 1100px;
+    preferred-height: 820px;
+    background: AppTheme.surface-primary;
+
+    // ── Responsive breakpoint ──────────────────────────────────────────────
+    property <bool> is-desktop: root.width >= 750px;
+
+    // ── Safe Area Metrics (NATIVE INTEGRATION) ─────────────────────────────
+    // root.safe-area-insets and root.virtual-keyboard-size are built-in Slint properties.
+    property <length> safe-area-top: is-desktop ? 0px : root.safe-area-insets.top;
+    property <length> safe-area-bottom: is-desktop ? 0px : root.safe-area-insets.bottom;
+    property <length> kb-height: root.virtual-keyboard-size.height;
+
+    // ── Screen router (Rust writes this property to navigate) ────────────────
+    in-out property <int> current-screen: 0; 
+
+    // ── Shared properties ──────────────────────────────────────────────────
+    in property <string>  my-display-name: "Shedrack G.";
+    in property <string>  my-node-id: "nBq3…Kx7R";
+    in property <int>     direct-peers: 8;
+    in property <int>     relay-peers: 1;
+    in property <bool>    is-offline: false;
+
+    // Active chat context
+    in-out property <string> active-peer-name: "Eric O.";
+    in-out property <string> active-peer-initials: "EO";
+    in-out property <string> active-peer-node-id: "0xAF3B…C72E";
+    in-out property <string> active-connection-mode: "direct";
+    in-out property <bool>   active-peer-verified: true;
+    in-out property <bool>   active-peer-online: true;
+    in-out property <string> active-group-name: "Project Group";
+    in-out property <string> active-group-members: "3";
+
+    callback on-send-message(string);
+    callback on-send-group-message(string);
+    callback on-add-contact(string, string);
+    callback on-mark-verified();
+    callback on-copy-node-id();
+    callback on-launch-group(string); // Name
+
+    // ── Global Focus Forwarding ──────────────────────────────────────────
+    forward-focus: back-handler;
+
+    // ── Android Back Button Logic ──────────────────────────────────────────
+    // Intercepts the system back button (mapped to Escape by Android backend)
+    back-handler := FocusScope {
+        key-pressed(event) => {
+            if event.text == "\u{001b}" || event.text == Key.Escape { // Escape key
+                if current-screen == 5 { current-screen = 4; return accept; }
+                if current-screen == 6 { current-screen = 4; return accept; }
+                if current-screen == 7 { current-screen = 4; return accept; }
+                if current-screen == 8 { current-screen = 5; return accept; }
+                if current-screen == 9 { current-screen = 4; return accept; }
+                if current-screen == 10 { current-screen = 4; return accept; }
+                if current-screen == 11 { current-screen = 10; return accept; }
+                if current-screen == 12 { current-screen = 11; return accept; }
+                if current-screen == 2 { current-screen = 1; return accept; }
+            }
+            return reject; 
+        }
+    }
+
+    // Main layout container 
+    Rectangle {
+        clip: true; 
+
+        // ── SPLASH SCREEN (0) ─────────────────────────────────────
+        if current-screen == 0: SplashScreen {
+            finished => { current-screen = 1; }
+        }
+
+        // ── ONBOARDING SCREENS (1-3) ───────────────────────────────
+        if current-screen == 1: WelcomeScreen {
+            is-locked: false;
+            get-started => { current-screen = 2; }
+        }
+
+        if current-screen == 2: SetupNameScreen {
+            is-desktop: root.is-desktop;
+            safe-area-top: root.safe-area-top;
+            go-back => { current-screen = 1; }
+            confirm-name(name) => { current-screen = 3; }
+        }
+
+        if current-screen == 3: IdentityCardScreen {
+            display-name: my-display-name;
+            node-id: my-node-id;
+            go-to-chats => { current-screen = 4; }
+            copy-node-id => { root.on-copy-node-id(); }
+        }
+
+        // ── MAIN APP (4+) ─────────────────────────────────────────
+        if current-screen >= 4: HorizontalLayout {
+            spacing: 0;
+
+            // ── LEFT PANEL (Master Sidebar / Mobile Home) ──
+            if (is-desktop && current-screen >= 4) || (!is-desktop && (current-screen == 4 || current-screen == 10)): Rectangle {
+                width: is-desktop ? 340px : parent.width;
+                background: AppTheme.surface-primary;
+
+                // On Desktop, the sidebar ALWAYS shows the Chat List (History).
+                // On Mobile, the sidebar toggles between Chat List (4) and Contacts (10).
+                if (is-desktop || current-screen == 4): ChatListScreen {
+                    is-desktop: root.is-desktop;
+                    safe-area-top: root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
+                    direct-peers: root.direct-peers;
+                    relay-peers: root.relay-peers;
+                    is-offline: root.is-offline;
+                    open-chat(id) => { current-screen = 5; }
+                    add-contact => { current-screen = 7; }
+                    open-contacts => { current-screen = 10; }
+                    open-settings => { current-screen = 9; }
+                }
+
+                // If on Mobile and current-screen is 10, show Contacts here.
+                if (!is-desktop && current-screen == 10): ContactsScreen {
+                    is-desktop: false;
+                    safe-area-top: root.safe-area-top;
+                    go-back => { current-screen = 4; }
+                    open-chat(id) => { current-screen = 5; }
+                    add-contact => { current-screen = 7; }
+                    new-group => { current-screen = 11; }
+                }
+
+                if is-desktop: Rectangle {
+                    x: parent.width - 1px; y: 0; width: 1px; height: parent.height;
+                    background: AppTheme.divider;
+                }
+            }
+
+            // ── RIGHT PANEL (Active Screen / Stage) ──
+            if is-desktop || (!is-desktop && current-screen >= 5 && current-screen != 10): Rectangle {
+                horizontal-stretch: 1;
+                background: AppTheme.surface-primary;
+
+                // Desktop Empty State
+                if is-desktop && (current-screen == 4 || current-screen == 10): Rectangle {
+                    if current-screen == 4: VerticalLayout {
+                        alignment: center; spacing: AppTheme.sp-md;
+                        Text { text: "💬"; font-size: 64px; horizontal-alignment: center; }
+                        Text { text: "Select a chat to start messaging."; font-size: 16px; color: AppTheme.text-secondary; horizontal-alignment: center; }
+                    }
+                    if current-screen == 10: ContactsScreen {
+                        is-desktop: true;
+                        safe-area-top: 0px;
+                        go-back => { current-screen = 4; }
+                        open-chat(id) => { current-screen = 5; }
+                        add-contact => { current-screen = 7; }
+                        new-group => { current-screen = 11; }
+                    }
+                }
+
+                // Screen 5 = Chat View (1:1)
+                if current-screen == 5: ChatViewScreen {
+                    is-desktop:      root.is-desktop;
+                    peer-name:       root.active-peer-name;
+                    peer-initials:   root.active-peer-initials;
+                    peer-node-id:    root.active-peer-node-id;
+                    connection-mode: root.active-connection-mode;
+                    is-verified:     root.active-peer-verified;
+                    is-online:       root.active-peer-online;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
+                    virtual-keyboard-height: root.kb-height;
+                    go-back => { current-screen = 4; }
+                    send-message(msg) => { root.on-send-message(msg); }
+                    open-verify => { current-screen = 8; }
+                }
+
+                // Screen 6 = Group View
+                if current-screen == 6: GroupViewScreen {
+                    is-desktop: root.is-desktop;
+                    group-name:   root.active-group-name;
+                    member-count: root.active-group-members;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
+                    virtual-keyboard-height: root.kb-height;
+                    go-back => { current-screen = 4; }
+                    send-message(msg) => { root.on-send-group-message(msg); }
+                }
+
+                // Screen 7 = Add Contact
+                if current-screen == 7: AddContactScreen {
+                    is-desktop: root.is-desktop;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    go-back => { current-screen = 4; }
+                    add-contact(id, name) => { root.on-add-contact(id, name); current-screen = 4; }
+                }
+
+                // Screen 8 = Verify Key
+                if current-screen == 8: VerifyKeyScreen {
+                    is-desktop: root.is-desktop;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    peer-name: root.active-peer-name;
+                    go-back => { current-screen = 5; }
+                    mark-verified => { root.on-mark-verified(); current-screen = 5; }
+                }
+
+                // Screen 9 = Settings
+                if current-screen == 9: SettingsScreen {
+                    is-desktop: root.is-desktop;
+                    display-name: root.my-display-name;
+                    node-id: root.my-node-id;
+                    direct-peers: root.direct-peers;
+                    relay-peers: root.relay-peers;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    go-back => { current-screen = 4; }
+                    copy-node-id => { root.on-copy-node-id(); }
+                }
+
+                // Screen 11 = Select Members
+                if current-screen == 11: SelectMembersScreen {
+                    is-desktop: root.is-desktop;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    go-back => { current-screen = 10; }
+                    next-step => { current-screen = 12; }
+                }
+
+                // Screen 12 = Create Group
+                if current-screen == 12: CreateGroupScreen {
+                    is-desktop: root.is-desktop;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    go-back => { current-screen = 11; }
+                    launch-group(name) => { root.on-launch-group(name); current-screen = 4; }
+                }
+            }
+        }
+    }
+}

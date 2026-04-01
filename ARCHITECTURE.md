@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-**Topic:** Secure Decentralized Chat Messaging Application  
-**Type:** School Final Year Project  
+**Topic:** Secure Decentralized Chat Messaging Application
+**Type:** School Final Year Project
 **Team:** 2 members
 
 ### Abstract
 
-This project builds a peer-to-peer (P2P) chat application with end-to-end encryption (E2EE) supporting both 1:1 direct communication and Decentralized Group Chat. Unlike traditional chat apps that rely on central servers, NodeChat uses decentralized networking via Iroh (for transport) and Pkarr (for peer discovery), so users communicate directly without routing messages through any central authority. The system utilizes an Event-Driven Actor Model to decouple the immediate-mode UI from the asynchronous networking, cryptographic, and storage operations.
+This project builds a peer-to-peer (P2P) chat application with end-to-end encryption (E2EE) supporting both 1:1 direct communication and Decentralized Group Chat. Unlike traditional chat apps that rely on central servers, NodeChat uses decentralized networking via Iroh (for transport) and Pkarr (for peer discovery), so users communicate directly without routing messages through any central authority. The system utilizes an Event-Driven Actor Model to decouple the declarative Slint UI from the asynchronous networking, cryptographic, and storage operations.
 
 ---
 
@@ -20,54 +20,57 @@ This project builds a peer-to-peer (P2P) chat application with end-to-end encryp
 |-------|---------|---------|
 | **iroh** | 0.97.0 | P2P networking, hole punching, DERP relay fallback, secure connections |
 | **iroh-gossip** | 0.97.0 | Broadcast messaging across P2P swarms (Group Chats) |
-| **pkarr** | 5.0 | DNS-based decentralized peer discovery (public key → node address) |
-| **x25519-dalek** | 2.0 | X25519 key exchange for 1:1 E2EE |
-| **chacha20poly1305** | 0.10 | Authenticated encryption (AEAD) for 1:1 and Groups |
-| **sha2** | 0.10 | SHA-256 hash ratcheting for Forward Secrecy |
-| **rusqlite** | 0.31 | Embedded SQLite for robust local storage (queue, history, contacts) |
-| **tokio** | 1.x | Async runtime and MPSC channels for Actor Model |
-| **uuid** | 1.x | Unique message IDs |
-| **anyhow** | 1.x | Error handling |
+| **pkarr** | 5.0.4 | DNS-based decentralized peer discovery (public key → node address) |
+| **x25519-dalek** | 2.0.1 | X25519 key exchange for 1:1 E2EE |
+| **chacha20poly1305** | 0.10.1 | Authenticated encryption (AEAD) for 1:1 and Groups |
+| **sha2** | 0.10.9 | SHA-256 hash ratcheting for Forward Secrecy |
+| **rusqlite** | 0.39.0 | Embedded SQLite for robust local storage (queue, history, contacts) |
+| **tokio** | 1.50.0 | Async runtime and MPSC channels for Actor Model |
+| **uuid** | 1.23.0 | Unique message IDs |
+| **anyhow** | 1.0.102 | Error handling |
+| **rand** | 0.10.0 | Cryptographic random number generation |
 
 > **Note on versions:** Always verify crate versions against `crates.io` before building. iroh in particular has an actively evolving API — pin exact versions in `Cargo.lock` and do not upgrade during active development.
 
-### 1.2 Frontend (Rust + egui)
-
-Based on **hello_android** project structure for cross-platform support:
+### 1.2 Frontend (Rust + Slint)
 
 | Crate | Version | Purpose |
 |-------|---------|---------|
-| **eframe** | 0.34 | GUI framework |
-| **egui** | 0.34 | Immediate-mode UI toolkit |
-| **egui_extras** | 0.34 | Extra UI components, images |
+| **slint** | 1.15.1 | Declarative UI framework — `.slint` markup files + Rust property bindings |
+| **slint-build** | 1.15.1 | Build script integration — compiles `.slint` files at build time |
+
+> **Slint licence:** NodeChat qualifies for the **Community (GPL) licence** — free for open-source, non-commercial school projects. The only obligation is displaying "Made with Slint" somewhere in the app (About screen).
 
 ### 1.3 Platform Support
 
-- **Primary:** Desktop — Windows, Linux, macOS (via eframe)
-- **Stretch Goal:** Android (via cargo-apk, building off hello_android template)
+- **Primary:** Desktop — Windows, Linux, macOS (via Slint's native backends)
+- **Stretch Goal:** Android (via Slint's official Android backend — significantly more stable than the previous egui/cargo-apk path)
 
-> **Android risk note:** The cargo-apk + egui Android toolchain is complex to configure. A working hello_android build should be verified in Week 1. If Android proves unstable, the project is scoped to desktop with Android documented as a planned extension.
+> **Android note:** Slint has documented, maintained Android support. Verify a working Slint Android build on a physical device in Week 1. If it proves unstable, scope to desktop with Android documented as a planned extension.
 
 ---
 
 ## 2. System Architecture (Actor Model)
 
-To prevent the application UI from freezing during heavy network operations, cryptographic key exchanges, or database writes, the architecture utilizes a strictly decoupled **Actor Model**.
+To prevent the UI from freezing during heavy network operations, cryptographic key exchanges, or database writes, the architecture uses a strictly decoupled **Actor Model**.
 
-The UI (Frontend) never directly touches the Database or Network. It sends `Command` events down a channel to the Backend Worker, and dynamically updates its views based on `AppEvent` responses broadcast from the worker.
+The Slint UI never directly touches the Database or Network. It sends `Command` events to the Backend Worker via a Tokio MPSC channel, and receives state updates back via `slint::invoke_from_event_loop`.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       EGUI FRONTEND                         │
-│   (Immediate Mode - Draws screen 60fps - Pure Synchronous)  │
+│                      SLINT FRONTEND                         │
+│  (Declarative .slint UI — driven by Rust property bindings) │
 │                                                             │
-│   [Chat UI]   [Contact Book Engine]    [Group Management]   │
+│   [Chat View]   [Contact Book]   [Group Management]         │
+│                                                             │
+│   Zero business logic in .slint files.                      │
+│   All state comes from ModelRc<T> and @property bindings.   │
 └────────────┬───────────────────────────────────────▲────────┘
              │                                       │
-  (mpsc::Sender<Command>)                 (mpsc::Receiver<AppEvent>)
-   - SendDirectMessage                     - MessageReceived
-   - CreateGroup                           - PeerOnlineStatus
-   - AddContact                            - QueueFlushed
+  (mpsc::Sender<Command>)         (slint::invoke_from_event_loop)
+   - SendDirectMessage              - AppEvent::IncomingMessage
+   - CreateGroup                    - AppEvent::PeerOnlineStatus
+   - AddContact                     - AppEvent::MessageStatusUpdate
              │                                       │
 ┌────────────▼───────────────────────────────────────┴────────┐
 │                  TOKIO ASYNC BACKEND CORE                   │
@@ -82,6 +85,41 @@ The UI (Frontend) never directly touches the Database or Network. It sends `Comm
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### How Slint Communicates with the Backend
+
+Unlike polling-based UIs, Slint uses a **push model**. The Tokio backend thread pushes state changes into the UI via `slint::invoke_from_event_loop`, which queues a closure to run safely on the Slint event thread:
+
+```rust
+// Pattern used in src/ui/mod.rs — backend pushes events into UI
+let handle = app_window.as_weak();
+
+tokio::spawn(async move {
+    while let Ok(event) = rx_events.recv().await {
+        let h = handle.clone();
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(ui) = h.upgrade() {
+                crate::ui::models::apply_event(&ui, event);
+            }
+        });
+    }
+});
+```
+
+The Slint UI fires `Command`s back to the backend via callbacks wired once at startup:
+
+```rust
+// Pattern used in src/ui/mod.rs — wiring a send button callback
+ui.on_send_message({
+    let tx = tx_commands.clone();
+    move |text| {
+        let _ = tx.try_send(Command::SendDirectMessage {
+            target: current_peer_id(),
+            plaintext: text.to_string(),
+        });
+    }
+});
+```
+
 ---
 
 ## 3. Module Design
@@ -93,26 +131,26 @@ The UI (Frontend) never directly touches the Database or Network. It sends `Comm
 ```rust
 // File: src/p2p/mod.rs
 
-/// Main networking backend struct
 pub struct NetworkManager {
-    endpoint: Endpoint,
-    gossip: GossipApi,
+    endpoint:    Endpoint,
+    gossip:      GossipApi,
+    connections: HashMap<NodeId, Connection>, // reused per peer — not reopened per message
 }
 
 impl NetworkManager {
-    /// 1. Direct 1:1 Message (Iroh Unicast)
-    /// Also used for securely transmitting Group symmetric keys during invites.
+    /// Direct 1:1 message (Iroh unicast).
+    /// Also used to transmit group symmetric keys during invites.
     pub async fn send_direct(&self, target: NodeId, payload: Vec<u8>) -> Result<()>;
-    
-    /// 2. Group Broadcast (Iroh Gossip)
-    /// Broadcasts encrypted payload to all peers subscribed to the group TopicId.
+
+    /// Group broadcast (Iroh Gossip).
+    /// Broadcasts encrypted payload to all subscribers of the group TopicId.
     pub async fn broadcast_group(&self, topic: TopicId, payload: Vec<u8>) -> Result<()>;
-    
-    /// Join a Gossip swarm for a newly invited or created group.
+
+    /// Join a Gossip swarm for a group. Idempotent — no-op if already subscribed.
     pub async fn subscribe_group(&self, topic: TopicId) -> Result<()>;
-    
-    /// Look up a peer's current network address via Pkarr.
-    /// Pkarr resolves a public key to a NodeAddr — it is not a message transport layer.
+
+    /// Resolve a peer's current network address via Pkarr.
+    /// Pkarr is a discovery layer only — not a transport layer.
     pub async fn discover_peer(&self, pk: PublicKey) -> Result<Option<NodeAddr>>;
 }
 ```
@@ -124,46 +162,34 @@ impl NetworkManager {
 **Purpose:** End-to-end encryption. Distinct approaches for 1:1 vs Groups.
 
 **1:1 Direct Chat:**
-We rely on Iroh's native Noise protocol for encrypted transport. For verifiable application-level E2EE (to satisfy academic requirements), we perform a static X25519 Diffie-Hellman Key Exchange to derive an initial ChaCha20-Poly1305 symmetric key. After each message is sent or received, we apply a **Hash Ratchet** (hashing the active session key via SHA-256) to guarantee Forward Secrecy — if the device is later compromised, past messages remain mathematically secure.
+We rely on Iroh's native Noise protocol for encrypted transport. For verifiable application-level E2EE, we perform a static X25519 Diffie-Hellman Key Exchange to derive an initial ChaCha20-Poly1305 symmetric key. After each message is sent or received, we apply a **Hash Ratchet** (SHA-256 of the current key) for Forward Secrecy.
 
-> **Scope note:** This is a SHA-256 hash ratchet, not a full Double Ratchet (as used by Signal). The Double Ratchet provides additional properties such as break-in recovery (healing after key compromise) that are beyond this project's scope. The hash ratchet alone satisfies the forward secrecy requirement.
+> **Scope note:** This is a SHA-256 hash ratchet, not a full Double Ratchet. The Double Ratchet provides break-in recovery properties that are beyond this project's scope. The hash ratchet satisfies the forward secrecy requirement.
 
 **Group Chat:**
-Because Signal-style Sender Keys are highly complex to coordinate in a serverless environment, groups use **Shared Symmetric Keys**. When Alice creates a group, her client generates a random 32-byte ChaCha20 key. She invites Bob by sending him the Group `TopicId` and the `SymmetricKey` via a secure **1:1 Direct E2EE message**. Once Bob holds the key, he can decrypt all Gossip messages broadcast to that group's topic.
+Groups use **Shared Symmetric Keys**. When Alice creates a group, her client generates a random 32-byte ChaCha20 key. She invites Bob by sending him the Group `TopicId` and `SymmetricKey` via a secure 1:1 Direct E2EE message.
 
-> **Known limitation — group key rotation:** When a member is removed from a group, they still possess the symmetric key. In the current design, a removed member could theoretically decrypt messages if they intercept Gossip traffic for that topic. Production solutions generate a new group key and re-distribute it to remaining members (key rotation). For this project's scope, the limitation is acknowledged and documented. The architecture does not prevent key rotation from being added as a future extension.
+> **Known limitation — group key rotation:** Removed members retain the old key. Production systems re-generate and re-distribute the group key on every removal. Documented as a future extension.
 
 ```rust
 // File: src/crypto/mod.rs
 
-/// The user's cryptographic identity — generated once on first launch, stored locally.
+/// The user's cryptographic identity — generated once on first launch.
 pub struct Identity {
-    pub node_id: NodeId,
-    pub x25519_static: StaticSecret,
+    pub node_id:        NodeId,
+    pub x25519_static:  StaticSecret,
 }
 
 impl CryptoManager {
-    // ---- 1:1 CRYPTO ---- 
-    /// Derive a shared secret using our private key and their public key (X25519 DH).
+    // ---- 1:1 CRYPTO ----
     pub fn derive_direct_key(our_secret: &StaticSecret, their_public: &PublicKey) -> [u8; 32];
-    
-    /// Advance the session key for Forward Secrecy: next_key = SHA-256(current_key)
     pub fn ratchet_key(current_key: &mut [u8; 32]);
-    
-    /// Encrypt a payload for a single peer using the current ratchet key.
     pub fn encrypt_direct(payload: &[u8], shared_key: &[u8; 32]) -> Vec<u8>;
-    
-    /// Decrypt a payload received from a direct peer.
     pub fn decrypt_direct(ciphertext: &[u8], shared_key: &[u8; 32]) -> Result<Vec<u8>>;
 
     // ---- GROUP CRYPTO ----
-    /// Generate a new random symmetric key for a new Group.
     pub fn generate_group_key() -> [u8; 32];
-    
-    /// Encrypt a payload for broadcast via Gossip using the group key.
     pub fn encrypt_group(payload: &[u8], group_key: &[u8; 32]) -> Vec<u8>;
-
-    /// Decrypt a Gossip payload using the group key.
     pub fn decrypt_group(ciphertext: &[u8], group_key: &[u8; 32]) -> Result<Vec<u8>>;
 }
 ```
@@ -172,31 +198,30 @@ impl CryptoManager {
 
 ### 3.3 Storage Layer (`src/storage/`)
 
-**Purpose:** A unified SQLite database using `rusqlite`. This eliminates the complexity of writing custom binary queues. If a peer is offline when a message is sent, the message is stored locally with `status = 'queued'` and flushed automatically when the peer is reachable.
+**Purpose:** A unified SQLite database. If a peer is offline, the message is stored with `status = 'queued'` and flushed when the peer is reachable.
 
 ```sql
--- SQLite Schema
-
-CREATE TABLE peers (
-    node_id      TEXT PRIMARY KEY,
-    display_name TEXT NOT NULL,
-    x25519_pubkey TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS peers (
+    node_id       TEXT PRIMARY KEY,
+    display_name  TEXT NOT NULL,
+    x25519_pubkey TEXT NOT NULL,
+    verified      INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE TABLE groups (
+CREATE TABLE IF NOT EXISTS groups (
     topic_id      TEXT PRIMARY KEY,
     group_name    TEXT NOT NULL,
-    symmetric_key BLOB NOT NULL  -- stored encrypted at rest with local password
+    symmetric_key BLOB NOT NULL  -- encrypted at rest under local password key
 );
 
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
     id        TEXT PRIMARY KEY,
-    type      TEXT NOT NULL,       -- 'text', 'image', 'file', 'group_invite'
-    target_id TEXT NOT NULL,       -- NodeId (1:1) or TopicId (group)
+    type      TEXT NOT NULL,      -- 'text', 'file', 'group_invite'
+    target_id TEXT NOT NULL,      -- NodeId (1:1) or TopicId (group)
     sender_id TEXT NOT NULL,
-    content   BLOB NOT NULL,       -- Decrypted plaintext stored locally, or file path on disk
-    timestamp INTEGER NOT NULL,
-    status    TEXT NOT NULL        -- 'queued', 'sent', 'delivered', 'read'
+    content   BLOB NOT NULL,      -- decrypted plaintext stored locally
+    timestamp INTEGER NOT NULL,   -- UTC Unix seconds
+    status    TEXT NOT NULL       -- 'queued' → 'sent' → 'delivered' → 'read'
 );
 ```
 
@@ -204,32 +229,22 @@ CREATE TABLE messages (
 
 ### 3.4 Offline Message Delivery
 
-**Purpose:** Define clearly how messages are guaranteed to reach an offline peer.
+**State 1 — Direct P2P (both online):** Iroh direct connection, NAT hole punching, DERP relay fallback. Status: `sent` → `delivered`.
 
-The delivery model operates in three states, tried in order:
+**State 2 — Local queue (Bob offline, Alice online):** Written to SQLite as `queued`. `flush_offline_queue()` retries every 10 seconds. Delivers when Pkarr resolves Bob's address.
 
-**State 1 — Direct P2P (both nodes online):**
-Alice's node connects to Bob's node directly via Iroh (with NAT hole punching, falling back to DERP relay if UDP is blocked). The message transmits in real time. Status updates to `sent` → `delivered`.
+**State 3 — DERP relay (NAT blocked):** Iroh transparently uses DERP. Relay forwards ciphertext only — never holds the decryption key.
 
-**State 2 — Local queue (Bob's node is offline, Alice stays online):**
-The message is written to SQLite with `status = 'queued'`. The backend worker's periodic flush task (`flush_offline_queue`, running every 10 seconds) retries delivery automatically each time it fires. When Bob's node comes back online and Pkarr resolves his address, the queued message sends and the status updates.
-
-**State 3 — DERP relay transport (NAT traversal blocked):**
-If direct UDP hole punching fails, Iroh transparently falls back to its DERP (Designated Encrypted Relay Point) relay infrastructure. DERP relays act as a transport proxy — they forward encrypted packets between nodes but never possess the decryption key and cannot read message content. This is a transport fallback only, not a store-and-forward system.
-
-**Acknowledged limitation — extended mutual offline:**
-The local queue delivers messages only while Alice's node remains running. If both Alice and Bob are offline simultaneously and Alice's device powers off, the queued messages are held in Alice's local SQLite and will flush the next time Alice's node runs and Bob is reachable. There is no server holding messages in the interim. This is a deliberate scope boundary. A production extension would implement a DHT-based store-and-forward mailbox (using Pkarr's BEP44 mutable item storage) to provide true asynchronous delivery. This is documented as a future extension, not a flaw.
+**Acknowledged limitation:** The local queue only works while Alice's node is running. Extended mutual-offline delivery requires a DHT mailbox (Pkarr BEP44) — documented as a future extension.
 
 ---
 
-### 3.5 Core Engine (The Actor Worker) (`src/core/`)
-
-**Purpose:** Ties Storage, Crypto, and Network together in a single asynchronous event loop.
+### 3.5 Core Engine — The Actor Worker (`src/core/`)
 
 ```rust
-// File: src/core/mod.rs
+// File: src/core/commands.rs
 
-/// Commands sent FROM egui TO the Backend Worker
+/// Commands sent FROM the Slint UI TO the Backend Worker.
 pub enum Command {
     SendDirectMessage  { target: NodeId, plaintext: String },
     SendFile           { target: NodeId, file_path: PathBuf },
@@ -239,15 +254,20 @@ pub enum Command {
     InviteToGroup      { target: NodeId, topic: TopicId },
 }
 
-/// Events broadcast FROM the Backend Worker TO egui
+/// Events pushed FROM the Backend Worker TO the Slint UI
+/// via slint::invoke_from_event_loop.
 pub enum AppEvent {
-    IncomingMessage       { sender: NodeId, plaintext: String },
-    IncomingFile          { sender: NodeId, file_name: String, path: PathBuf },
-    MessageStatusUpdate   { id: Uuid, status: MessageStatus },
-    IncomingGroupMessage  { topic: TopicId, sender: NodeId, plaintext: String },
-    GroupInviteReceived   { topic: TopicId, group_name: String },
-    PeerOnlineStatus      { peer: NodeId, online: bool },
+    IncomingMessage      { sender: NodeId, plaintext: String },
+    IncomingFile         { sender: NodeId, file_name: String, path: PathBuf },
+    MessageStatusUpdate  { id: Uuid, status: MessageStatus },
+    IncomingGroupMessage { topic: TopicId, sender: NodeId, plaintext: String },
+    GroupInviteReceived  { topic: TopicId, group_name: String },
+    PeerOnlineStatus     { peer: NodeId, online: bool, via_relay: bool },
 }
+```
+
+```rust
+// File: src/core/mod.rs
 
 pub struct NodeChatWorker {
     db:          rusqlite::Connection,
@@ -258,20 +278,16 @@ pub struct NodeChatWorker {
 }
 
 impl NodeChatWorker {
-    /// Main asynchronous loop running in the background thread.
     pub async fn run(mut self) {
         loop {
             tokio::select! {
-                // 1. Listen for UI Commands
                 Some(cmd) = self.rx_commands.recv() => {
                     self.handle_command(cmd).await;
                 }
-                // 2. Listen for Network Events (Iroh Unicast or Gossip)
                 event = self.network.next_event() => {
                     self.handle_network(event).await;
                 }
-                // 3. Periodic tasks — retry queued messages for peers now reachable
-                _ = tokio::time::sleep(Duration::from_secs(10)) => {
+                _ = tokio::time::sleep(Duration::from_secs(QUEUE_FLUSH_INTERVAL_SECS)) => {
                     self.flush_offline_queue().await;
                 }
             }
@@ -282,64 +298,22 @@ impl NodeChatWorker {
 
 ---
 
-### 3.6 Frontend GUI (`src/ui/`)
+### 3.6 Frontend — Slint UI (`src/ui/` + `ui/`)
 
-**Purpose:** Synchronous egui renderer. Completely detached from network blocking. Maintains only visual state compiled from backend events.
+**`ui/` — `.slint` files:** Pure declarative markup. Layouts, components, colours, animations. Zero business logic. Emits named callbacks only.
 
-```rust
-// File: src/ui/mod.rs
+**`src/ui/mod.rs` — Rust wiring:** Loads the compiled Slint window, wires callbacks to `Command` sends, spawns the event listener task that pushes `AppEvent`s into Slint models and properties.
 
-pub struct NodeChatUI {
-    /// Channel to send commands to the backend worker
-    tx_cmd: mpsc::Sender<Command>,
-    /// Channel to receive events from the backend worker
-    rx_event: broadcast::Receiver<AppEvent>,
-    
-    // Local UI state — built entirely from received AppEvents
-    active_chat:   ActiveChat,
-    messages_view: Vec<UIChatMessage>,
-    contact_book:  Vec<UIPeer>,
-}
-
-impl eframe::App for NodeChatUI {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // 1. Drain any incoming backend events non-blockingly
-        while let Ok(event) = self.rx_event.try_recv() {
-            self.update_state_from_event(event);
-        }
-        
-        // 2. Draw UI panels
-        egui::SidePanel::left("contacts").show(ctx, |ui| {
-            // Contact list and group list
-        });
-        
-        egui::CentralPanel::default().show(ctx, |ui| {
-            // Message thread view
-            if ui.button("Send").clicked() {
-                let _ = self.tx_cmd.try_send(Command::SendDirectMessage { ... });
-            }
-        });
-    }
-}
-```
+**`src/ui/models.rs` — Data bridge:** Implements Slint's `ModelRc<T>` for message lists and contact lists. Contains the `apply_event()` dispatcher that translates `AppEvent` variants into Slint property updates.
 
 ---
 
 ### 3.7 User Identity & Onboarding
 
-**Purpose:** Zero-server identity generation and local security.
-
-**Zero-Server Registration:**
-On first launch, the app automatically generates an X25519/Ed25519 keypair. The public key becomes the permanent `NodeId`. No cloud registration, username, or email is required or used. Identity is mathematically owned by the user.
-
-**Local Display Name:**
-The user enters a Display Name locally. This name is only exchanged during P2P handshakes to populate a contact's local phonebook entry — it is never stored on any server.
-
-**Local Password Encryption:**
-To protect chat history and the private key if the device is stolen, the SQLite database and private keystore are optionally encrypted at rest using a user-supplied local password. The password is never transmitted anywhere. Decryption happens locally on startup.
-
-**Contact Model:**
-There is no centralized "add friend" system. Contacts are added by sharing a `NodeId` (the public key fingerprint) via any out-of-band channel — in person, via QR code, or via another messenger. The Contacts feature is a purely local SQLite phonebook mapping a `NodeId` to a human-readable display name.
+- **Zero-Server Registration:** X25519/Ed25519 keypair generated locally on first launch. Public key = `NodeId`. No cloud registration.
+- **Local Display Name:** Shared only during P2P handshakes. Never sent to any server.
+- **Local Password Encryption:** SQLite and private key optionally encrypted at rest. Password never transmitted.
+- **Contact Model:** Local SQLite phonebook only. Contacts added by exchanging `NodeId` out-of-band (QR code, in person).
 
 ---
 
@@ -347,34 +321,65 @@ There is no centralized "add friend" system. Contacts are added by sharing a `No
 
 ```
 nodechat/
-├── ARCHITECTURE.md           # This document
-├── README.md                 # Project description and setup guide
-├── Cargo.toml                # Workspace and dependency definitions
+├── AGENT.md
+├── ARCHITECTURE.md
+├── RULES.md
+├── UX_FLOW.md
+├── README.md
+├── Cargo.toml
+├── Cargo.lock
+├── build.rs                      ← slint_build::compile("ui/app.slint")
 │
 ├── src/
-│   ├── main.rs               # Entry point — boots Tokio runtime and egui window
+│   ├── main.rs                   ← boots Tokio + runs Slint event loop
 │   │
-│   ├── core/                 # Backend Worker (Actor Model loop)
-│   │   ├── mod.rs            # NodeChatWorker implementation
-│   │   └── commands.rs       # Command and AppEvent enum definitions
+│   ├── core/
+│   │   ├── mod.rs                ← NodeChatWorker async select loop
+│   │   └── commands.rs           ← Command + AppEvent definitions
 │   │
-│   ├── p2p/                  # Network layer
-│   │   ├── mod.rs            # NetworkManager struct
-│   │   ├── direct.rs         # Iroh unicast connection handling
-│   │   └── group.rs          # Iroh Gossip swarm handling
+│   ├── p2p/
+│   │   ├── mod.rs                ← NetworkManager
+│   │   ├── direct.rs             ← Iroh unicast
+│   │   └── group.rs              ← Iroh Gossip
 │   │
-│   ├── crypto/               # Encryption layer
-│   │   └── mod.rs            # Identity, key exchange, encrypt/decrypt, ratchet
+│   ├── crypto/
+│   │   └── mod.rs                ← Identity, DH, encrypt/decrypt, ratchet
 │   │
-│   ├── storage/              # Database layer
-│   │   ├── mod.rs            # SQLite initialization and connection management
-│   │   └── queries.rs        # All SQL CRUD operations
+│   ├── storage/
+│   │   ├── mod.rs                ← SQLite init + schema
+│   │   └── queries.rs            ← All SQL CRUD
 │   │
-│   └── ui/                   # Frontend
-│       ├── mod.rs            # NodeChatUI main loop and event processing
-│       └── views.rs          # Individual panel renderers (contacts, chat, groups)
+│   └── ui/
+│       ├── mod.rs                ← NodeChatApp: loads window, wires callbacks, runs
+│       └── models.rs             ← ModelRc impls + apply_event() dispatcher
 │
-└── hello_android/            # Cross-platform Android build reference
+├── ui/                           ← Pure .slint markup — zero Rust logic here
+│   ├── app.slint                 ← Root AppWindow
+│   ├── components/
+│   │   ├── message_bubble.slint
+│   │   ├── contact_row.slint
+│   │   ├── chat_input.slint
+│   │   └── status_dot.slint
+│   └── screens/
+│       ├── welcome.slint
+│       ├── setup_name.slint
+│       ├── identity_card.slint
+│       ├── chat_list.slint
+│       ├── chat_view.slint
+│       ├── group_view.slint
+│       ├── contacts.slint
+│       ├── add_contact.slint
+│       ├── verify_key.slint
+│       └── settings.slint
+│
+├── assets/
+│   ├── fonts/
+│   │   └── inter.ttf
+│   └── icons/
+│       └── app_icon.png
+│
+└── tests/
+    └── integration_tests.rs
 ```
 
 ---
@@ -382,98 +387,85 @@ nodechat/
 ## 5. Implementation Order
 
 ### Phase 1 — Core Foundation (Week 1–2)
-- Set up Cargo workspace and verify dependency versions build cleanly.
-- Wire up Tokio Actor Model: MPSC channels between main thread and background worker.
-- Initialize the SQLite schema via rusqlite.
-- Verify hello_android builds on target Android device (early risk mitigation).
+- Set up Cargo workspace, add all dependencies, confirm `cargo build` is clean.
+- Add `build.rs` with `slint_build::compile` and confirm a blank Slint window renders.
+- Wire Tokio Actor Model channels between `main.rs` and `NodeChatWorker`.
+- Initialize SQLite schema with WAL mode.
+- Verify Slint Android build on a physical Android device (early risk check).
 
 ### Phase 2 — Peer-to-Peer 1:1 Networking (Week 3–4)
-- Bind the Iroh Endpoint in the backend worker.
-- Implement Pkarr peer discovery (resolving a NodeId to a NodeAddr).
-- Enable basic unicast data streams between two pre-configured NodeIds on a LAN.
+- Bind Iroh Endpoint in `NodeChatWorker`.
+- Implement Pkarr peer discovery.
+- Enable raw unicast data streams between two NodeIds on a LAN.
 
 ### Phase 3 — Identity & E2EE Crypto (Week 5–6)
 - Implement X25519 keypair generation and persistence.
-- Wire X25519 DH exchange into ChaCha20-Poly1305 encrypt/decrypt for 1:1 messages.
-- Implement the SHA-256 hash ratchet for Forward Secrecy.
-- Implement the offline queue: write to SQLite on send failure, flush on reconnect.
+- Wire X25519 DH + ChaCha20-Poly1305 for 1:1 message encryption.
+- Implement SHA-256 hash ratchet.
+- Implement offline queue: write to SQLite on failure, flush on reconnect.
 
 ### Phase 4 — UI Integration (Week 7–8)
-- Bind the egui frontend to the backend via channels.
-- Build the Contacts phonebook panel.
-- Build the 1:1 Direct Chat panel with delivery status display.
-- Build the onboarding flow (first launch keypair generation, display name, local password).
+- Build all `.slint` components and screens per `UX_FLOW.md`.
+- Wire all Slint callbacks to `Command` sends in `src/ui/mod.rs`.
+- Wire all `AppEvent` variants to model updates via `invoke_from_event_loop`.
+- Build full onboarding flow.
 
 ### Phase 5 — Group Chat Expansion (Week 9–10)
-- Integrate iroh-gossip into the Network layer.
-- Implement symmetric group key generation and storage.
-- Implement group invite flow (transmit TopicId + key via secure 1:1 message).
-- Build Group Chat UI panels.
+- Integrate `iroh-gossip` into the Network layer.
+- Implement symmetric group key generation and encrypted SQLite storage.
+- Implement group invite flow via secure 1:1 message.
+- Build Group Chat screens and wire them.
 
 ### Phase 6 — Polish & Defense Prep (Week 11–12)
-- End-to-end integration testing across two separate machines.
-- Unit tests for all crypto functions and storage queries.
+- End-to-end integration testing on two separate machines.
+- All required unit and integration tests passing (per RULES.md section 10).
 - Final documentation, README, and presentation slides.
-- Android demo build if toolchain is stable.
+- Android demo build if Slint Android toolchain is confirmed stable.
 
 ---
 
 ## 6. Testing Plan
 
 ### Unit Tests
-- **Crypto:** Verify ChaCha20 decrypt fails on altered ciphertext bits (authentication tag check). Verify X25519 key derivation is deterministic. Verify hash ratchet advances correctly.
-- **Storage:** Verify messages with `status = 'queued'` are reliably written and retrieved. Verify status updates are applied correctly.
+- Crypto: ChaCha20 roundtrip, tampered ciphertext rejection, ratchet advancement, X25519 shared secret agreement.
+- Storage: Queued message write/read, status transition enforcement, group key round-trip.
 
 ### Integration Tests
-- Two isolated `NodeChatWorker` instances exchanging a `Command::SendDirectMessage` on localhost, verifying the receiving worker emits `AppEvent::IncomingMessage` with correct plaintext.
-- Verify peer discovery using a local Pkarr instance.
-- Offline queue test: send a message while recipient worker is stopped, start recipient, verify message flushes and arrives.
+- Two `NodeChatWorker` instances on localhost exchanging a direct message end-to-end.
+- Offline queue: send while recipient is stopped, restart recipient, verify flush within 15 seconds.
+- Pkarr discovery: verify `discover_peer` resolves a locally bound test node.
 
 ---
 
 ## 7. Defense Points
 
-When presenting this project, emphasize:
-
-1. **True Decentralization:** No server needed for messaging. Pkarr handles peer discovery (resolving public keys to addresses). Iroh handles encrypted transport. The only optional infrastructure is Iroh's DERP relay for NAT traversal — which relays encrypted packets it cannot decrypt.
-
-2. **Actor Model Architecture:** The UI thread is explicitly decoupled from all networking and database IO via Tokio MPSC channels. This is a standard pattern for professional desktop applications. The UI renders at 60fps regardless of network conditions.
-
-3. **Data Sovereignty:** 100% of user data — messages, contacts, group keys, identity — lives exclusively on the user's local device in an encrypted SQLite database. No third party has any access to any of it.
-
-4. **Honest Offline Queue Model:** The local SQLite queue guarantees delivery when Alice's node is running and Bob eventually comes online. The system transparently documents the extended mutual-offline limitation and identifies DHT-based store-and-forward as the production extension path.
-
-5. **Decentralized Groups:** P2P group chat is solved by combining iroh-gossip (broadcast transport) with a symmetric key securely distributed via 1:1 E2EE messages. No group server. No group admin infrastructure. Any group member can broadcast.
-
-6. **Robust NAT Traversal:** Even on aggressive networks (university Wi-Fi blocking UDP hole punching), NodeChat falls back transparently to Iroh's DERP relay servers. Connectivity is never broken. The relay only ever touches encrypted ciphertext.
-
-7. **Forward Secrecy (Hash Ratchet):** A SHA-256 hash ratchet advances the 1:1 session key after every message. Past message payloads remain secure even if the current key is later compromised. The scope boundary relative to the full Signal Double Ratchet is explicitly documented.
-
-8. **Transparent Architectural Trade-offs:** The project explicitly acknowledges where scope-appropriate simplifications are made — hash ratchet over Double Ratchet, symmetric group keys over Sender Keys, local queue over DHT mailbox — and can articulate the full production solution for each. This demonstrates understanding of the full problem space beyond the implementation itself.
+1. **True Decentralization:** No server needed. Pkarr for discovery. Iroh for transport. DERP relay (optional fallback) touches only ciphertext it cannot decrypt.
+2. **Actor Model Architecture:** Slint UI is fully decoupled from all networking and DB IO. Responsive regardless of network conditions.
+3. **Data Sovereignty:** 100% of user data lives exclusively on the user's local device in an encrypted SQLite database.
+4. **Honest Offline Queue Model:** Local queue guarantees delivery while Alice's node is running. Extended mutual-offline limitation explicitly documented with the DHT mailbox production path.
+5. **Decentralized Groups:** iroh-gossip + symmetric key distributed via 1:1 E2EE. No group server.
+6. **Robust NAT Traversal:** DERP relay fallback ensures connectivity even on aggressive networks.
+7. **Forward Secrecy:** SHA-256 hash ratchet advances the session key after every message.
+8. **Transparent Trade-offs:** Every simplification (hash ratchet, symmetric group keys, local queue) is documented with its production solution. Demonstrates understanding of the full problem space.
 
 ---
 
 ## 8. Design Decisions
 
-### The Contact Model
-**Why no central "Add Friend" system?**
-In a truly decentralized P2P system, there is no central authority to manage friend relationships. Identity is a cryptographic keypair, not a database entry. The Contacts feature is a local SQLite phonebook — it maps a `NodeId` to a human-readable display name purely for convenience. Adding a contact means exchanging `NodeId` values out-of-band (QR code, in person, etc.), which is both more secure and more private than a central social graph.
+### Why Slint over egui?
+Slint's declarative `.slint` markup cleanly separates visual design from Rust logic — enforcing the Actor Model separation by design. It produces a polished, consumer-grade UI (critical for defense impression), has first-class documented Android support, supports hot-reload during development, and builds beautiful list views (chat bubbles, contact rows) with far less code than egui's immediate-mode API.
 
-### The UI Freezing Problem
-**Why the Actor Model?**
-egui is an immediate-mode GUI — the entire UI redraws up to 60 times per second. If network I/O, key exchange, or database writes happen on the main thread, even a 50ms delay freezes the entire application visibly. The Actor Model isolates all async work in a Tokio background thread. The UI thread only sends commands and reads events — it never blocks.
+### The Contact Model
+No centralized friend system. Identity is a cryptographic keypair. Contacts are a local SQLite phonebook only — `NodeId` → display name. Added by exchanging NodeIds out-of-band.
 
 ### Group E2EE
-**Why Symmetric Keys for Groups instead of Signal's Sender Keys?**
-Signal's Sender Key Distribution protocol is highly complex: each group member generates their own chain key, distributes it to all other members, and handles member join/leave events with re-keying. In a serverless environment with no guaranteed message ordering, coordinating this correctly is an unsolved engineering problem at this scale. A shared ChaCha20 symmetric key — securely delivered to each member via individual 1:1 E2EE messages — fully guarantees end-to-end encryption for the group channel while avoiding this complexity. The trade-off (no per-sender forward secrecy, no automatic key rotation on member removal) is explicitly acknowledged in section 3.2.
+Shared ChaCha20 symmetric key delivered per-member via 1:1 E2EE avoids Signal's Sender Key coordination complexity in a serverless environment. Trade-off is explicitly documented.
 
 ### Offline Delivery
-**Why not implement a DHT mailbox?**
-A DHT store-and-forward mailbox (e.g. using Pkarr's BEP44 mutable item storage) would provide true asynchronous delivery even when both sender and recipient are simultaneously offline. However, implementing a correct DHT storage layer with appropriate TTLs, encryption at rest, and spam protection adds significant complexity beyond the project's 12-week scope. The local SQLite queue provides delivery guarantees for all realistic scenarios where Alice's node is running — which covers the large majority of real-world usage patterns. The DHT mailbox is documented as the production extension path.
+Local SQLite queue covers all realistic scenarios where Alice's node is running. DHT mailbox documented as production extension.
 
 ### Decentralized Onboarding
-**How do users log in without a server?**
-The user mathematically owns their identity. On first launch, the application generates a cryptographic keypair locally. The public key *is* the identity. To protect against device theft, the private key and local database are encrypted with an optional local master password. No server is ever involved in authentication — there is no account to hack, no password database to breach, no login endpoint to attack.
+Keypair generated locally. Public key is the identity. Private key + DB encrypted with optional local password. No server ever involved.
 
 ---
 
@@ -481,14 +473,14 @@ The user mathematically owns their identity. On first launch, the application ge
 
 | Limitation | Current Behavior | Production Extension |
 |---|---|---|
-| Extended mutual offline | Messages queued locally; lost if Alice's node is off | DHT BEP44 store-and-forward mailbox |
+| Extended mutual offline | Messages queued locally; held if Alice's node is off | DHT BEP44 store-and-forward mailbox |
 | Group key rotation | Removed members retain old key | Re-key all remaining members on removal |
 | Full forward secrecy | SHA-256 hash ratchet (one direction) | Full Signal Double Ratchet |
 | Group member forward secrecy | Shared symmetric key | Signal Sender Keys per member |
-| Android support | Stretch goal / toolchain risk | Full cargo-apk pipeline |
+| Android support | Stretch goal — Slint Android backend | Full Slint Android pipeline |
 
 ---
 
-*Last Updated: 2026-03-30*  
-*Project: NodeChat — Secure Decentralized Chat*  
-*Version: 1.1 — Architecture finalized, limitations documented*
+*Last Updated: 2026-03-30*
+*Project: NodeChat — Secure Decentralized Chat*
+*Version: 1.3 — Latest Crate Versions*
