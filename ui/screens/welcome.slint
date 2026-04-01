@@ -1,0 +1,120 @@
+import { AppTheme } from "../theme.slint";
+
+export component WelcomeScreen inherits Rectangle {
+    background: AppTheme.surface-primary;
+    in property <bool> is-locked: false;
+
+    callback get-started();
+    callback unlock(string);
+
+    property <bool> wrong-password: false;
+
+    VerticalLayout {
+        alignment: center;
+        spacing: AppTheme.sp-lg;
+        padding: AppTheme.sp-lg;
+
+        // --- App Branding ---
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../../assets/icons/app_logo_with_name_transparent_bg.png");
+                height: 180px; 
+                width: 180px;
+                image-fit: contain;
+            }
+        }
+
+        Text {
+            text: is-locked ? "Enter your password to unlock" : "Secure. Private. Yours.";
+            font-size: 16px; 
+            color: AppTheme.text-secondary;
+            horizontal-alignment: center;
+        }
+
+        Rectangle { height: AppTheme.sp-lg; }
+
+        // ── First launch ──────────────────────────────────────────────────────
+        if !is-locked: VerticalLayout {
+            spacing: AppTheme.sp-md;
+            
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 320px;
+                    height: 52px; border-radius: 16px;
+                    background: AppTheme.accent;
+                    TouchArea {
+                        clicked => { root.get-started(); }
+                        Text {
+                            text: "Get Started";
+                            font-size: 17px; font-weight: 700; color: #FFFFFF;
+                            horizontal-alignment: center; vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            Text {
+                text: "No account. No phone number. No server required.";
+                font-size: 13px; color: AppTheme.text-tertiary;
+                horizontal-alignment: center;
+            }
+        }
+
+        // ── Locked state ─────────────────────────────────────────────────────
+        if is-locked: VerticalLayout {
+            spacing: AppTheme.sp-md;
+
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 320px;
+                    height: 52px; border-radius: AppTheme.radius-md;
+                    background: AppTheme.surface-secondary;
+
+                    HorizontalLayout {
+                        padding-left: AppTheme.sp-md; padding-right: AppTheme.sp-md;
+
+                        pw-input := TextInput {
+                            font-size: 16px; color: AppTheme.text-primary;
+                            vertical-alignment: center; horizontal-stretch: 1;
+                            input-type: password; single-line: true;
+                            accepted => { root.unlock(self.text); }
+                        }
+                    }
+
+                    if pw-input.text == "": Text {
+                        x: AppTheme.sp-md; y: 0; height: parent.height;
+                        text: "Enter Password";
+                        font-size: 16px; color: AppTheme.text-tertiary;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            if wrong-password: Text {
+                text: "Incorrect password. Please try again.";
+                font-size: 13px; color: AppTheme.accent-danger;
+                horizontal-alignment: center;
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 320px;
+                    height: 52px; border-radius: 16px;
+                    background: AppTheme.accent;
+                    TouchArea {
+                        clicked => { root.unlock(pw-input.text); }
+                        Text {
+                            text: "Unlock";
+                            font-size: 17px; font-weight: 700; color: #FFFFFF;
+                            horizontal-alignment: center; vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

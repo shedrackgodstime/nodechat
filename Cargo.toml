@@ -1,73 +1,60 @@
 [package]
-name = "nodechat"
+name = "NodeChat"
+description = "NodeChat — A Secure Decentralized P2P Messenger"
 version = "0.1.0"
 edition = "2024"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
-# P2P & Discovery
-iroh = "0.97.0"
-iroh-gossip = "0.97.0"
-iroh-tickets = "0.4.0"
-pkarr = "5.0"
-
-# E2EE Crypto
-x25519-dalek = { version = "2.0", features = ["static_secrets"] }
-chacha20poly1305 = "0.10"
-sha2 = "0.10.8"
-# UI
-# UI
-eframe = { version = "0.34", default-features = false, features = ["glow", "default_fonts", "wayland", "x11"] }
-egui = "0.34"
-rand = "0.8"
-parking_lot = "0.12"
-
-# Storage
-rusqlite = { version = "0.31", features = ["bundled"] }
-
-# Async Core
-tokio = { version = "1.50", features = ["full", "rt-multi-thread"] }
-futures = "0.3"
-uuid = { version = "1.8", features = ["v4", "serde"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-anyhow = "1.0"
-data-encoding = "2.2"
-hex = "0.4.3"
-log = "0.4"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-digest = { version = "0.10", optional = true }
+iroh = "=0.97.0"
+iroh-gossip = "=0.97.0"
+x25519-dalek = "=2.0.1"
+chacha20poly1305 = "=0.10.1"
+sha2 = "=0.10.8"
+rusqlite = "=0.31.0"
+tokio = "=1.50.0"
+uuid = "=1.8.0"
+anyhow = "=1.0.102"
+rand = "=0.8.0"
+tracing = "=0.1"
+tracing-subscriber = "=0.3"
+slint = { version = "=1.15.1", features = ["backend-winit"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
-android_logger = "0.15"
-winit = { version = "0.30", features = ["android-native-activity"] }
-android-activity = { path = "hello_android/vendor/android-activity", features = ["native-activity"] }
-eframe = { version = "0.34", default-features = false, features = ["glow", "android-native-activity"] }
+slint = { version = "=1.15.1", features = ["backend-android-activity-06"] }
+android-activity = "0.6.0"
+
+[dependencies.android-activity]
+version = "0.6.0"
+optional = true
 
 [features]
-digest = ["dep:digest"]
+default = []
+android = ["dep:android-activity"]
 
-[patch.crates-io]
-android-activity = { path = "hello_android/vendor/android-activity" }
+[build-dependencies]
+slint-build = "=1.15.1"
+
+[lib]
+name = "nodechat"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "NodeChat"
+path = "src/main.rs"
 
 [package.metadata.android]
-package = "com.nodechat"
-build_targets = ["aarch64-linux-android", "x86_64-linux-android"]
-[[package.metadata.android.uses_permission]]
-name = "android.permission.INTERNET"
+apk_name = "NodeChat"
+label = "NodeChat"
+package = "com.nodechat.app"
+target_sdk_version = 33
+min_sdk_version = 24
+resources = "android/res"
 
-[[package.metadata.android.uses_permission]]
-name = "android.permission.ACCESS_NETWORK_STATE"
-
-[package.metadata.android.sdk]
-min_sdk_version = 23
-target_sdk_version = 24
+[package.metadata.android.application]
+icon = "@mipmap/ic_launcher"
 
 [package.metadata.android.signing.release]
-alias = "androiddebugkey"
-path = "/home/kristency/.android/debug.keystore"
-keystore_password = "android"
-key_password = "android"
+path = "release.keystore"
+keystore_password = "nodechat"
+key_alias = "nodechat"
+key_password = "nodechat"

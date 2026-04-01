@@ -1,0 +1,171 @@
+import { ScrollView } from "std-widgets.slint";
+import { AppTheme } from "../theme.slint";
+import { ContactRow } from "../components/contact_row.slint";
+
+// SelectMembersScreen — Group Creation Phase 1
+// Allows users to toggle selection for multiple decentralized peers.
+
+export struct SelectionData {
+    id: string,
+    name: string,
+    initials: string,
+    is-selected: bool,
+    is-online: bool,
+}
+
+export component SelectMembersScreen inherits Rectangle {
+    in property <[SelectionData]> contacts: [
+        { id: "1", name: "Eric O.",   initials: "EO", is-selected: false, is-online: true },
+        { id: "2", name: "Mama",      initials: "MA", is-selected: false, is-online: false },
+        { id: "3", name: "Shedrack",  initials: "SG", is-selected: false, is-online: true },
+        { id: "4", name: "Anon 4f7c", initials: "AN", is-selected: false, is-online: false },
+    ];
+    in property <bool>   is-desktop: false;
+    in property <length> safe-area-top: 0px;
+    in property <int>    selected-count: 0;
+
+    callback go-back();
+    callback toggle-selection(string); // id
+    callback next-step(); // Move to Group Name Screen
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        padding: 0;
+        spacing: 0;
+
+        // --- Pro Immersive Header ──────────────────────────────────
+        Rectangle {
+            height: (is-desktop ? 64px : 72px) + root.safe-area-top;
+            background: AppTheme.surface-secondary;
+            
+            Rectangle {
+                y: parent.height - 1px;
+                width: 100%; height: 1px;
+                background: AppTheme.divider; 
+            }
+
+            HorizontalLayout {
+                y: root.safe-area-top;
+                height: is-desktop ? 64px : 72px;
+                padding-left: 12px;
+                padding-right: 16px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        TouchArea {
+                            width: 32px; height: 32px;
+                            clicked => { root.go-back(); }
+                            Text { text: "✕"; font-size: 22px; color: AppTheme.text-secondary; horizontal-alignment: center; vertical-alignment: center; }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: "Select members";
+                            font-size: 18px; font-weight: 700;
+                            color: AppTheme.text-primary;
+                        }
+                        Text {
+                            text: selected-count + " of " + contacts.length + " selected";
+                            font-size: 12px; color: AppTheme.accent; font-weight: 700;
+                        }
+                    }
+                }
+
+                if selected-count > 0: VerticalLayout {
+                    alignment: center;
+                    TouchArea {
+                        width: 60px; height: 36px;
+                        clicked => { root.next-step(); }
+                        Rectangle {
+                            background: AppTheme.accent;
+                            border-radius: 12px;
+                            Text { text: "Next"; font-size: 14px; font-weight: 800; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Search/Peers Stream (Desktop-Adaptive) ───────────────────────
+        ScrollView {
+            vertical-stretch: 1;
+            mouse-drag-pan-enabled: true;
+
+            HorizontalLayout {
+                alignment: center; 
+                VerticalLayout {
+                    width: is-desktop ? 640px : root.width;
+                    alignment: start;
+
+                    for contact[i] in contacts: TouchArea {
+                        height: 74px;
+                        clicked => { root.toggle-selection(contact.id); }
+                        
+                        Rectangle {
+                            background: contact.is-selected ? AppTheme.surface-secondary : transparent;
+                            animate background { duration: 150ms; }
+
+                            HorizontalLayout {
+                                padding-left: 16px; padding-right: 16px; spacing: 14px;
+                                alignment: start;
+
+                                // Avatar
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 52px; height: 52px;
+                                        border-radius: 26px;
+                                        background: contact.is-selected ? AppTheme.accent : AppTheme.surface-tertiary;
+                                        animate background { duration: 150ms; }
+                                        Text { text: contact.initials; font-size: 18px; font-weight: 700; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                                    }
+                                }
+
+                                // Name & Selection Indicator
+                                HorizontalLayout {
+                                    horizontal-stretch: 1;
+                                    alignment: space-between;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text { text: contact.name; font-size: 16px; font-weight: 600; color: AppTheme.text-primary; }
+                                        Text { text: contact.is-online ? "online" : "offline"; font-size: 11px; color: contact.is-online ? AppTheme.accent-success : AppTheme.text-tertiary; }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 24px; height: 24px;
+                                            border-radius: 12px;
+                                            border-width: 2px;
+                                            border-color: contact.is-selected ? AppTheme.accent-success : AppTheme.divider;
+                                            background: contact.is-selected ? AppTheme.accent-success : transparent;
+                                            animate background { duration: 100ms; }
+                                            
+                                            if contact.is-selected: Text { text: "✓"; font-size: 14px; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Divider with 82px indent
+                            Rectangle {
+                                y: parent.height - 1px; height: 1px;
+                                background: AppTheme.divider; opacity: 0.15;
+                                x: 82px; width: parent.width - 82px;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

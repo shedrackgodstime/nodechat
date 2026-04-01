@@ -1,0 +1,201 @@
+import { AppTheme } from "../theme.slint";
+import { ScrollView } from "std-widgets.slint";
+
+// VerifyKeyScreen — Pro Security Verification UI
+// Standardized for high-end P2P key verification (Safety Numbers).
+
+export component VerifyKeyScreen inherits Rectangle {
+    in property <string> peer-name: "";
+    in property <bool>   is-desktop: false;
+    in property <length> safe-area-top: 0px;
+
+    // Safety numbers (9 chunks of 5-digits)
+    in property <string> num-1: "47821";
+    in property <string> num-2: "90134";
+    in property <string> num-3: "22871";
+    in property <string> num-4: "55409";
+    in property <string> num-5: "13782";
+    in property <string> num-6: "88021";
+    in property <string> num-7: "30156";
+    in property <string> num-8: "71943";
+    in property <string> num-9: "04820";
+
+    callback mark-verified();
+    callback scan-qr();
+    callback go-back();
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        padding: 0;
+        spacing: 0;
+
+        // --- Pro Immersive Header ──────────────────────────────────
+        Rectangle {
+            height: (is-desktop ? 64px : 72px) + root.safe-area-top;
+            background: AppTheme.surface-secondary;
+            
+            Rectangle {
+                y: parent.height - 1px;
+                width: 100%; height: 1px;
+                background: AppTheme.divider; 
+            }
+
+            HorizontalLayout {
+                y: root.safe-area-top;
+                height: is-desktop ? 64px : 72px;
+                padding-left: 12px;
+                padding-right: 16px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        TouchArea {
+                            width: 32px; height: 32px;
+                            clicked => { root.go-back(); }
+                            Text { text: "←"; font-size: 22px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: "Verify Security Key";
+                            font-size: 18px; font-weight: 700;
+                            color: AppTheme.text-primary;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                if is-desktop: VerticalLayout {
+                    alignment: center;
+                    TouchArea {
+                        width: 44px; height: 44px;
+                        clicked => { root.go-back(); }
+                        Text { text: "✕"; font-size: 20px; color: AppTheme.text-secondary; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
+
+        // --- Desktop-Adaptive Body ──────────────────────────────────────────
+        ScrollView {
+            vertical-stretch: 1;
+            mouse-drag-pan-enabled: true;
+
+            HorizontalLayout {
+                alignment: center;
+                
+                VerticalLayout {
+                    width: is-desktop ? 640px : root.width;
+                    padding: 16px;
+                    padding-top: 24px;
+                    spacing: 24px;
+                    alignment: start;
+
+                    // Header Text
+                    Text {
+                        text: "Compare these safety numbers with " + peer-name + " to confirm the E2EE link is secure.";
+                        font-size: 14px; color: AppTheme.text-secondary; horizontal-alignment: center; wrap: word-wrap;
+                    }
+
+                    // --- SECTION: SAFETY NUMBERS GRID ---
+                    VerticalLayout {
+                        spacing: 12px;
+                        VerticalLayout {
+                            padding-left: 8px;
+                            Text { text: "VERIFICATION CODE"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 0.8px; }
+                        }
+                        
+                        Rectangle {
+                            border-radius: 18px;
+                            background: AppTheme.surface-secondary;
+                            
+                            VerticalLayout {
+                                padding: 18px;
+                                spacing: 12px;
+
+                                // 3x3 Grid
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    for n in [num-1, num-2, num-3]: Rectangle {
+                                        horizontal-stretch: 1; height: 58px; border-radius: 12px; background: AppTheme.surface-tertiary;
+                                        Text { text: n; font-size: 18px; font-weight: 800; color: AppTheme.text-primary; horizontal-alignment: center; vertical-alignment: center; font-family: "monospace"; letter-spacing: 1px; }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    for n in [num-4, num-5, num-6]: Rectangle {
+                                        horizontal-stretch: 1; height: 58px; border-radius: 12px; background: AppTheme.surface-tertiary;
+                                        Text { text: n; font-size: 18px; font-weight: 800; color: AppTheme.text-primary; horizontal-alignment: center; vertical-alignment: center; font-family: "monospace"; letter-spacing: 1px; }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    for n in [num-7, num-8, num-9]: Rectangle {
+                                        horizontal-stretch: 1; height: 58px; border-radius: 12px; background: AppTheme.surface-tertiary;
+                                        Text { text: n; font-size: 18px; font-weight: 800; color: AppTheme.text-primary; horizontal-alignment: center; vertical-alignment: center; font-family: "monospace"; letter-spacing: 1px; }
+                                    }
+                                }
+
+                                TouchArea {
+                                    height: 52px;
+                                    clicked => { root.scan-qr(); }
+                                    HorizontalLayout {
+                                        alignment: center; spacing: 8px;
+                                        Text { text: "📷"; font-size: 16px; vertical-alignment: center; }
+                                        Text { text: "Scan Friend's Device"; font-size: 14px; font-weight: 700; color: AppTheme.accent; vertical-alignment: center; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // --- SECTION: ACTIONS ---
+                    VerticalLayout {
+                        spacing: 12px;
+                        VerticalLayout {
+                            padding-left: 8px;
+                            Text { text: "TRUST DECISION"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 0.8px; }
+                        }
+
+                        Rectangle {
+                            border-radius: 20px;
+                            height: 60px;
+                            background: AppTheme.accent-success;
+                            
+                            TouchArea {
+                                clicked => { root.mark-verified(); }
+                                Text {
+                                    text: "✓  Verify & Secure Channel";
+                                    font-size: 16px; font-weight: 800; color: #FFFFFF;
+                                    horizontal-alignment: center; vertical-alignment: center;
+                                }
+                            }
+                        }
+                        
+                        VerticalLayout {
+                            padding-top: 12px;
+                            spacing: 8px;
+                            Text {
+                                text: "⚠️ NUMBERS DON'T MATCH?";
+                                font-size: 11px; font-weight: 900; color: AppTheme.accent-danger; horizontal-alignment: center;
+                            }
+                            Text {
+                                text: "If the numbers differ, someone may be intercepting your connection. Do not continue this conversation.";
+                                font-size: 11px; color: AppTheme.text-tertiary; horizontal-alignment: center; wrap: word-wrap;
+                            }
+                        }
+                    }
+                    
+                    Rectangle { height: 32px; }
+                }
+            }
+        }
+    }
+}

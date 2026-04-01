@@ -1,0 +1,102 @@
+import { AppTheme } from "../theme.slint";
+
+// MessageBubble — High-End Decentralized Messaging UI (NodeChat Identity)
+// Cleaned up for zero-warning compilation.
+
+export component MessageBubble inherits Rectangle {
+    in property <string> text: "";
+    in property <string> timestamp: "";
+    in property <bool>   is-mine: false;
+    in property <string> status: "";          
+    in property <bool>   is-ephemeral: false;
+    in property <int>    ttl-seconds: 0;
+    in property <string> sender-name: "";     
+
+    callback clicked();
+
+    background: transparent;
+    min-height: bubble-layout.preferred-height + 8px;
+
+    HorizontalLayout {
+        alignment: is-mine ? end : start;
+        padding-left: is-mine ? 48px : 0;
+        padding-right: is-mine ? 0 : 48px;
+
+        // --- The Bubble Container ---
+        Rectangle {
+            background: is-mine ? AppTheme.bubble-out : AppTheme.bubble-in;
+            border-radius: 12px;
+            border-top-right-radius: is-mine ? 2px : 12px;
+            border-top-left-radius: is-mine ? 12px : 2px;
+
+            bubble-layout := VerticalLayout {
+                padding: 8px;
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 2px;
+
+                // Group sender name (NodeChat Groups)
+                if sender-name != "" && !is-mine: VerticalLayout {
+                    padding-bottom: 2px;
+                    Text {
+                        text: sender-name;
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: AppTheme.accent;
+                    }
+                }
+
+                // Ephemeral Timer (NodeChat Private Feature)
+                if is-ephemeral: HorizontalLayout {
+                    spacing: 4px;
+                    padding-bottom: 2px;
+                    Text { text: "⏱"; font-size: 10px; vertical-alignment: center; color: is-mine ? #CCC : AppTheme.text-secondary; }
+                    Text {
+                        text: (ttl-seconds / 60) + "m remaining";
+                        font-size: 10px;
+                        color: is-mine ? #CCC : AppTheme.text-secondary;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Message Body
+                Text {
+                    text: text;
+                    font-size: 15px;
+                    color: AppTheme.text-primary;
+                    wrap: word-wrap;
+                    horizontal-stretch: 1;
+                }
+
+                // Meta Row (Time + Status)
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 6px;
+                    padding-top: 4px;
+
+                    Text {
+                        text: timestamp;
+                        font-size: 11px;
+                        color: is-mine ? #BDC3C7 : AppTheme.text-secondary;
+                        vertical-alignment: center;
+                    }
+
+                    if is-mine: Text {
+                        text: 
+                            status == "read" ? "✓" :
+                            status == "delivered" ? "✓" :
+                            status == "sent" ? "✓" : "🕐";
+                        font-size: 13px;
+                        color: status == "read" ? AppTheme.accent : #8696A0;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+            
+            TouchArea {
+                clicked => { root.clicked(); }
+            }
+        }
+    }
+}

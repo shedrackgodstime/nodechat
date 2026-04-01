@@ -1,29 +1,39 @@
-use anyhow::Result;
-use eframe::egui;
-use nodechat::run_app;
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-fn main() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(fmt::layer())
-        .with(EnvFilter::from_default_env().add_directive("nodechat=info".parse().unwrap()))
-        .init();
+use anyhow::Context;
+mod core;
+mod ui;
 
-    let rt = tokio::runtime::Builder::new_multi_thread()
+slint::include_modules!();
+
+fn main() -> anyhow::Result<()> {
+    run_app()
+}
+
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+fn android_main(app: android_activity::AndroidApp) {
+    slint::android::init(app).unwrap();
+    run_app().unwrap();
+}
+
+fn run_app() -> anyhow::Result<()> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
-        .unwrap();
+        .context("Failed to build Tokio runtime")?;
 
-    let _enter = rt.enter();
+    let (_tx_commands, rx_commands) = tokio::sync::mpsc::channel(100);
 
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1000.0, 600.0])
-            .with_min_inner_size([400.0, 300.0]),
-        ..Default::default()
-    };
+    runtime.spawn(async move {
+        let worker = core::NodeChatWorker::new(rx_commands).await;
+        worker.run().await;
+    });
 
-    let db_path = "nodechat_local.sqlite".to_string();
+    let app = AppWindow::new()
+        .context("Failed to create Slint window")?;
 
-    run_app(options, db_path)
+    app.run()?;
+
+    Ok(())
 }

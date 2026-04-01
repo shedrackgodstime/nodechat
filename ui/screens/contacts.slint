@@ -1,0 +1,215 @@
+import { ScrollView } from "std-widgets.slint";
+import { AppTheme } from "../theme.slint";
+import { ContactRow } from "../components/contact_row.slint";
+
+// ContactsScreen — Pro Integrated P2P Phonebook
+// Designed for strict 'straight line' alignment and desktop-adaptive width.
+
+export struct ContactData {
+    id: string,
+    name: string,
+    initials: string,
+    node-id: string,
+    is-online: bool,
+    is-relay: bool,
+    is-verified: bool,
+}
+
+export component ContactsScreen inherits Rectangle {
+    in property <[ContactData]> contacts: [
+        { id: "1", name: "Eric O.",   initials: "EO", node-id: "nBq3p6X…C72E", is-online: true,  is-relay: false, is-verified: true },
+        { id: "2", name: "Mama",      initials: "MA", node-id: "x9B1C2…44FA", is-online: false, is-relay: false, is-verified: true },
+        { id: "3", name: "Anon 4f7c", initials: "AN", node-id: "k4F7C9…0012", is-online: true,  is-relay: true,  is-verified: false },
+    ];
+    in property <bool>   is-desktop: false;
+    in property <length> safe-area-top: 0px;
+
+    callback go-back();
+    callback open-chat(string);    
+    callback add-contact();
+    callback new-group();
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        padding: 0;
+        spacing: 0;
+
+        // --- Pro Immersive Header ──────────────────────────────────
+        Rectangle {
+            height: (is-desktop ? 64px : 72px) + root.safe-area-top;
+            background: AppTheme.surface-secondary;
+            
+            Rectangle {
+                y: parent.height - 1px;
+                width: 100%; height: 1px;
+                background: AppTheme.divider; 
+            }
+
+            HorizontalLayout {
+                y: root.safe-area-top;
+                height: is-desktop ? 64px : 72px;
+                padding-left: 12px;
+                padding-right: 16px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+
+                    if !is-desktop: VerticalLayout {
+                        alignment: center;
+                        TouchArea {
+                            width: 32px; height: 32px;
+                            clicked => { root.go-back(); }
+                            Text { text: "←"; font-size: 22px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: "Select Peer";
+                            font-size: 18px; font-weight: 700;
+                            color: AppTheme.text-primary;
+                        }
+                        Text {
+                            text: contacts.length + " decentralized contacts";
+                            font-size: 11px;
+                            color: AppTheme.text-tertiary;
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    TouchArea {
+                        width: 44px; height: 44px;
+                        clicked => { root.add-contact(); }
+                        Text { text: "⊕"; font-size: 22px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
+
+        // --- Search/Action Context Area ──────────────────────────────────
+        Rectangle {
+            height: 64px;
+            background: AppTheme.surface-secondary;
+            
+            VerticalLayout {
+                padding-left: 16px; padding-right: 16px; padding-bottom: 14px;
+                alignment: center;
+
+                Rectangle {
+                    border-radius: 16px;
+                    background: AppTheme.surface-tertiary;
+                    height: 48px;
+
+                    HorizontalLayout {
+                        padding-left: 18px; alignment: start; spacing: 12px;
+                        Text { text: "⚲"; font-size: 18px; color: AppTheme.text-tertiary; vertical-alignment: center; }
+                        search := TextInput {
+                            font-size: 17px; color: AppTheme.text-primary;
+                            horizontal-stretch: 1; vertical-alignment: center; single-line: true;
+                        }
+                    }
+
+                    if search.text == "": Text {
+                        x: 48px; height: parent.height;
+                        text: "Search name, ID or group...";
+                        font-size: 17px; color: AppTheme.text-tertiary;
+                        vertical-alignment: center; opacity: 0.5;
+                    }
+                }
+            }
+        }
+
+        // --- Scrollable Directory (Desktop-Adaptive) ─────────────────────
+        ScrollView {
+            vertical-stretch: 1;
+            mouse-drag-pan-enabled: true;
+
+            HorizontalLayout {
+                alignment: start; // Left-aligned on desktop
+                VerticalLayout {
+                    max-width: 800px;
+                    horizontal-stretch: 1;
+                    alignment: start;
+
+                    // Header: Direct Actions
+                    VerticalLayout {
+                        padding-left: 16px; padding-top: 24px; padding-bottom: 12px;
+                        Text { text: "DIRECT ACTIONS"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 0.8px; }
+                    }
+
+                    TouchArea {
+                        height: 64px;
+                        clicked => { root.new-group(); }
+                        HorizontalLayout {
+                            padding-left: 16px; padding-right: 16px; spacing: 14px;
+                            alignment: start;
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 52px; height: 52px; border-radius: 26px;
+                                    background: AppTheme.surface-tertiary;
+                                    Text { text: "👥"; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Text { text: "Create New P2P Group"; font-size: 16px; font-weight: 700; color: AppTheme.accent; }
+                            }
+                        }
+                    }
+
+                    // Divider with standard 82px indent
+                    HorizontalLayout {
+                        padding-left: 82px;
+                        Rectangle { height: 1px; background: AppTheme.divider; opacity: 0.15; horizontal-stretch: 1; }
+                    }
+
+                    TouchArea {
+                        height: 64px;
+                        clicked => { root.add-contact(); }
+                        HorizontalLayout {
+                            padding-left: 16px; padding-right: 16px; spacing: 14px;
+                            alignment: start;
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 52px; height: 52px; border-radius: 26px;
+                                    background: AppTheme.surface-tertiary;
+                                    Text { text: "👤"; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Text { text: "Add Peer by NodeId"; font-size: 16px; font-weight: 700; color: AppTheme.accent; }
+                            }
+                        }
+                    }
+
+                    // Header: Peer Directory
+                    VerticalLayout {
+                        padding-left: 16px; padding-top: 32px; padding-bottom: 12px;
+                        Text { text: "PEER DIRECTORY"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 0.8px; }
+                    }
+
+                    // The actual contact list
+                    for contact[i] in contacts: ContactRow {
+                        name:        contact.name;
+                        initials:    contact.initials;
+                        last-message: contact.node-id; // Shows ID as subtitle
+                        timestamp:   "";
+                        is-online:   contact.is-online;
+                        is-relay:    contact.is-relay;
+                        is-verified: contact.is-verified;
+                        clicked => { root.open-chat(contact.id); }
+                    }
+                }
+            }
+        }
+    }
+}
