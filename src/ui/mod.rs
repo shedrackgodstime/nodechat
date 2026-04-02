@@ -82,11 +82,10 @@ fn wire_send_group_message(app: &AppWindow, tx: mpsc::Sender<Command>) {
 /// Fired when the user confirms adding a new contact.
 /// Rust: sends Command::SendDirectMessage with a handshake payload (to be defined).
 fn wire_add_contact(app: &AppWindow, tx: mpsc::Sender<Command>) {
-    app.on_add_contact(move |node_id, _name| {
-        // WIRE: register peer in DB, initiate X25519 handshake
-        let _ = tx.try_send(Command::SendDirectMessage {
-            target:    node_id.to_string(),
-            plaintext: String::from("{\"type\":\"handshake\"}"),
+    app.on_add_contact(move |ticket_or_id, name| {
+        let _ = tx.try_send(Command::AddContact {
+            ticket_or_id: ticket_or_id.to_string(),
+            display_name: name.to_string(),
         });
     });
 }
@@ -109,9 +108,9 @@ fn wire_copy_node_id(app: &AppWindow, _tx: mpsc::Sender<Command>) {
     app.on_copy_node_id(move || {
         if let Some(app) = handle.upgrade() {
             let node_id = app.get_my_node_id().to_string();
-            // Note: Manual clipboard set is disabled here due to API mismatch in this Slint version.
-            // However, the Node ID is now a ReadOnly TextInput, so users can highlight and copy natively.
-            tracing::info!("node id requested for copy: {}", node_id);
+            // Note: Actual clipboard copy is handled natively in Slint (settings.slint / identity_card.slint)
+            // for maximum cross-platform (Desktop + Android) compatibility.
+            tracing::info!("node id copy event logged from UI: {}", node_id);
         }
     });
 }

@@ -21,6 +21,7 @@ use uuid::Uuid;
 use crate::crypto::CryptoManager;
 use crate::p2p::{NetworkEvent, NetworkManager};
 use crate::storage::{self, queries};
+use iroh_tickets::Ticket;
 
 use commands::{AppEvent, Command, MessageStatus};
 
@@ -63,17 +64,19 @@ impl NodeChatWorker {
         let (net_tx, rx_network) = mpsc::channel(NETWORK_EVENT_CHANNEL_CAPACITY);
 
         let mut network = NetworkManager::new(net_tx);
-        network.initialize().await.context("failed to bind network endpoint")?;
+
 
         // Load identity if it exists.
         let local_identity = queries::get_local_identity(&db)?;
+        let mut iroh_secret = None;
         let crypto = if let Some(rec) = local_identity {
             let mut iroh_seed = [0u8; 32];
             iroh_seed.copy_from_slice(&rec.node_id_bytes);
             
             // Recover iroh public key (NodeID) from the secret seed
-            let iroh_secret = iroh::SecretKey::from_bytes(&iroh_seed);
-            let public_node_id = iroh_secret.public();
+            let secret = iroh::SecretKey::from_bytes(&iroh_seed);
+            let public_node_id = secret.public();
+            iroh_secret = Some(secret);
             
             let mut x25519_secret = [0u8; 32];
             x25519_secret.copy_from_slice(&rec.x25519_secret);
@@ -83,6 +86,9 @@ impl NodeChatWorker {
         } else {
             None
         };
+
+        // Initialize network (possibly with our persisted secret)
+        network.initialize(iroh_secret).await.context("failed to bind network endpoint")?;
 
         Ok(Self {
             db,
@@ -99,6 +105,7 @@ impl NodeChatWorker {
         let mut flush_interval =
             tokio::time::interval(tokio::time::Duration::from_secs(QUEUE_FLUSH_INTERVAL_SECS));
 
+        self.emit_network_status().await;
         loop {
             tokio::select! {
                 // ── UI Commands ──────────────────────────────────────────────
@@ -121,6 +128,7 @@ impl NodeChatWorker {
                     if let Err(e) = self.flush_offline_queue().await {
                         tracing::error!("queue flush error: {:?}", e);
                     }
+                    self.emit_network_status().await;
                 }
             }
         }
@@ -157,6 +165,9 @@ impl NodeChatWorker {
             }
             Command::FinaliseIdentity => {
                 self.cmd_finalise_identity().await
+            }
+            Command::AddContact { ticket_or_id, display_name } => {
+                self.cmd_add_contact(ticket_or_id, display_name).await
             }
             Command::ClearMessages => {
                 self.cmd_clear_messages().await
@@ -499,6 +510,51 @@ impl NodeChatWorker {
             }
         }
         Ok(())
+    }
+
+    async fn cmd_add_contact(&mut self, ticket_or_id: String, display_name: String) -> Result<()> {
+        // Parse the ticket or ID.
+        // If it's a ticket (starts with 'ticket:' or is long/base32), we extract the NodeId.
+        // For now, I'll defer complex ticket parsing to NetworkManager but I need the raw NodeId for the DB.
+        
+        let node_id = if ticket_or_id.len() > 64 {
+            match iroh_tickets::endpoint::EndpointTicket::deserialize(&ticket_or_id) {
+                Ok(ticket) => {
+                    let ticket: iroh_tickets::endpoint::EndpointTicket = ticket;
+                    ticket.endpoint_addr().id.to_string()
+                }
+                _ => {
+                    // Fallback to raw string if it's just a node id
+                    ticket_or_id.clone()
+                }
+            }
+        } else {
+            ticket_or_id.clone()
+        };
+
+        let record = storage::queries::PeerRecord {
+            node_id:       node_id.clone(),
+            display_name:  display_name.clone(),
+            x25519_pubkey: "".to_owned(), // Placeholder until first handshake (C-04)
+            verified:      false,
+        };
+        queries::insert_peer(&self.db, &record).context("failed to save contact")?;
+
+        tracing::info!(peer = %node_id, name = %display_name, "added new contact");
+        
+        // Push initial network status update to UI (since peer counts might have changed)
+        self.emit_network_status().await;
+        
+        Ok(())
+    }
+
+    async fn emit_network_status(&mut self) {
+        let status = self.network.connection_status();
+        self.emit(AppEvent::NetworkStatus {
+            direct_peers: status.direct as i32,
+            relay_peers:  status.relay as i32,
+            is_offline:   status.direct == 0 && status.relay == 0,
+        });
     }
 
     async fn cmd_clear_messages(&mut self) -> Result<()> {

@@ -100,6 +100,9 @@ export component SettingsScreen inherits Rectangle {
                     spacing: 14px;
                     alignment: start;
 
+                    // Hidden input for native clipboard operations
+                    copy-input := TextInput { width: 0px; height: 0px; opacity: 0; }
+
                     // --- PROFILE SPOTLIGHT CARD ---
                     Rectangle {
                         height: 90px;
@@ -158,25 +161,48 @@ export component SettingsScreen inherits Rectangle {
 
                                 Rectangle { height: 1px; background: AppTheme.divider; opacity: 0.4; }
 
-                                TouchArea {
-                                    height: 60px;
-                                    clicked => { root.copy-node-id(); }
+                                node-id-touch := TouchArea {
+                                    min-height: 60px;
+                                    property <bool> copied: false;
+                                    clicked => { 
+                                        // Use native Slint copy mechanism (official doc approach)
+                                        copy-input.text = node-id;
+                                        copy-input.select-all();
+                                        copy-input.copy();
+                                        copy-input.clear-selection();
+                                        
+                                        // Visual feedback
+                                        self.copied = true;
+                                        root.copy-node-id(); // notify Rust
+                                    }
+                                    
+                                    Timer {
+                                        interval: 2s;
+                                        running: node-id-touch.copied;
+                                        triggered => { node-id-touch.copied = false; }
+                                    }
+
                                     HorizontalLayout {
                                         padding-left: 16px; padding-right: 16px; alignment: center; spacing: 14px;
                                         Text { text: "🔑"; font-size: 18px; vertical-alignment: center; }
                                         VerticalLayout {
                                             horizontal-stretch: 1; alignment: center;
                                             Text { text: "Private Node Identifier"; font-size: 15px; font-weight: 600; color: AppTheme.text-primary; }
-                                            TextInput { 
+                                            Text { 
                                                 text: node-id; 
                                                 font-size: 11px; 
                                                 color: AppTheme.text-tertiary; 
                                                 font-family: "monospace"; 
-                                                read-only: true;
-                                                single-line: true;
+                                                wrap: word-wrap;
                                             }
                                         }
-                                        Text { text: "📋"; font-size: 14px; color: AppTheme.accent; vertical-alignment: center; }
+                                        Text { 
+                                            text: node-id-touch.copied ? "✅" : "📋"; 
+                                            font-size: 16px; 
+                                            color: node-id-touch.copied ? #25D366 : AppTheme.accent; 
+                                            vertical-alignment: center; 
+                                            animate color { duration: 150ms; }
+                                        }
                                     }
                                 }
 

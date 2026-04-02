@@ -129,8 +129,7 @@ export component AppWindow inherits Window {
 
             // ── LEFT PANEL (Sidebar on desktop / Home on mobile) ──────────
             if is-desktop || current-screen == 0 || current-screen == 6: Rectangle {
-                width: is-desktop ? 340px : 0px; 
-                horizontal-stretch: is-desktop ? 0 : 1;
+                width: is-desktop ? 340px : root.width; 
                 background: AppTheme.surface-primary;
 
                 if is-desktop || current-screen == 0: ChatListScreen {
