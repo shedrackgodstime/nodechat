@@ -15,40 +15,35 @@ use super::NetworkManager;
 /// # Errors
 /// Returns an error if the peer is unreachable. Caller is responsible for queuing.
 pub(crate) async fn send(
-    _manager: &mut NetworkManager,
+    manager: &mut NetworkManager,
     target_node_id: &str,
     payload: Vec<u8>,
 ) -> Result<()> {
-    // WIRE: iroh 0.97.0
-    //
-    // let endpoint = manager.endpoint.as_ref()
-    //     .ok_or_else(|| anyhow::anyhow!("endpoint not initialised"))?;
-    //
-    // // Reuse existing connection (RULES.md P-04).
-    // if let Some(conn) = manager.connections.get(target_node_id) {
-    //     let mut send_stream = conn.open_uni().await?;
-    //     send_stream.write_all(&payload).await?;
-    //     send_stream.finish().await?;
-    //     return Ok(());
-    // }
-    //
-    // // Pkarr discovery before queuing (RULES.md P-03).
-    // let node_id: iroh::NodeId = target_node_id.parse()
-    //     .context("invalid node id")?;
-    // let addr = endpoint.resolve(node_id).await
-    //     .context("pkarr discovery failed for peer")?;
-    //
-    // let conn = endpoint.connect(addr, b"nodechat/alpha").await
-    //     .context("failed to connect to peer")?;
-    // let mut send_stream = conn.open_uni().await?;
-    // send_stream.write_all(&payload).await?;
-    // send_stream.finish().await?;
-    // manager.connections.insert(target_node_id.to_owned(), conn);
+    let endpoint = manager.endpoint.as_ref()
+        .ok_or_else(|| anyhow::anyhow!("endpoint not initialised"))?;
 
-    tracing::warn!(
+    let target: iroh::EndpointId = target_node_id.parse()?;
+
+    // Reuse existing connection if possible (RULES.md P-04)
+    let conn = if let Some(conn) = manager.connections.get(target_node_id) {
+        conn.clone()
+    } else {
+        // Iroh 0.97.0 connect with ALPN
+        let conn = endpoint.connect(iroh::EndpointAddr::from(target), b"nodechat/alpha").await?;
+        manager.connections.insert(target_node_id.to_owned(), conn.clone());
+        conn
+    };
+
+    // Open uni-directional stream for fire-and-forget message delivery
+    let mut send_stream = conn.open_uni().await?;
+    send_stream.write_all(&payload).await?;
+    send_stream.finish()?;
+
+    tracing::debug!(
         peer = target_node_id,
         payload_len = payload.len(),
-        "direct::send — iroh 0.97.0 wiring pending"
+        "Direct message sent successfully"
     );
+
     Ok(())
 }

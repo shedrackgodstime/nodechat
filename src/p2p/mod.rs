@@ -58,18 +58,14 @@ pub enum NetworkEvent {
 // Scaffold: fields are unused until iroh 0.97.0 API is wired. Remove this allow before Phase 3.
 #[allow(dead_code)]
 pub struct NetworkManager {
-    /// Iroh endpoint. Concrete type is iroh::Endpoint — kept as `Option` until
-    /// `initialize` is called so the struct can be constructed before `async` context.
-    // WIRE: replace with iroh::Endpoint once API is confirmed for 0.97.0
-    endpoint: Option<()>,
+    /// Iroh endpoint.
+    endpoint: Option<iroh::Endpoint>,
 
     /// Iroh Gossip handle.
-    // WIRE: replace with iroh_gossip::Gossip once API is confirmed for 0.97.0
-    gossip: Option<()>,
+    gossip: Option<iroh_gossip::net::Gossip>,
 
     /// Reused connections keyed by hex-encoded NodeId (RULES.md P-04).
-    // WIRE: replace value type with iroh::Connection once API is confirmed
-    connections: HashMap<String, ()>,
+    connections: HashMap<String, iroh::endpoint::Connection>,
 
     /// Topics currently subscribed (for idempotency guard — RULES.md P-05).
     subscribed_topics: std::collections::HashSet<String>,
@@ -94,15 +90,51 @@ impl NetworkManager {
     ///
     /// # Errors
     /// Returns an error if the endpoint fails to bind.
-    pub async fn initialize(&mut self) -> Result<()> {
-        // WIRE: iroh 0.97.0
-        //   let endpoint = iroh::Endpoint::builder()
-        //       .discovery(Box::new(iroh::discovery::ConcurrentDiscovery::from_services(vec![...])))
-        //       .bind()
-        //       .await?;
-        //   self.endpoint = Some(endpoint);
-        //   self.gossip = Some(iroh_gossip::Gossip::builder().spawn(endpoint.clone()).await?);
-        tracing::warn!("NetworkManager::initialize — iroh 0.97.0 wiring pending");
+    pub async fn initialize(&mut self, secret_key: Option<iroh::SecretKey>) -> Result<()> {
+        let mut builder = iroh::Endpoint::builder(iroh::endpoint::presets::N0);
+        if let Some(s) = secret_key {
+            builder = builder.secret_key(s);
+        }
+        let endpoint = builder.bind().await?;
+        let gossip = iroh_gossip::net::Gossip::builder().spawn(endpoint.clone());
+
+        let node_id = endpoint.id();
+        self.endpoint = Some(endpoint.clone());
+        self.gossip = Some(gossip);
+
+        // Spawn incoming connection handler loop
+        let event_tx = self.event_tx.clone();
+        tokio::spawn(async move {
+            tracing::info!("Starting incoming connection loop for node {}", node_id);
+            while let Some(incoming) = endpoint.accept().await {
+                let event_tx = event_tx.clone();
+                tokio::spawn(async move {
+                    if let Ok(conn) = incoming.await {
+                        let remote_id = conn.remote_id().to_string();
+                        // Surface peer connection event to UI
+                        let _ = event_tx.send(NetworkEvent::PeerConnected {
+                            node_id: remote_id.clone(),
+                            via_relay: true, // WIRE: check if actually via relay
+                        }).await;
+
+                        // Listen for incoming uni-directional streams (typical for direct messages)
+                        while let Ok(mut recv) = conn.accept_uni().await {
+                            if let Ok(payload) = recv.read_to_end(MAX_PAYLOAD_BYTES).await {
+                                let _ = event_tx.send(NetworkEvent::DirectMessage {
+                                    from: remote_id.clone(),
+                                    payload,
+                                }).await;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+
+        tracing::info!(
+            node_id = node_id.to_string(),
+            "NetworkManager initialized with Iroh 0.97.0"
+        );
         Ok(())
     }
 
@@ -111,11 +143,10 @@ impl NetworkManager {
     /// # Errors
     /// Returns an error if the endpoint has not been initialised.
     pub fn local_node_id(&self) -> Result<String> {
-        if self.endpoint.is_none() {
-            bail!("network not initialised — call initialize() first");
-        }
-        // WIRE: Ok(self.endpoint.as_ref().unwrap().node_id().to_string())
-        Ok(String::from("00000000000000000000000000000000"))
+        self.endpoint
+            .as_ref()
+            .map(|e| e.id().to_string())
+            .ok_or_else(|| anyhow::anyhow!("network not initialised — call initialize() first"))
     }
 
     /// Send an encrypted payload to a peer directly (Iroh unicast).
@@ -176,4 +207,19 @@ impl NetworkManager {
             .await
             .map_err(|_| anyhow::anyhow!("network event channel closed"))
     }
+
+    /// Returns the number of currently active peer connections.
+    pub fn connection_status(&self) -> NetworkStatusInfo {
+        // WIRE: filter by iroh::endpoint::Connection stats to distinguish direct vs relay
+        // For now, we report the total count of active QUIC connections.
+        NetworkStatusInfo { 
+            direct: self.connections.len(), 
+            relay: 0 
+        }
+    }
+}
+
+pub struct NetworkStatusInfo {
+    pub direct: usize,
+    pub relay:  usize,
 }

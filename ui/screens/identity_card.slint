@@ -73,6 +73,9 @@ export component IdentityCardScreen inherits Rectangle {
                     }
                 }
 
+                // Hidden input for native clipboard operations
+                copy-input := TextInput { width: 0px; height: 0px; opacity: 0; }
+
                 // Node ID Display
                 VerticalLayout {
                     spacing: AppTheme.sp-xs;
@@ -95,7 +98,7 @@ export component IdentityCardScreen inherits Rectangle {
                             alignment: center;
 
                             Text {
-                                text: node-id; // Rust delivers truncated or full
+                                text: node-id;
                                 font-size: 13px;
                                 font-family: "monospace";
                                 color: AppTheme.text-secondary;
@@ -108,12 +111,28 @@ export component IdentityCardScreen inherits Rectangle {
                             Rectangle {
                                 width: 56px; height: 32px;
                                 border-radius: 8px;
-                                background: AppTheme.accent;
+                                background: node-id-touch.copied ? #25D366 : AppTheme.accent;
+                                animate background { duration: 150ms; }
 
-                                TouchArea {
-                                    clicked => { root.copy-node-id(); }
+                                node-id-touch := TouchArea {
+                                    property <bool> copied: false;
+                                    clicked => { 
+                                        copy-input.text = node-id;
+                                        copy-input.select-all();
+                                        copy-input.copy();
+                                        copy-input.clear-selection();
+                                        self.copied = true;
+                                        root.copy-node-id(); 
+                                    }
+                                    
+                                    Timer {
+                                        interval: 2s;
+                                        running: node-id-touch.copied;
+                                        triggered => { node-id-touch.copied = false; }
+                                    }
+
                                     Text {
-                                        text: "Copy";
+                                        text: node-id-touch.copied ? "✅" : "Copy";
                                         font-size: 13px;
                                         font-weight: 600;
                                         color: #FFFFFF;

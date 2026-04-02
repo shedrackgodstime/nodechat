@@ -126,6 +126,13 @@ pub enum Command {
         /// Hex-encoded NodeId of the peer to mark as verified.
         node_id: String,
     },
+    /// Add a new contact by Iroh EndpointTicket or raw NodeId.
+    AddContact {
+        /// The Iroh ticket string (base32) or raw hex NodeId.
+        ticket_or_id: String,
+        /// The local display name for this peer.
+        display_name: String,
+    },
     /// Clear all messages from the local database.
     ClearMessages,
     /// Delete the local identity and all associated data.
@@ -198,6 +205,16 @@ pub enum AppEvent {
         online: bool,
         /// `true` if the connection is routed through a DERP relay (reduced privacy).
         via_relay: bool,
+    },
+
+    /// Current global network health and peer counts.
+    NetworkStatus {
+        /// Number of peers reached via direct P2P (QUIC).
+        direct_peers: i32,
+        /// Number of peers reached via DERP relay.
+        relay_peers: i32,
+        /// `true` if this node has no connection to any relay/peer.
+        is_offline: bool,
     },
 
     /// Setup is complete, UI should hide onboarding overlay.

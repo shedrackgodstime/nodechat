@@ -58,6 +58,12 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
             tracing::info!("messages cleared — UI refresh pending");
         }
 
+        AppEvent::NetworkStatus { direct_peers, relay_peers, is_offline } => {
+            ui.set_direct_peers(direct_peers);
+            ui.set_relay_peers(relay_peers);
+            ui.set_is_offline(is_offline);
+        }
+
         AppEvent::Error { message } => {
             // WIRE: surface message in a toast / banner component
             tracing::warn!("backend error surfaced to UI: {}", message);
