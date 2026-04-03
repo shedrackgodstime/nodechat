@@ -7,13 +7,18 @@
 //! See `src/p2p/direct.rs` for 1:1 unicast and `src/p2p/group.rs` for gossip.
 
 use anyhow::{bail, Result};
-use std::collections::HashMap;
+use iroh::protocol::{AcceptError, ProtocolHandler, Router};
+use iroh_tickets::endpoint::EndpointTicket;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
 pub mod direct;
 pub mod group;
 
 /// Maximum bytes allowed in a single direct message payload (plaintext + overhead).
 const MAX_PAYLOAD_BYTES: usize = 64 * 1024; // 64 KiB
+/// ALPN used for direct NodeChat connections.
+pub const DIRECT_ALPN: &[u8] = b"nodechat/direct/1";
 
 /// Events produced by the network layer and consumed by the core worker.
 #[derive(Debug)]
@@ -61,14 +66,17 @@ pub struct NetworkManager {
     /// Iroh endpoint.
     endpoint: Option<iroh::Endpoint>,
 
+    /// Router that keeps our ALPN handlers alive for the lifetime of the endpoint.
+    router: Option<Router>,
+
     /// Iroh Gossip handle.
     gossip: Option<iroh_gossip::net::Gossip>,
 
     /// Reused connections keyed by hex-encoded NodeId (RULES.md P-04).
-    connections: HashMap<String, iroh::endpoint::Connection>,
+    connections: Arc<Mutex<HashMap<String, iroh::endpoint::Connection>>>,
 
     /// Topics currently subscribed (for idempotency guard — RULES.md P-05).
-    subscribed_topics: std::collections::HashSet<String>,
+    subscribed_topics: HashSet<String>,
 
     /// Sender half for surfacing network events to the core worker.
     event_tx: tokio::sync::mpsc::Sender<NetworkEvent>,
@@ -79,9 +87,10 @@ impl NetworkManager {
     pub fn new(event_tx: tokio::sync::mpsc::Sender<NetworkEvent>) -> Self {
         Self {
             endpoint: None,
+            router: None,
             gossip: None,
-            connections: HashMap::new(),
-            subscribed_topics: std::collections::HashSet::new(),
+            connections: Arc::new(Mutex::new(HashMap::new())),
+            subscribed_topics: HashSet::new(),
             event_tx,
         }
     }
@@ -96,40 +105,19 @@ impl NetworkManager {
             builder = builder.secret_key(s);
         }
         let endpoint = builder.bind().await?;
+        endpoint.online().await;
+        let router = Router::builder(endpoint.clone())
+            .accept(DIRECT_ALPN, DirectProtocolHandler {
+                event_tx: self.event_tx.clone(),
+                connections: self.connections.clone(),
+            })
+            .spawn();
         let gossip = iroh_gossip::net::Gossip::builder().spawn(endpoint.clone());
 
         let node_id = endpoint.id();
         self.endpoint = Some(endpoint.clone());
+        self.router = Some(router);
         self.gossip = Some(gossip);
-
-        // Spawn incoming connection handler loop
-        let event_tx = self.event_tx.clone();
-        tokio::spawn(async move {
-            tracing::info!("Starting incoming connection loop for node {}", node_id);
-            while let Some(incoming) = endpoint.accept().await {
-                let event_tx = event_tx.clone();
-                tokio::spawn(async move {
-                    if let Ok(conn) = incoming.await {
-                        let remote_id = conn.remote_id().to_string();
-                        // Surface peer connection event to UI
-                        let _ = event_tx.send(NetworkEvent::PeerConnected {
-                            node_id: remote_id.clone(),
-                            via_relay: true, // WIRE: check if actually via relay
-                        }).await;
-
-                        // Listen for incoming uni-directional streams (typical for direct messages)
-                        while let Ok(mut recv) = conn.accept_uni().await {
-                            if let Ok(payload) = recv.read_to_end(MAX_PAYLOAD_BYTES).await {
-                                let _ = event_tx.send(NetworkEvent::DirectMessage {
-                                    from: remote_id.clone(),
-                                    payload,
-                                }).await;
-                            }
-                        }
-                    }
-                });
-            }
-        });
 
         tracing::info!(
             node_id = node_id.to_string(),
@@ -149,6 +137,17 @@ impl NetworkManager {
             .ok_or_else(|| anyhow::anyhow!("network not initialised — call initialize() first"))
     }
 
+    /// Return this endpoint's shareable ticket string.
+    ///
+    /// The ticket packages the current endpoint address for manual peer discovery.
+    pub fn endpoint_ticket(&self) -> Result<String> {
+        let endpoint = self
+            .endpoint
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("network not initialised — call initialize() first"))?;
+        Ok(EndpointTicket::new(endpoint.addr()).to_string())
+    }
+
     /// Send an encrypted payload to a peer directly (Iroh unicast).
     ///
     /// Reuses an existing connection if one exists (RULES.md P-04).
@@ -156,7 +155,12 @@ impl NetworkManager {
     ///
     /// # Errors
     /// Returns an error if the peer is unreachable after Pkarr discovery (RULES.md P-02, P-03).
-    pub async fn send_direct(&mut self, target_node_id: &str, payload: Vec<u8>) -> Result<()> {
+    pub async fn send_direct(
+        &self,
+        target_node_id: &str,
+        dial_hint: Option<&str>,
+        payload: Vec<u8>,
+    ) -> Result<()> {
         if payload.len() > MAX_PAYLOAD_BYTES {
             bail!(
                 "payload exceeds maximum size ({} > {})",
@@ -164,7 +168,7 @@ impl NetworkManager {
                 MAX_PAYLOAD_BYTES
             );
         }
-        direct::send(self, target_node_id, payload).await
+        direct::send(self, target_node_id, dial_hint, payload).await
     }
 
     /// Broadcast an encrypted payload to all subscribers of a gossip topic (Iroh Gossip).
@@ -210,16 +214,115 @@ impl NetworkManager {
 
     /// Returns the number of currently active peer connections.
     pub fn connection_status(&self) -> NetworkStatusInfo {
+        let direct = self.connections.lock().map(|map| map.len()).unwrap_or(0);
         // WIRE: filter by iroh::endpoint::Connection stats to distinguish direct vs relay
-        // For now, we report the total count of active QUIC connections.
-        NetworkStatusInfo { 
-            direct: self.connections.len(), 
-            relay: 0 
+        NetworkStatusInfo { direct, relay: 0 }
+    }
+
+    /// Returns `true` if we currently have a cached direct connection for `target_node_id`.
+    pub fn has_connection(&self, target_node_id: &str) -> bool {
+        self.connections
+            .lock()
+            .map(|map| map.contains_key(target_node_id))
+            .unwrap_or(false)
+    }
+
+    /// Returns the currently connected peer node ids.
+    pub fn active_connections(&self) -> Vec<String> {
+        self.connections
+            .lock()
+            .map(|map| map.keys().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// Remove a cached connection for a peer after the conversation is deleted.
+    pub fn remove_connection(&self, target_node_id: &str) {
+        if let Ok(mut connections) = self.connections.lock() {
+            connections.remove(target_node_id);
         }
+    }
+
+    /// Spawn a background reader for a newly dialed direct connection.
+    ///
+    /// This is needed because direct replies can arrive on our outbound
+    /// connection, not only on inbound accepts.
+    pub(crate) fn spawn_direct_reader(&self, remote_id: String, connection: iroh::endpoint::Connection) {
+        let event_tx = self.event_tx.clone();
+        let connections = self.connections.clone();
+
+        tokio::spawn(async move {
+            if let Err(err) = drive_direct_connection(event_tx, connections, remote_id, connection, false).await {
+                tracing::debug!("direct reader task ended: {:?}", err);
+            }
+        });
     }
 }
 
 pub struct NetworkStatusInfo {
     pub direct: usize,
     pub relay:  usize,
+}
+
+#[derive(Clone, Debug)]
+struct DirectProtocolHandler {
+    event_tx: tokio::sync::mpsc::Sender<NetworkEvent>,
+    connections: Arc<Mutex<HashMap<String, iroh::endpoint::Connection>>>,
+}
+
+impl ProtocolHandler for DirectProtocolHandler {
+    async fn accept(
+        &self,
+        connection: iroh::endpoint::Connection,
+    ) -> Result<(), AcceptError> {
+        let remote_id = connection.remote_id().to_string();
+        tracing::info!(peer = %remote_id, "direct protocol accepted");
+        drive_direct_connection(
+            self.event_tx.clone(),
+            self.connections.clone(),
+            remote_id,
+            connection,
+            true,
+        )
+        .await
+    }
+}
+
+async fn drive_direct_connection(
+    event_tx: tokio::sync::mpsc::Sender<NetworkEvent>,
+    connections: Arc<Mutex<HashMap<String, iroh::endpoint::Connection>>>,
+    remote_id: String,
+    connection: iroh::endpoint::Connection,
+    via_relay: bool,
+) -> Result<(), AcceptError> {
+    {
+        let mut connections = connections.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        connections.insert(remote_id.clone(), connection.clone());
+    }
+
+    let _ = event_tx
+        .send(NetworkEvent::PeerConnected {
+            node_id: remote_id.clone(),
+            via_relay,
+        })
+        .await;
+
+    while let Ok(mut recv) = connection.accept_uni().await {
+        if let Ok(payload) = recv.read_to_end(MAX_PAYLOAD_BYTES).await {
+            let _ = event_tx
+                .send(NetworkEvent::DirectMessage {
+                    from: remote_id.clone(),
+                    payload,
+                })
+                .await;
+        }
+    }
+
+    {
+        let mut connections = connections.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        connections.remove(&remote_id);
+    }
+
+    let _ = event_tx.send(NetworkEvent::PeerDisconnected { node_id: remote_id }).await;
+
+    Ok(())
 }

@@ -5,7 +5,7 @@ export component WelcomeScreen inherits Rectangle {
     in property <bool> is-locked: false;
 
     callback get-started();
-    callback unlock(string);
+    callback unlock();
 
     property <bool> wrong-password: false;
 
@@ -26,7 +26,7 @@ export component WelcomeScreen inherits Rectangle {
         }
 
         Text {
-            text: is-locked ? "Enter your password to unlock" : "Secure. Private. Yours.";
+            text: is-locked ? "Tap Unlock to continue" : "Secure. Private. Yours.";
             font-size: 16px; 
             color: AppTheme.text-secondary;
             horizontal-alignment: center;
@@ -45,6 +45,8 @@ export component WelcomeScreen inherits Rectangle {
                     height: 52px; border-radius: 16px;
                     background: AppTheme.accent;
                     TouchArea {
+                        width: parent.width;
+                        height: parent.height;
                         clicked => { root.get-started(); }
                         Text {
                             text: "Get Started";
@@ -66,35 +68,8 @@ export component WelcomeScreen inherits Rectangle {
         if is-locked: VerticalLayout {
             spacing: AppTheme.sp-md;
 
-            HorizontalLayout {
-                alignment: center;
-                Rectangle {
-                    width: 320px;
-                    height: 52px; border-radius: AppTheme.radius-md;
-                    background: AppTheme.surface-secondary;
-
-                    HorizontalLayout {
-                        padding-left: AppTheme.sp-md; padding-right: AppTheme.sp-md;
-
-                        pw-input := TextInput {
-                            font-size: 16px; color: AppTheme.text-primary;
-                            vertical-alignment: center; horizontal-stretch: 1;
-                            input-type: password; single-line: true;
-                            accepted => { root.unlock(self.text); }
-                        }
-                    }
-
-                    if pw-input.text == "": Text {
-                        x: AppTheme.sp-md; y: 0; height: parent.height;
-                        text: "Enter Password";
-                        font-size: 16px; color: AppTheme.text-tertiary;
-                        vertical-alignment: center;
-                    }
-                }
-            }
-
             if wrong-password: Text {
-                text: "Incorrect password. Please try again.";
+                text: "Unlock failed. Please try again.";
                 font-size: 13px; color: AppTheme.accent-danger;
                 horizontal-alignment: center;
             }
@@ -106,7 +81,9 @@ export component WelcomeScreen inherits Rectangle {
                     height: 52px; border-radius: 16px;
                     background: AppTheme.accent;
                     TouchArea {
-                        clicked => { root.unlock(pw-input.text); }
+                        width: parent.width;
+                        height: parent.height;
+                        clicked => { root.unlock(); }
                         Text {
                             text: "Unlock";
                             font-size: 17px; font-weight: 700; color: #FFFFFF;

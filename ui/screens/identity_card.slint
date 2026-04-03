@@ -3,6 +3,7 @@ import { AppTheme } from "../theme.slint";
 export component IdentityCardScreen inherits Rectangle {
     in property <string> display-name: "";
     in property <string> node-id: "";
+    in property <string> endpoint-ticket: "";
 
     callback go-to-chats();
     callback copy-node-id();
@@ -80,7 +81,7 @@ export component IdentityCardScreen inherits Rectangle {
                 VerticalLayout {
                     spacing: AppTheme.sp-xs;
                     Text {
-                        text: "PUBLIC NODE ID";
+                        text: "SHAREABLE TICKET";
                         font-size: 11px;
                         font-weight: 700;
                         color: AppTheme.text-tertiary;
@@ -98,7 +99,7 @@ export component IdentityCardScreen inherits Rectangle {
                             alignment: center;
 
                             Text {
-                                text: node-id;
+                                text: endpoint-ticket;
                                 font-size: 13px;
                                 font-family: "monospace";
                                 color: AppTheme.text-secondary;
@@ -117,7 +118,7 @@ export component IdentityCardScreen inherits Rectangle {
                                 node-id-touch := TouchArea {
                                     property <bool> copied: false;
                                     clicked => { 
-                                        copy-input.text = node-id;
+                                        copy-input.text = endpoint-ticket;
                                         copy-input.select-all();
                                         copy-input.copy();
                                         copy-input.clear-selection();
@@ -148,7 +149,7 @@ export component IdentityCardScreen inherits Rectangle {
         }
 
         Text {
-            text: "Share your ID or QR code with friends to start chatting securely and privately.";
+            text: "Share your ticket or QR code with friends to start chatting securely and privately.";
             font-size: 13px;
             color: AppTheme.text-tertiary;
             horizontal-alignment: center;

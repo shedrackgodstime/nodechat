@@ -23,12 +23,8 @@ export component ChatViewScreen inherits Rectangle {
     in property <bool> is-verified: false;
     in property <bool> is-online: false;
     in property <bool> is-desktop: false;
-    in property <[MessageData]> messages: [
-        { id: "m1", text: "yo I pushed the ref doc to the repo", timestamp: "12:38", is-mine: false, status: "", is-ephemeral: false, ttl-seconds: 0 },
-        { id: "m2", text: "received it, reviewing phase 2 now", timestamp: "12:40", is-mine: true, status: "delivered", is-ephemeral: false, ttl-seconds: 0 },
-        { id: "m3", text: "what about adding the offline queue fallback?", timestamp: "12:41", is-mine: false, status: "", is-ephemeral: false, ttl-seconds: 0 },
-        { id: "m4", text: "already in the plan — Pkarr flush on reconnect ✓", timestamp: "12:43", is-mine: true, status: "read", is-ephemeral: false, ttl-seconds: 0 },
-    ];
+    in property <string> connection-stage: "";
+    in property <[MessageData]> messages: [];
 
     in property <length> safe-area-top: 0px;
     in property <length> safe-area-bottom: 0px;
@@ -36,8 +32,9 @@ export component ChatViewScreen inherits Rectangle {
 
     callback go-back();
     callback send-message(string);
-    callback open-verify();
     callback open-contact-info();
+    callback delete-conversation();
+    callback retry-queued();
 
     background: AppTheme.surface-primary; 
 
@@ -116,9 +113,102 @@ export component ChatViewScreen inherits Rectangle {
                     alignment: center;
                     TouchArea {
                         width: 44px; height: 44px;
-                        clicked => { root.open-verify(); }
+                        clicked => { root.open-contact-info(); }
                         Text { text: "⋮"; font-size: 22px; color: AppTheme.text-secondary; horizontal-alignment: center; vertical-alignment: center; }
                     }
+                    TouchArea {
+                        width: 78px; height: 28px;
+                        clicked => { root.retry-queued(); }
+                        Rectangle {
+                            width: 100%; height: 100%;
+                            border-radius: 14px;
+                            background: AppTheme.accent-warning;
+                            Text {
+                                text: "Retry now";
+                                font-size: 11px;
+                                font-weight: 700;
+                                color: #1B1B1B;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                    TouchArea {
+                        width: 58px; height: 28px;
+                        clicked => { root.delete-conversation(); }
+                        Rectangle {
+                            width: 100%; height: 100%;
+                            border-radius: 14px;
+                            background: AppTheme.accent-danger;
+                            Text {
+                                text: "Delete";
+                                font-size: 11px;
+                                font-weight: 700;
+                                color: #FFFFFF;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            height: 54px;
+            background: is-online ? AppTheme.surface-primary : #2D1010;
+            border-width: 1px;
+            border-color: is-online ? AppTheme.divider : AppTheme.accent-danger;
+
+            VerticalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                spacing: 2px;
+                alignment: center;
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        Rectangle {
+                            width: 10px;
+                            height: 10px;
+                            border-radius: 5px;
+                            background:
+                                is-online
+                                ? (is-verified ? AppTheme.accent-success : AppTheme.accent-warning)
+                                : AppTheme.accent-danger;
+                        }
+
+                        Text {
+                            text:
+                                is-online
+                                ? (is-verified ? "Connected · verified peer" : "Connected · verification pending")
+                                : "Handshake pending";
+                            font-size: 12px;
+                            font-weight: 700;
+                            color: is-online ? AppTheme.accent-success : AppTheme.accent-danger;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Text {
+                        text: connection-mode + " route";
+                        font-size: 11px;
+                        color: is-online ? AppTheme.text-secondary : #FFB4B0;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: connection-stage == "" ? "waiting for peer response" : connection-stage;
+                    font-size: 11px;
+                    color: is-online ? AppTheme.text-secondary : #FFB4B0;
+                    vertical-alignment: center;
                 }
             }
         }
@@ -165,6 +255,26 @@ export component ChatViewScreen inherits Rectangle {
                                         font-size: 11px; color: AppTheme.text-secondary;
                                         horizontal-alignment: center; vertical-alignment: center;
                                     }
+                                }
+                            }
+
+                            if messages.length == 0: VerticalLayout {
+                                width: 100%;
+                                padding-top: 40px;
+                                spacing: 10px;
+                                alignment: center;
+                                Text {
+                                    text: "No messages yet";
+                                    font-size: 18px;
+                                    font-weight: 700;
+                                    color: AppTheme.text-primary;
+                                    horizontal-alignment: center;
+                                }
+                                Text {
+                                    text: "Say hello to start the conversation.";
+                                    font-size: 13px;
+                                    color: AppTheme.text-secondary;
+                                    horizontal-alignment: center;
                                 }
                             }
 

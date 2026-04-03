@@ -1,0 +1,319 @@
+import { AppTheme } from "../theme.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component ContactDetailsScreen inherits Rectangle {
+    in property <string> peer-name: "";
+    in property <string> peer-initials: "";
+    in property <string> peer-node-id: "";
+    in property <string> endpoint-ticket: "";
+    in property <string> connection-mode: "direct";
+    in property <string> connection-stage: "";
+    in property <bool> is-online: false;
+    in property <bool> is-verified: false;
+    in property <bool> is-desktop: false;
+    in property <length> safe-area-top: 0px;
+
+    callback go-back();
+    callback chat-now();
+    callback mark-verified();
+    callback clear-chat();
+    callback remove-contact();
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        padding: 0;
+        spacing: 0;
+
+        Rectangle {
+            height: (is-desktop ? 64px : 72px) + root.safe-area-top;
+            background: AppTheme.surface-secondary;
+
+            Rectangle {
+                y: parent.height - 1px;
+                width: 100%;
+                height: 1px;
+                background: AppTheme.divider;
+            }
+
+            HorizontalLayout {
+                y: root.safe-area-top;
+                height: is-desktop ? 64px : 72px;
+                padding-left: 12px;
+                padding-right: 16px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        TouchArea {
+                            width: 32px;
+                            height: 32px;
+                            clicked => { root.go-back(); }
+                            Text {
+                                text: "←";
+                                font-size: 22px;
+                                color: AppTheme.accent;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: "Contact Settings";
+                            font-size: 18px;
+                            font-weight: 700;
+                            color: AppTheme.text-primary;
+                        }
+                        Text {
+                            text: peer-name;
+                            font-size: 12px;
+                            color: AppTheme.text-secondary;
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    TouchArea {
+                        width: 72px;
+                        height: 32px;
+                        clicked => { root.chat-now(); }
+                        Rectangle {
+                            width: 100%;
+                            height: 100%;
+                            border-radius: 12px;
+                            background: AppTheme.accent;
+                            Text {
+                                text: "Chat";
+                                font-size: 13px;
+                                font-weight: 800;
+                                color: #FFFFFF;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            mouse-drag-pan-enabled: true;
+
+            HorizontalLayout {
+                alignment: center;
+
+                VerticalLayout {
+                    max-width: 720px;
+                    horizontal-stretch: 1;
+                    padding: 16px;
+                    padding-top: 24px;
+                    spacing: 18px;
+
+                    Rectangle {
+                        border-radius: 20px;
+                        background: AppTheme.surface-secondary;
+
+                        VerticalLayout {
+                            padding: 18px;
+                            spacing: 14px;
+
+                            HorizontalLayout {
+                                spacing: 14px;
+                                alignment: start;
+
+                                Rectangle {
+                                    width: 56px;
+                                    height: 56px;
+                                    border-radius: 28px;
+                                    background: AppTheme.accent;
+                                    Text {
+                                        text: peer-initials != "" ? peer-initials : "?";
+                                        font-size: 18px;
+                                        font-weight: 800;
+                                        color: #FFFFFF;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text {
+                                        text: peer-name;
+                                        font-size: 20px;
+                                        font-weight: 800;
+                                        color: AppTheme.text-primary;
+                                    }
+                                    Text {
+                                        text: is-online ? "Online" : "Offline";
+                                        font-size: 12px;
+                                        font-weight: 700;
+                                        color: is-online ? AppTheme.accent-success : AppTheme.accent-danger;
+                                    }
+                                    Text {
+                                        text: (is-verified ? "Verified peer" : "Verification pending") + " · " + connection-mode;
+                                        font-size: 11px;
+                                        color: AppTheme.text-secondary;
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: connection-stage == "" ? "No active handshake state." : connection-stage;
+                                font-size: 11px;
+                                color: AppTheme.text-tertiary;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        spacing: 10px;
+                        Text {
+                            text: "PEER DETAILS";
+                            font-size: 11px;
+                            font-weight: 800;
+                            color: AppTheme.text-tertiary;
+                            letter-spacing: 0.8px;
+                        }
+
+                        Rectangle {
+                            border-radius: 18px;
+                            background: AppTheme.surface-secondary;
+
+                            VerticalLayout {
+                                padding: 16px;
+                                spacing: 12px;
+
+                                VerticalLayout {
+                                    spacing: 4px;
+                                    Text {
+                                        text: "Node ID";
+                                        font-size: 10px;
+                                        color: AppTheme.text-tertiary;
+                                        font-weight: 700;
+                                    }
+                                    Text {
+                                        text: peer-node-id;
+                                        font-size: 12px;
+                                        color: AppTheme.text-primary;
+                                        font-family: "monospace";
+                                        wrap: word-wrap;
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    spacing: 4px;
+                                    Text {
+                                        text: "Endpoint Ticket";
+                                        font-size: 10px;
+                                        color: AppTheme.text-tertiary;
+                                        font-weight: 700;
+                                    }
+                                    Text {
+                                        text: endpoint-ticket == "" ? "Not stored yet." : endpoint-ticket;
+                                        font-size: 11px;
+                                        color: AppTheme.text-primary;
+                                        font-family: "monospace";
+                                        wrap: word-wrap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        spacing: 10px;
+                        Text {
+                            text: "ACTIONS";
+                            font-size: 11px;
+                            font-weight: 800;
+                            color: AppTheme.text-tertiary;
+                            letter-spacing: 0.8px;
+                        }
+
+                        Rectangle {
+                            height: 56px;
+                            border-radius: 18px;
+                            background: AppTheme.accent;
+                            TouchArea {
+                                clicked => { root.chat-now(); }
+                                Text {
+                                    text: "Open Chat";
+                                    font-size: 16px;
+                                    font-weight: 800;
+                                    color: #FFFFFF;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 56px;
+                            border-radius: 18px;
+                            background: is-verified ? AppTheme.surface-tertiary : AppTheme.accent-success;
+                            TouchArea {
+                                clicked => { root.mark-verified(); }
+                                Text {
+                                    text: is-verified ? "Already Verified" : "Mark Verified";
+                                    font-size: 15px;
+                                    font-weight: 800;
+                                    color: is-verified ? AppTheme.text-secondary : #FFFFFF;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 56px;
+                            border-radius: 18px;
+                            background: AppTheme.accent-warning;
+                            TouchArea {
+                                clicked => { root.clear-chat(); }
+                                Text {
+                                    text: "Clear Chat History";
+                                    font-size: 15px;
+                                    font-weight: 800;
+                                    color: #1B1B1B;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 56px;
+                            border-radius: 18px;
+                            background: AppTheme.accent-danger;
+                            TouchArea {
+                                clicked => { root.remove-contact(); }
+                                Text {
+                                    text: "Remove Contact";
+                                    font-size: 15px;
+                                    font-weight: 800;
+                                    color: #FFFFFF;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle { height: 24px; }
+                }
+            }
+        }
+    }
+}

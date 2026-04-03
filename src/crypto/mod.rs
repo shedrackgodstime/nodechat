@@ -99,6 +99,11 @@ impl CryptoManager {
         &self.identity
     }
 
+    /// Return the local X25519 public key bytes for peer handshakes.
+    pub fn x25519_public_bytes(&self) -> [u8; KEY_SIZE] {
+        *self.identity.x25519_public.as_bytes()
+    }
+
     // ── 1:1 Session Key Lifecycle ─────────────────────────────────────────────
 
     /// Derive and store the initial 1:1 session key for `peer_id` via X25519 DH.
@@ -393,7 +398,8 @@ mod tests {
         let key = CryptoManager::generate_group_key();
         mgr.register_group_key("tamper-topic", key);
         let mut ct = mgr.encrypt_group("tamper-topic", b"tamper").unwrap();
-        ct[ct.len() - 1] ^= 0xFF;
+        let last = ct.len() - 1;
+        ct[last] ^= 0xFF;
         assert!(mgr.decrypt_group("tamper-topic", &ct).is_err());
     }
 

@@ -105,62 +105,116 @@ export component SelectMembersScreen inherits Rectangle {
                     width: is-desktop ? 640px : root.width;
                     alignment: start;
 
-                    for contact[i] in contacts: TouchArea {
-                        height: 74px;
-                        clicked => { root.toggle-selection(contact.id); }
-                        
-                        Rectangle {
-                            background: contact.is-selected ? AppTheme.surface-secondary : transparent;
-                            animate background { duration: 150ms; }
+                    for contact[i] in contacts: Rectangle {
+                        min-height: 74px;
+                        horizontal-stretch: 1;
+                        background: contact.is-selected ? AppTheme.surface-secondary : transparent;
+                        border-width: contact.is-selected ? 1px : 0px;
+                        border-color: contact.is-selected ? AppTheme.accent-success : transparent;
+                        border-radius: 16px;
+                        animate background { duration: 150ms; }
 
+                        TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            clicked => { root.toggle-selection(contact.id); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 16px; padding-right: 16px; spacing: 14px;
+                            alignment: start;
+
+                            // Avatar
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 52px; height: 52px;
+                                    border-radius: 26px;
+                                    background: contact.is-selected ? AppTheme.accent : AppTheme.surface-tertiary;
+                                    animate background { duration: 150ms; }
+                                    Text { text: contact.initials; font-size: 18px; font-weight: 700; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                            }
+
+                            // Name & Selection Indicator
                             HorizontalLayout {
-                                padding-left: 16px; padding-right: 16px; spacing: 14px;
-                                alignment: start;
+                                horizontal-stretch: 1;
+                                alignment: space-between;
 
-                                // Avatar
                                 VerticalLayout {
                                     alignment: center;
-                                    Rectangle {
-                                        width: 52px; height: 52px;
-                                        border-radius: 26px;
-                                        background: contact.is-selected ? AppTheme.accent : AppTheme.surface-tertiary;
-                                        animate background { duration: 150ms; }
-                                        Text { text: contact.initials; font-size: 18px; font-weight: 700; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                                    Text { text: contact.name; font-size: 16px; font-weight: 600; color: AppTheme.text-primary; }
+                                    Text { text: contact.is-online ? "online" : "offline"; font-size: 11px; color: contact.is-online ? AppTheme.accent-success : AppTheme.text-tertiary; }
+                                    if contact.is-selected: Text {
+                                        text: "Selected for this group";
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        color: AppTheme.accent-success;
                                     }
                                 }
 
-                                // Name & Selection Indicator
-                                HorizontalLayout {
-                                    horizontal-stretch: 1;
-                                    alignment: space-between;
-
-                                    VerticalLayout {
-                                        alignment: center;
-                                        Text { text: contact.name; font-size: 16px; font-weight: 600; color: AppTheme.text-primary; }
-                                        Text { text: contact.is-online ? "online" : "offline"; font-size: 11px; color: contact.is-online ? AppTheme.accent-success : AppTheme.text-tertiary; }
-                                    }
-
-                                    VerticalLayout {
-                                        alignment: center;
-                                        Rectangle {
-                                            width: 24px; height: 24px;
-                                            border-radius: 12px;
-                                            border-width: 2px;
-                                            border-color: contact.is-selected ? AppTheme.accent-success : AppTheme.divider;
-                                            background: contact.is-selected ? AppTheme.accent-success : transparent;
-                                            animate background { duration: 100ms; }
-                                            
-                                            if contact.is-selected: Text { text: "✓"; font-size: 14px; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: contact.is-selected ? 72px : 24px;
+                                        height: 24px;
+                                        border-radius: 12px;
+                                        border-width: contact.is-selected ? 0px : 2px;
+                                        border-color: contact.is-selected ? transparent : AppTheme.divider;
+                                        background: contact.is-selected ? AppTheme.accent-success : transparent;
+                                        Text {
+                                            text: contact.is-selected ? "Selected" : "";
+                                            font-size: 10px;
+                                            font-weight: 900;
+                                            color: contact.is-selected ? #FFFFFF : AppTheme.text-tertiary;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
                                         }
                                     }
                                 }
                             }
+                        }
 
-                            // Divider with 82px indent
-                            Rectangle {
-                                y: parent.height - 1px; height: 1px;
-                                background: AppTheme.divider; opacity: 0.15;
-                                x: 82px; width: parent.width - 82px;
+                        // Divider with 82px indent
+                        Rectangle {
+                            y: parent.height - 1px; height: 1px;
+                            background: AppTheme.divider; opacity: 0.15;
+                            x: 82px; width: parent.width - 82px;
+                        }
+                    }
+
+                    if contacts.length == 0: VerticalLayout {
+                        padding-left: 16px;
+                        padding-right: 16px;
+                        padding-top: 24px;
+                        padding-bottom: 24px;
+                        alignment: center;
+
+                        Rectangle {
+                            height: 120px;
+                            horizontal-stretch: 1;
+                            border-radius: 20px;
+                            background: AppTheme.surface-secondary;
+                            border-width: 1px;
+                            border-color: AppTheme.divider;
+
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 8px;
+
+                                Text {
+                                    text: "No selectable peers match this search";
+                                    font-size: 16px;
+                                    font-weight: 700;
+                                    color: AppTheme.text-primary;
+                                    horizontal-alignment: center;
+                                }
+                                Text {
+                                    text: "Try a different name, ticket, or node id.";
+                                    font-size: 12px;
+                                    color: AppTheme.text-tertiary;
+                                    horizontal-alignment: center;
+                                }
                             }
                         }
                     }

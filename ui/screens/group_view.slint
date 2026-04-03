@@ -18,11 +18,7 @@ export struct GroupMessageData {
 export component GroupViewScreen inherits Rectangle {
     in property <string>             group-name: "Project Swarm";
     in property <string>             member-count: "3";
-    in property <[GroupMessageData]> messages: [
-        { id: "g1", text: "Pushed the build — everyone pull latest", timestamp: "15:02", is-mine: false, sender-name: "Eric O.", status: "" },
-        { id: "g2", text: "Looks good from my end, tests passing", timestamp: "15:10", is-mine: true, sender-name: "", status: "sent" },
-        { id: "g3", text: "Same here, deploying to staging", timestamp: "15:14", is-mine: false, sender-name: "Shedrack", status: "" },
-    ];
+    in property <[GroupMessageData]> messages: [];
     in property <bool>   is-desktop: false;
     in property <length> safe-area-top: 0px;
     in property <length> safe-area-bottom: 0px;
@@ -30,7 +26,6 @@ export component GroupViewScreen inherits Rectangle {
 
     callback go-back();
     callback send-message(string);
-    callback open-group-info();
 
     background: AppTheme.surface-primary;
 
@@ -94,13 +89,46 @@ export component GroupViewScreen inherits Rectangle {
                     }
                 }
 
-                VerticalLayout {
-                    alignment: center;
-                    TouchArea {
-                        width: 40px; height: 40px;
-                        clicked => { root.open-group-info(); }
-                        Text { text: "⋮"; font-size: 20px; color: AppTheme.text-secondary; horizontal-alignment: center; vertical-alignment: center; }
+            }
+        }
+
+        Rectangle {
+            height: 42px;
+            background: AppTheme.surface-primary;
+            border-width: 1px;
+            border-color: AppTheme.divider;
+
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                spacing: 10px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Rectangle {
+                        width: 10px;
+                        height: 10px;
+                        border-radius: 5px;
+                        background: AppTheme.accent-success;
                     }
+
+                    Text {
+                        text: "Gossip swarm · " + member-count + " members";
+                        font-size: 12px;
+                        font-weight: 700;
+                        color: AppTheme.accent;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: "group session active";
+                    font-size: 11px;
+                    color: AppTheme.text-secondary;
+                    vertical-alignment: center;
                 }
             }
         }
@@ -131,6 +159,26 @@ export component GroupViewScreen inherits Rectangle {
                                 alignment: center; spacing: 8px;
                                 Text { text: "🛡️"; font-size: 12px; vertical-alignment: center; }
                                 Text { text: "Group is secured with Gossip-AEAD encryption"; font-size: 11px; font-weight: 700; color: AppTheme.text-tertiary; vertical-alignment: center; }
+                            }
+                        }
+
+                        if messages.length == 0: VerticalLayout {
+                            width: 100%;
+                            padding-top: 40px;
+                            spacing: 10px;
+                            alignment: center;
+                            Text {
+                                text: "No group messages yet";
+                                font-size: 18px;
+                                font-weight: 700;
+                                color: AppTheme.text-primary;
+                                horizontal-alignment: center;
+                            }
+                            Text {
+                                text: "Start the first update for this group.";
+                                font-size: 13px;
+                                color: AppTheme.text-secondary;
+                                horizontal-alignment: center;
                             }
                         }
 

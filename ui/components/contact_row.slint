@@ -122,17 +122,55 @@ export component ContactRow inherits Rectangle {
 
                     Text {
                         text:
-                            is-queued ? unread + " msgs waiting" :
+                            is-queued ? "Queued" :
+                            !is-online ? "Offline" :
                             !is-verified ? "Safety keys not verified" :
                             last-message;
                         font-size: 14px;
                         color:
                             is-queued    ? AppTheme.accent-warning :
+                            !is-online   ? AppTheme.accent-danger :
                             !is-verified ? AppTheme.accent-warning :
                             AppTheme.text-secondary;
                         horizontal-stretch: 1;
                         overflow: elide;
                         vertical-alignment: center;
+                    }
+
+                    if is-queued: VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            min-width: 58px;
+                            height: 20px;
+                            border-radius: 10px;
+                            background: AppTheme.accent-warning;
+                            Text {
+                                text: "QUEUED";
+                                font-size: 9px;
+                                font-weight: 900;
+                                color: #1B1B1B;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    if !is-online: VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            min-width: 62px;
+                            height: 20px;
+                            border-radius: 10px;
+                            background: AppTheme.accent-danger;
+                            Text {
+                                text: is-relay ? "OFFLINE · RELAY" : "OFFLINE";
+                                font-size: 9px;
+                                font-weight: 900;
+                                color: #FFFFFF;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
                     }
 
                     if unread > 0 && !is-queued: VerticalLayout {

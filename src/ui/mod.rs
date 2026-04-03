@@ -22,12 +22,19 @@ pub fn wire_callbacks(
 ) {
     wire_confirm_name(app, tx.clone());
     wire_setup_complete(app, tx.clone());
+    wire_unlock(app, tx.clone());
     wire_send_message(app, tx.clone());
     wire_send_group_message(app, tx.clone());
     wire_add_contact(app, tx.clone());
     wire_mark_verified(app, tx.clone());
+    wire_clear_contact_chat(app, tx.clone());
+    wire_remove_contact(app, tx.clone());
+    wire_toggle_group_member(app, tx.clone());
     wire_copy_node_id(app, tx.clone());
+    wire_delete_conversation(app, tx.clone());
+    wire_retry_queued_messages(app, tx.clone());
     wire_launch_group(app, tx.clone());
+    wire_load_conversation(app, tx.clone());
     wire_settings_actions(app, tx.clone());
 
     spawn_event_listener(app.as_weak(), rx_events);
@@ -53,29 +60,99 @@ fn wire_setup_complete(app: &AppWindow, tx: mpsc::Sender<Command>) {
     });
 }
 
+/// Fired when a returning user taps Unlock on the placeholder gate.
+/// Rust: forwards a simple unlock command to the backend worker.
+fn wire_unlock(app: &AppWindow, tx: mpsc::Sender<Command>) {
+    app.on_unlock(move || {
+        let _ = tx.try_send(Command::UnlockApp);
+    });
+}
+
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 /// Fired when the user presses Send in a 1:1 chat.
 /// Rust: sends Command::SendDirectMessage to the backend worker.
 fn wire_send_message(app: &AppWindow, tx: mpsc::Sender<Command>) {
-    let active_peer = app.get_active_peer_node_id().to_string();
+    let handle = app.as_weak();
     app.on_send_message(move |text| {
-        let _ = tx.try_send(Command::SendDirectMessage {
-            target:    active_peer.clone(),
-            plaintext: text.to_string(),
-        });
+        if let Some(app) = handle.upgrade() {
+            let text = text.trim().to_owned();
+            if text.is_empty() {
+                return;
+            }
+            let target = app.get_active_peer_node_id().to_string();
+            if target.is_empty() {
+                return;
+            }
+            let _ = tx.try_send(Command::SendDirectMessage {
+                target,
+                plaintext: text,
+            });
+        }
+    });
+}
+
+fn wire_delete_conversation(app: &AppWindow, tx: mpsc::Sender<Command>) {
+    let handle = app.as_weak();
+    app.on_delete_conversation(move |target, is_group| {
+        if let Some(app) = handle.upgrade() {
+            let target = target.trim().to_owned();
+            if target.is_empty() {
+                return;
+            }
+            let _ = tx.try_send(Command::DeleteConversation {
+                target,
+                is_group,
+            });
+            if is_group {
+                app.set_active_group_topic_id(String::new().into());
+                app.set_active_group_name(String::new().into());
+                app.set_active_group_members(String::new().into());
+            } else {
+                app.set_active_peer_node_id(String::new().into());
+                app.set_active_peer_name(String::new().into());
+                app.set_active_peer_initials(String::new().into());
+                app.set_active_peer_online(false);
+                app.set_active_peer_verified(false);
+            }
+            app.set_current_screen(0);
+        }
+    });
+}
+
+/// Fired when the user taps Retry Now in a direct chat.
+fn wire_retry_queued_messages(app: &AppWindow, tx: mpsc::Sender<Command>) {
+    let handle = app.as_weak();
+    app.on_retry_queued(move || {
+        if let Some(app) = handle.upgrade() {
+            let target = app.get_active_peer_node_id().to_string();
+            if target.is_empty() {
+                return;
+            }
+            let _ = tx.try_send(Command::RetryQueuedMessages { target });
+        }
     });
 }
 
 /// Fired when the user presses Send in a group chat.
 /// Rust: sends Command::SendGroupMessage to the backend worker.
 fn wire_send_group_message(app: &AppWindow, tx: mpsc::Sender<Command>) {
-    let active_group = app.get_active_group_name().to_string(); // WIRE: use TopicId not name
+    let handle = app.as_weak();
     app.on_send_group_message(move |text| {
-        let _ = tx.try_send(Command::SendGroupMessage {
-            topic:     active_group.clone(),
-            plaintext: text.to_string(),
-        });
+        if let Some(app) = handle.upgrade() {
+            let text = text.trim().to_owned();
+            if text.is_empty() {
+                return;
+            }
+            let topic = app.get_active_group_name().to_string();
+            if topic.is_empty() {
+                return;
+            }
+            let _ = tx.try_send(Command::SendGroupMessage {
+                topic,
+                plaintext: text,
+            });
+        }
     });
 }
 
@@ -93,11 +170,57 @@ fn wire_add_contact(app: &AppWindow, tx: mpsc::Sender<Command>) {
 /// Fired when the user taps Mark as Verified on the key verification screen.
 /// Rust: sends Command::MarkVerified to the backend worker.
 fn wire_mark_verified(app: &AppWindow, tx: mpsc::Sender<Command>) {
-    let peer_id = app.get_active_peer_node_id().to_string();
+    let handle = app.as_weak();
     app.on_mark_verified(move || {
-        let _ = tx.try_send(Command::MarkVerified {
-            node_id: peer_id.clone(),
-        });
+        if let Some(app) = handle.upgrade() {
+            let node_id = app.get_active_peer_node_id().to_string();
+            if node_id.is_empty() {
+                return;
+            }
+            let _ = tx.try_send(Command::MarkVerified { node_id });
+        }
+    });
+}
+
+fn wire_clear_contact_chat(app: &AppWindow, tx: mpsc::Sender<Command>) {
+    let handle = app.as_weak();
+    app.on_clear_chat(move || {
+        if let Some(app) = handle.upgrade() {
+            let target = app.get_active_peer_node_id().to_string();
+            if target.is_empty() {
+                return;
+            }
+            let _ = tx.try_send(Command::ClearConversationHistory {
+                target,
+                is_group: false,
+            });
+        }
+    });
+}
+
+fn wire_remove_contact(app: &AppWindow, tx: mpsc::Sender<Command>) {
+    let handle = app.as_weak();
+    app.on_remove_contact(move || {
+        if let Some(app) = handle.upgrade() {
+            let target = app.get_active_peer_node_id().to_string();
+            if target.is_empty() {
+                return;
+            }
+            let _ = tx.try_send(Command::DeleteConversation {
+                target,
+                is_group: false,
+            });
+        }
+    });
+}
+
+fn wire_toggle_group_member(app: &AppWindow, tx: mpsc::Sender<Command>) {
+    app.on_toggle_group_member(move |peer_id| {
+        let peer_id = peer_id.trim().to_owned();
+        if peer_id.is_empty() {
+            return;
+        }
+        let _ = tx.try_send(Command::ToggleGroupMemberSelection { peer_id });
     });
 }
 
@@ -107,10 +230,15 @@ fn wire_copy_node_id(app: &AppWindow, _tx: mpsc::Sender<Command>) {
     let handle = app.as_weak();
     app.on_copy_node_id(move || {
         if let Some(app) = handle.upgrade() {
+            let ticket = app.get_my_endpoint_ticket().to_string();
             let node_id = app.get_my_node_id().to_string();
             // Note: Actual clipboard copy is handled natively in Slint (settings.slint / identity_card.slint)
             // for maximum cross-platform (Desktop + Android) compatibility.
-            tracing::info!("node id copy event logged from UI: {}", node_id);
+            tracing::info!(
+                share_ticket = %ticket,
+                node_id = %node_id,
+                "identity share copy event logged from UI"
+            );
         }
     });
 }
@@ -136,6 +264,16 @@ fn wire_launch_group(app: &AppWindow, tx: mpsc::Sender<Command>) {
     app.on_launch_group(move |name| {
         let _ = tx.try_send(Command::CreateGroup {
             name: name.to_string(),
+        });
+    });
+}
+
+/// Fired when the UI wants the active conversation thread loaded from SQLite.
+fn wire_load_conversation(app: &AppWindow, tx: mpsc::Sender<Command>) {
+    app.on_load_conversation(move |target, is_group| {
+        let _ = tx.try_send(Command::LoadConversation {
+            target: target.to_string(),
+            is_group,
         });
     });
 }
