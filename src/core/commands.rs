@@ -9,6 +9,81 @@
 use std::path::PathBuf;
 use uuid::Uuid;
 
+/// A chat row as shown in the home list.
+///
+/// This crosses the backend/UI boundary so the Slint layer can render
+/// the list without reading SQLite directly.
+#[derive(Debug, Clone)]
+pub struct ChatPreviewData {
+    /// Hex-encoded peer node ID or group topic ID.
+    pub id: String,
+    /// Display name shown in the list.
+    pub name: String,
+    /// Short initials for the avatar.
+    pub initials: String,
+    /// Preview text for the latest message or queue state.
+    pub last_message: String,
+    /// Timestamp label shown in the row.
+    pub timestamp: String,
+    /// Unread badge count.
+    pub unread: i32,
+    /// `true` if this row represents a group chat.
+    pub is_group: bool,
+    /// `true` if the peer is currently reachable.
+    pub is_online: bool,
+    /// `true` if the peer is currently using relay routing.
+    pub is_relay: bool,
+    /// `true` if the row has queued outbound messages.
+    pub is_queued: bool,
+    /// `true` if the peer has been key-verified.
+    pub is_verified: bool,
+}
+
+/// A direct-chat message row rendered in the active conversation view.
+#[derive(Debug, Clone)]
+pub struct ChatMessageData {
+    pub id: String,
+    pub text: String,
+    pub timestamp: String,
+    pub is_mine: bool,
+    pub status: String,
+    pub is_ephemeral: bool,
+    pub ttl_seconds: i32,
+}
+
+/// A group-chat message row rendered in the active conversation view.
+#[derive(Debug, Clone)]
+pub struct GroupMessageData {
+    pub id: String,
+    pub text: String,
+    pub timestamp: String,
+    pub is_mine: bool,
+    pub sender_name: String,
+    pub status: String,
+}
+
+/// A contact row rendered in the contacts directory page.
+#[derive(Debug, Clone)]
+pub struct ContactDirectoryData {
+    pub id: String,
+    pub name: String,
+    pub initials: String,
+    pub node_id: String,
+    pub is_online: bool,
+    pub is_relay: bool,
+    pub is_verified: bool,
+}
+
+/// A selectable peer row rendered in the group member picker.
+#[derive(Debug, Clone)]
+pub struct GroupSelectionData {
+    pub id: String,
+    pub name: String,
+    pub initials: String,
+    pub is_selected: bool,
+    pub is_online: bool,
+}
+
 /// Delivery status of a single message.
 ///
 /// Advances forward only: `Queued → Sent → Delivered → Read`.
@@ -96,6 +171,12 @@ pub enum Command {
         name: String,
     },
 
+    /// Toggle whether a peer is selected for a new group.
+    ToggleGroupMemberSelection {
+        /// Hex-encoded NodeId of the peer.
+        peer_id: String,
+    },
+
     /// Ensure identity creation flow is triggered.
     CreateIdentity {
         /// The chosen display name
@@ -126,17 +207,55 @@ pub enum Command {
         /// Hex-encoded NodeId of the peer to mark as verified.
         node_id: String,
     },
-    /// Add a new contact by Iroh EndpointTicket or raw NodeId.
+    /// Add a new contact by Iroh EndpointTicket or discovery-capable NodeId.
     AddContact {
-        /// The Iroh ticket string (base32) or raw hex NodeId.
+        /// The Iroh ticket string (base32) or raw NodeId.
         ticket_or_id: String,
         /// The local display name for this peer.
         display_name: String,
     },
     /// Clear all messages from the local database.
     ClearMessages,
+    /// Clear only the messages in a single conversation.
+    ClearConversationHistory {
+        /// Hex-encoded NodeId or TopicId of the conversation to clear.
+        target: String,
+        /// `true` if this is a group conversation.
+        is_group: bool,
+    },
+    /// Delete a single conversation and its local history.
+    DeleteConversation {
+        /// Hex-encoded NodeId or TopicId of the conversation to remove.
+        target: String,
+        /// `true` if this is a group conversation.
+        is_group: bool,
+    },
+    /// Retry queued direct messages for a peer immediately.
+    RetryQueuedMessages {
+        /// Hex-encoded NodeId of the direct peer.
+        target: String,
+    },
     /// Delete the local identity and all associated data.
     DeleteIdentity,
+    /// Unlock the app shell after a returning-user gate is dismissed.
+    UnlockApp,
+
+    /// Notify the backend that the app moved to foreground/background.
+    SetAppForeground {
+        /// `true` when the app is visible and active to the user.
+        foreground: bool,
+    },
+
+    /// Push current endpoint/share info to the UI after startup wiring completes.
+    RefreshLocalInfo,
+
+    /// Load the selected conversation thread into the active chat pane.
+    LoadConversation {
+        /// Hex-encoded NodeId or TopicId.
+        target: String,
+        /// `true` if this is a group conversation.
+        is_group: bool,
+    },
 }
 
 /// Events pushed FROM `NodeChatWorker` TO the Slint UI via `slint::invoke_from_event_loop`.
@@ -185,6 +304,10 @@ pub enum AppEvent {
     MessageStatusUpdate {
         /// The message whose status changed.
         id: Uuid,
+        /// The conversation this message belongs to.
+        target: String,
+        /// `true` if the message belongs to a group conversation.
+        is_group: bool,
         /// The new delivery status.
         status: MessageStatus,
     },
@@ -207,6 +330,14 @@ pub enum AppEvent {
         via_relay: bool,
     },
 
+    /// Direct-chat handshake progress for the currently active peer.
+    PeerHandshakeStage {
+        /// Hex-encoded NodeId of the peer.
+        peer: String,
+        /// Human-readable progress label.
+        stage: String,
+    },
+
     /// Current global network health and peer counts.
     NetworkStatus {
         /// Number of peers reached via direct P2P (QUIC).
@@ -226,8 +357,79 @@ pub enum AppEvent {
         node_id: String,
     },
 
+    /// Shareable endpoint ticket for the local identity / discovery flow.
+    EndpointTicketUpdated {
+        /// Ticket string created from the local endpoint address.
+        ticket: String,
+    },
+
     /// All local messages have been cleared.
     MessagesCleared,
+
+    /// A single conversation's messages have been cleared.
+    ConversationCleared {
+        /// Hex-encoded NodeId or TopicId that was cleared.
+        target: String,
+        /// `true` if the cleared conversation was a group.
+        is_group: bool,
+    },
+
+    /// A single conversation has been removed from the local database.
+    ConversationDeleted {
+        /// Hex-encoded NodeId or TopicId that was removed.
+        target: String,
+        /// `true` if the removed conversation was a group.
+        is_group: bool,
+    },
+
+    /// Contact details for the currently selected peer.
+    PeerContactDetails {
+        /// Hex-encoded NodeId of the peer.
+        peer: String,
+        /// Imported ticket or dial hint used to reach the peer.
+        endpoint_ticket: String,
+        /// `true` if the peer is key-verified.
+        verified: bool,
+    },
+
+    /// The app lock overlay has been dismissed.
+    UnlockComplete,
+
+    /// The home chat list has changed and should be re-rendered.
+    ChatsUpdated {
+        /// Rows to display in the chat list.
+        chats: Vec<ChatPreviewData>,
+    },
+
+    /// The contacts directory has changed and should be re-rendered.
+    ContactsUpdated {
+        /// Rows to display in the contacts directory.
+        contacts: Vec<ContactDirectoryData>,
+    },
+
+    /// The group member picker has changed and should be re-rendered.
+    GroupSelectionUpdated {
+        /// Rows to display in the picker.
+        contacts: Vec<GroupSelectionData>,
+        /// Number of currently selected peers.
+        selected_count: i32,
+    },
+
+    /// The active direct conversation should be re-rendered.
+    DirectConversationLoaded {
+        /// Hex-encoded peer NodeId.
+        target: String,
+        /// Rows to display in the active thread.
+        messages: Vec<ChatMessageData>,
+    },
+
+    /// The active group conversation should be re-rendered.
+    GroupConversationLoaded {
+        /// Hex-encoded TopicId.
+        topic: String,
+        /// Rows to display in the active thread.
+        messages: Vec<GroupMessageData>,
+    },
 
     /// A non-fatal backend error to surface to the user in plain English (RULES.md E-03).
     Error {

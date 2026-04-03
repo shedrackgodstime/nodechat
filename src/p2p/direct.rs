@@ -1,11 +1,9 @@
 //! Iroh unicast — direct 1:1 message delivery.
-//!
-//! WIRE: Implements `NetworkManager::send_direct`.
-//! All function bodies are scaffolded pending iroh 0.97.0 API verification.
 
 use anyhow::Result;
+use iroh_tickets::Ticket;
 
-use super::NetworkManager;
+use super::{NetworkManager, DIRECT_ALPN};
 
 /// Send `payload` to `target_node_id` over Iroh direct connection.
 ///
@@ -15,23 +13,46 @@ use super::NetworkManager;
 /// # Errors
 /// Returns an error if the peer is unreachable. Caller is responsible for queuing.
 pub(crate) async fn send(
-    manager: &mut NetworkManager,
+    manager: &NetworkManager,
     target_node_id: &str,
+    dial_hint: Option<&str>,
     payload: Vec<u8>,
 ) -> Result<()> {
     let endpoint = manager.endpoint.as_ref()
         .ok_or_else(|| anyhow::anyhow!("endpoint not initialised"))?;
 
-    let target: iroh::EndpointId = target_node_id.parse()?;
+    let target: iroh::EndpointAddr = if let Some(hint) = dial_hint {
+        if let Ok(ticket) = iroh_tickets::endpoint::EndpointTicket::deserialize(hint) {
+            ticket.endpoint_addr().clone()
+        } else {
+            let target: iroh::EndpointId = hint.parse()?;
+            target.into()
+        }
+    } else {
+        let target: iroh::EndpointId = target_node_id.parse()?;
+        target.into()
+    };
 
     // Reuse existing connection if possible (RULES.md P-04)
-    let conn = if let Some(conn) = manager.connections.get(target_node_id) {
-        conn.clone()
-    } else {
-        // Iroh 0.97.0 connect with ALPN
-        let conn = endpoint.connect(iroh::EndpointAddr::from(target), b"nodechat/alpha").await?;
-        manager.connections.insert(target_node_id.to_owned(), conn.clone());
-        conn
+    let conn = {
+        let maybe_conn = manager
+            .connections
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(target_node_id)
+            .cloned();
+        if let Some(conn) = maybe_conn {
+            conn
+        } else {
+            let conn: iroh::endpoint::Connection = endpoint.connect(target, DIRECT_ALPN).await?;
+            manager
+                .connections
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .insert(target_node_id.to_owned(), conn.clone());
+            manager.spawn_direct_reader(target_node_id.to_owned(), conn.clone());
+            conn
+        }
     };
 
     // Open uni-directional stream for fire-and-forget message delivery

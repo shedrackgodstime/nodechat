@@ -1,0 +1,77 @@
+---
+title: "Tickets"
+---
+
+A ticket is a serializable token that packages dialing information for an iroh
+endpoint. They're a convenience pattern you can use in your application to make
+sharing connection details easier - but they're entirely optional.
+
+<Note>
+Have a ticket? Try pasting it into the [iroh ticket explorer](https://ticket.iroh.computer) to break it down! Here's an [example](https://ticket.iroh.computer?ticket=docaaacarwhmusoqf362j3jpzrehzkw3bqamcp2mmbhn3fmag3mzzfjp4beahj2v7aezhojvfqi5wltr4vxymgzqnctryyup327ct7iy4s5noxy6aaa)
+</Note>
+
+## What is a ticket?
+
+Here's an example ticket:
+
+```text
+docaaacarwhmusoqf362j3jpzrehzkw3bqamcp2mmbhn3fmag3mzzfjp4beahj2v7aezhojvfqi5wltr4vxymgzqnctryyup327ct7iy4s5noxy6aaa
+```
+
+Yes, they're long. But they pack a lot of information: an endpoint address (node ID, relay URL, and direct addresses) plus optional application-specific data like a document ID or blob hash.
+
+The key insight: instead of making users copy and paste just a hash and then figure out where to find the data, tickets combine *what* you want with *where to get it from*. This gives iroh everything needed to establish a connection immediately.
+
+Tickets work well in QR codes, can be sent via messaging apps, or published to a coordination server. They're particularly useful for short-lived sessions where both devices are online at the same time.
+
+## When to use tickets
+
+**Use tickets when:**
+- Bootstrapping peer connections without a central coordination server
+- Building apps where users manually share connection info (QR codes, copy/paste)
+- You want a single token that contains both content identifiers and connection details
+- Short-lived sessions where both peers are online simultaneously
+
+**Don't use tickets when:**
+- You have a central server or database to coordinate connections
+- You're building long-lived connections where dialing details change frequently
+- You can cache `EndpointID`s and let iroh resolve dialing details at runtime
+
+If you have *any* means of coordinating (a database, server, or gossip protocol), we recommend you work with `EndpointID`s directly instead of tickets. Let iroh handle the discovery and connection details transparently.
+
+## Creating tickets
+
+The `iroh-tickets` crate provides utilities for creating and parsing tickets. Here's how to create a basic endpoint ticket:
+
+```rust
+use iroh_tickets::endpoint::EndpointTicket;
+
+let ticket = EndpointTicket::new(endpoint.addr());
+println!("Share this ticket: {ticket}");
+```
+
+You can also create application-specific ticket types that include additional data beyond the endpoint address.
+
+## Ticket patterns
+
+Tickets typically follow this pattern:
+1. An ASCII prefix indicating the ticket type (e.g., `endpoint`, `blob`, `doc`)
+2. A base32-lowercase-encoded payload containing [postcard-encoded](https://postcard.jamesmunns.com/wire-format.html) data
+
+The postcard encoding keeps tickets compact despite containing multiple pieces of information.
+
+## Security considerations
+
+**Tickets contain IP addresses**: When you create a ticket, it embeds the IP addresses you're currently reachable at. Sharing a ticket means sharing your IP address with whoever receives it. This is intentional - it enables direct connections without a central server.
+
+This is actually *better* than many P2P systems that broadcast your IP to all peers. With tickets, you form a "cozy network" between peers you explicitly choose to connect with.
+
+**Tickets are reusable**: Unlike what the name might imply, tickets are not single-use tokens. Once created, a ticket can be used multiple times by anyone who has it.
+
+**Application-specific tickets may contain secrets**: Depending on what your application includes in a ticket (like write capabilities for a document), tickets can grant ongoing access. Treat them accordingly.
+
+**Tickets can go stale**: The dialing information in a ticket (especially IP addresses) can become outdated as network conditions change. For long-lived connections, prefer caching `EndpointID`s and letting iroh resolve current dialing details.
+
+## Building your own ticket types
+
+The `iroh-tickets` crate is designed to be extended. You can create custom ticket types for your application that bundle your own data alongside endpoint addresses. See the [crate documentation](https://docs.rs/iroh-tickets) for details.

@@ -1,0 +1,43 @@
+---
+title: "Creating an Endpoint"
+---
+
+An endpoint is the core building block of an iroh node. It manages network
+connections, handles incoming and outgoing traffic, and provides the necessary
+infrastructure for implementing protocols.
+
+Once you have an Endpoint, you can use it to create connections or accept
+incoming connections from other endpoints. 
+
+## Creating an Endpoint
+
+This method initializes a new endpoint and binds it to a local address, allowing it
+to listen for incoming connections.
+
+```rust
+use iroh::{Endpoint, presets};
+use anyhow::Result;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let endpoint = Endpoint::bind(presets::N0).await?;
+    // ...
+    Ok(())
+}
+```
+
+
+1. `bind` creates the endpoint and starts listening for
+incoming connections
+2. `await` keyword is used to wait for the endpoint
+to be created in an asynchronous context.
+
+## Next Steps
+
+With an endpoint created, you can now start discovering and connecting to other endpoints.
+
+Explore the following guides to learn more:
+- [DNS Global Discovery](/connecting/dns-discovery)
+- [Local Network Discovery](/connecting/local-discovery)
+- [Gossip and Topic Broadcast](/connecting/gossip)
+- [Writing a Protocol](/protocols/writing-a-protocol)

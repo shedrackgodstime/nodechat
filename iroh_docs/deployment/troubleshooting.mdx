@@ -1,0 +1,139 @@
+---
+title: "Troubleshooting"
+---
+
+## Logging
+
+iroh uses the `tracing` crate for logging. To see what's happening inside iroh, you need to enable logging in your application.
+
+### Setup
+
+First, add the tracing subscriber dependency:
+
+```bash
+cargo add tracing-subscriber
+```
+
+Then, at the top of your `main` function, initialize the subscriber:
+
+```rust
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
+    
+    // ...existing code...
+}
+```
+
+### Running with logs
+
+Now run your application with the `RUST_LOG` environment variable to control the log level:
+
+```bash
+# For general info logs from iroh
+RUST_LOG=iroh=info cargo run
+
+# For more detailed debug logs if you need more information
+RUST_LOG=iroh=debug cargo run
+```
+
+This will print log messages to your terminal, helping you understand what iroh is doing and diagnose any issues.
+
+## Doctor CLI 
+[iroh doctor](https://github.com/n0-computer/iroh-doctor) is a command-line tool that helps you diagnose network connectivity issues with your iroh setup.
+
+### Installation
+
+```
+cargo install iroh-doctor
+``` 
+
+### Home Relay
+
+All iroh endpoints will maintain a single home relay server that they're
+reachable at. On startup iroh will probe its configured relays & choose the one
+with the lowest latency.
+
+Report on the current network environment, using either an explicitly provided
+stun host or the settings from the config file by using `iroh-doctor report`.
+
+```shell
+iroh-doctor report
+```
+
+An example output looks like this:
+```
+getting report using relay map RelayMap {
+    nodes: {
+        RelayUrl(
+            "https://aps1-1.relay.iroh.network./",
+        ): RelayNode {
+            url: RelayUrl(
+                "https://aps1-1.relay.iroh.network./",
+            ),
+            stun_only: false,
+            stun_port: 3478,
+        },
+        ...
+    },
+}
+Report {
+    udp: true,
+    ipv6: true,
+    ipv4: true,
+    ipv6_can_send: true,
+    ipv4_can_send: true,
+    os_has_ipv6: true,
+    icmpv4: None,
+    icmpv6: None,
+    mapping_varies_by_dest_ip: Some(false),
+    mapping_varies_by_dest_ipv6: Some(false),
+    hair_pinning: Some(false),
+    portmap_probe: Some(
+        ProbeOutput {
+            upnp: false,
+            pcp: false,
+            nat_pmp: false,
+        },
+    ),
+    preferred_relay: Some(
+        RelayUrl(
+            "https://use1-1.relay.iroh.network./",
+        ),
+    ),
+    relay_latency: RelayLatencies(
+        {
+            RelayUrl(
+                "https://aps1-1.relay.iroh.network./",
+            ): 229.446041ms,
+            RelayUrl(
+                "https://euw1-1.relay.iroh.network./",
+            ): 98.979167ms,
+            RelayUrl(
+                "https://use1-1.relay.iroh.network./",
+            ): 10.133208ms,
+        },
+    ),
+    relay_v4_latency: RelayLatencies(
+        {
+            RelayUrl(
+                "https://aps1-1.relay.iroh.network./",
+            ): 229.446041ms,
+            ...
+        },
+    ),
+    relay_v6_latency: RelayLatencies(
+        {
+            RelayUrl(
+                "https://aps1-1.relay.iroh.network./",
+            ): 238.579417ms,
+            ...
+        },
+    ),
+    global_v4: Some(72.**.**.**:54696),
+    global_v6: Some([2600:**:**:***::100b]:53549),
+    captive_portal: None,
+}
+```
+
+The above output shows that the endpoint is using the `use1-1.relay.iroh.network` relay, and that it has a latency of 10ms. This is the relay that the endpoint will use to establish connections with other endpoints.

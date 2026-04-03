@@ -1,0 +1,324 @@
+---
+title: "Blobs"
+---
+
+the blobs protocol works with sequences of opaque data ("blobs"), which are often the bytes of a file.
+It's a protocol for data storage and transfer. `iroh-blobs` is _content-addressed_, which means data is always referenced to by it's cryptographic hash. Blobs implements request/response and 
+streaming transfers blobs or ranges of blobs, using hashes to verify streams remain intact.
+
+All blobs within iroh are referred to by the BLAKE3 hash of its content. BLAKE3 is a _tree hashing_ algorithm, that splits its input into uniform chunks and arranges them as the leaves of a binary tree, producing intermediate _chunk hashes_ that accumulate up to a _root hash._ Iroh uses the 32 byte root hash (or just “hash”) as an immutable blob identifier. 
+
+<Frame>
+  <img className="block dark:hidden" src="/images/blobs_fig_1_blob.svg" alt="Blobs are sequences of opaque data, which are referred to by their hash" style={{ borderRadius: '0.5rem' }} />
+  <img className="hidden dark:block" src="/images/blobs_fig_1_blob_dark.svg" alt="Blobs are sequences of opaque data, which are referred to by their hash" style={{ borderRadius: '0.5rem' }} />
+</Frame>
+
+The blobs protocol leverages the tree hash structure of BLAKE3 as a basis for _incremental verification_. When data is sent over the network, the integrity of each chunk is checked both by the sender and the receiver, as described by Section 6.4 “Verified Streaming” of the [BLAKE3 paper](https://github.com/BLAKE3-team/BLAKE3-specs). Iroh caches all chunk hashes as external metadata, leaving the unaltered input blob as the canonical source of bytes. Verified streaming also facilitates _range requests:_ fetching a verifiable contiguous subsequence of a blob by streaming only the portions of the BLAKE3 binary tree required to verify the designated subsequence.
+
+Chunk hashes are distinct from root hashes and only used during data transfer. The chunk size of BLAKE3 is a tunable constant that defaults to 1KiB, which results in a 6% overhead on on the size of the input blob. Increasing the chunk size reduces overhead, at the cost of requiring more data transfer before an incremental verification checkpoint is reached. The chunk size constant can be modified & recalculated *without affecting the root hash.* This opens the door to experiment with different chunk size constants, even at runtime. We intend to investigate chunk size optimization in future work.
+
+## Collections
+
+A *Collection* is an ordered sequence of hashes that refer to other blobs. Collection reference counts can range from 0-billions. Collections are the _only_ means of relating blobs, and form the basis of synchronization & querying. Collections cannot be queried nested as graphs.
+
+The serialized form of a collection is each 32 byte hash in the collection, concatenated without any separator. A collection is only valid if it's byte length is a multiple of 32, which also makes indexing into a collection with a known byte length trivial: multiply the desired index by 32.
+
+By convention, the initial element in a collection is the _metadata blob:_ it stores information about all other blobs in the collection. The contents of a metadata blob can be defined by applications.
+
+<Frame>
+  <img className="block dark:hidden" src="/images/blobs_fig_2_collection.svg" alt="collections are an ordered sequence of" style={{ borderRadius: '0.5rem' }} />
+  <img className="hidden dark:block" src="/images/blobs_fig_2_collection_dark.svg" alt="collections are an ordered sequence of" style={{ borderRadius: '0.5rem' }} />
+</Frame>
+
+
+## Concepts
+
+- Blob: an opaque sequence of bytes (no embedded metadata).
+- Link: a 32-byte BLAKE3 hash that identifies a blob.
+- HashSeq: a blob that contains a sequence of links (useful for chunking/trees).
+- Provider / Requester: provider serves data; requester fetches it. An endpoint can be both.
+
+## Installation
+
+```
+cargo add iroh-blobs
+```
+
+- [Primary docs and API reference](https://docs.rs/iroh-blobs/latest/iroh_blobs/)
+- [Code samples on GitHub](https://github.com/n0-computer/iroh-blobs/tree/main/examples)
+
+## Tutorial
+
+Let's dive into iroh by building a simple file transfer tool in rust! 
+
+At the end we should be able to transfer a file from one device by running this:
+
+```sh
+$ cargo run -- send ./file.txt
+Indexing file.
+File analyzed. Fetch this file by running:
+cargo run -- receive blobabvojvy[...] file.txt
+```
+
+And then fetch it on any other device like so:
+```sh
+$ cargo run -- receive blobabvojvy[...] file.txt
+Starting download.
+Finished download.
+Copying to destination.
+Finished copying.
+Shutting down.
+```
+
+In this guide we'll be omitting the import statements required to get this working.
+If you're ever confused about what to import, take a look at the imports in the [complete example](https://github.com/n0-computer/iroh-blobs/blob/main/examples/transfer.rs).
+
+
+### Get set up
+
+We'll assume you've set up [rust](https://www.rust-lang.org/) and [cargo](https://doc.rust-lang.org/cargo/) on your machine.
+
+Initialize a new project by running:
+
+```bash
+cargo init file-transfer
+cd file-transfer
+```
+
+Now, add the dependencies we'll need for this tutorial:
+
+```bash
+cargo add iroh iroh-blobs tokio anyhow
+```
+
+From here on we'll be working inside the `src/main.rs` file.
+
+
+### Create an `iroh::Endpoint`
+
+To start interacting with other iroh endpoints, we need to build an `iroh::Endpoint`.
+This is what manages the possibly changing network underneath, maintains a connection to the closest relay, and finds ways to address devices by `EndpointId`.
+
+```rust
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Create an endpoint, it allows creating and accepting
+    // connections in the iroh p2p world
+    let endpoint = Endpoint::bind(presets::N0).await?;
+
+    // ...
+
+    Ok(())
+}
+```
+
+There we go, this is all we need to [open connections](https://docs.rs/iroh/latest/iroh/endpoint/struct.Endpoint.html#method.connect) or [accept them](https://docs.rs/iroh/latest/iroh/endpoint/struct.Endpoint.html#method.accept).
+
+### Using an existing protocol: iroh-blobs
+
+Instead of writing our own protocol from scratch, let's use [iroh-blobs](/protocols/blobs), which already does what we want:
+It loads files from your file system and provides a protocol for seekable, resumable downloads of these files.
+
+```rust
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Create an endpoint, it allows creating and accepting
+    // connections in the iroh p2p world
+    let endpoint = Endpoint::bind(presets::N0).await?;
+
+    // We initialize an in-memory backing store for iroh-blobs
+    let store = MemStore::new();
+    // Then we initialize a struct that can accept blobs requests over iroh connections
+    let blobs = BlobsProtocol::new(&store, None);
+
+    // ...
+
+    Ok(())
+}
+```
+
+<Note>
+Learn more about what we mean by "protocol" on the [protocol documentation page](/concepts/protocols).
+</Note>
+
+With these two lines, we've initialized iroh-blobs and gave it access to our `Endpoint`.
+
+At this point what we want to do depends on whether we want to accept incoming iroh connections from the network or create outbound iroh connections to other endpoints.
+Which one we want to do depends on if the executable was called with `send` as an argument or `receive`, so let's parse these two options out from the CLI arguments and match on them:
+
+```rust
+// Grab all passed in arguments, the first one is the binary itself, so we skip it.
+let args: Vec<String> = std::env::args().skip(1).collect();
+// Convert to &str, so we can pattern-match easily:
+let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+
+match arg_refs.as_slice() {
+    ["send", filename] => {
+        todo!();
+    }
+    ["receive", ticket, filename] => {
+        todo!();
+    }
+    _ => {
+        println!("Couldn't parse command line arguments: {args:?}");
+        println!("Usage:");
+        println!("    # to send:");
+        println!("    cargo run -- send [FILE]");
+        println!("    # this will print a ticket.");
+        println!();
+        println!("    # to receive:");
+        println!("    cargo run -- receive [TICKET] [FILE]");
+    }
+}
+```
+
+We're also going to print some simple help text when there's no arguments or we can't parse them.
+
+What's left to do now is fill in the two `todo!()`s!
+
+
+### Getting ready to send
+
+If we want to make a file available over the network with iroh-blobs, we first need to hash this file.
+
+<Note>
+What does this step do?
+
+It hashes the file using [BLAKE3](https://en.wikipedia.org/wiki/BLAKE_(hash_function)) and remembers a so-called ["outboard"](https://github.com/oconnor663/bao?tab=readme-ov-file#outboard-mode) for that file.
+This outboard contains information about hashes of parts of this file.
+All of this enables some extra features with iroh-blobs like automatically verifying the integrity of the file *while it's streaming*, verified range downloads and download resumption.
+</Note>
+
+```rust
+let filename: PathBuf = filename.parse()?;
+let abs_path = std::path::absolute(&filename)?;
+
+println!("Hashing file.");
+
+// When we import a blob, we get back a "tag" that refers to said blob in the store
+// and allows us to control when/if it gets garbage-collected
+let tag = store.blobs().add_path(abs_path).await?;
+```
+
+<Note>
+For other use cases, there are other ways of importing blobs into iroh-blobs, you're not restricted to pulling them from the file system!
+You can see other options available, such as [`add_slice`](https://docs.rs/iroh-blobs/latest/iroh_blobs/api/blobs/struct.Blobs.html#method.add_slice).
+Make sure to also check out the options you can pass and their documentation for some interesting tidbits on performance.
+</Note>
+
+The return value `tag` contains the final piece of information such that another endpoint can fetch a blob from us.
+
+We'll use a `BlobTicket` to put the file's BLAKE3 hash and our endpoint's `EndpointId` into a single copy-able string:
+
+```rust
+let endpoint_id = endpoint.id();
+let ticket = BlobTicket::new(endpoint_id.into(), tag.hash, tag.format);
+
+println!("File hashed. Fetch this file by running:");
+println!(
+    "cargo run -- receive {ticket} {}",
+    filename.display()
+);
+```
+
+Now we've imported the file and produced instructions for how to fetch it, but we're actually not yet actively listening for incoming connections yet! (iroh-blobs won't do so unless you specifically tell it to do that.)
+
+For that we'll use iroh's `Router`.
+Similar to routers in webserver libraries, it runs a loop accepting incoming connections and routes them to the specific handler.
+However, instead of handlers being organized by HTTP paths, it routes based on "ALPNs".
+Read more about ALPNs and the router on the [protocol](/concepts/protocols) page.
+
+In our case, we only need a single protocol, but constructing a router also takes care of running the accept loop, so that makes our life easier:
+
+```rs
+// For sending files we build a router that accepts blobs connections & routes them
+// to the blobs protocol.
+let router = Router::builder(endpoint)
+    .accept(iroh_blobs::ALPN, blobs)
+    .spawn();
+
+tokio::signal::ctrl_c().await?;
+
+// Gracefully shut down the endpoint
+println!("Shutting down.");
+router.shutdown().await?;
+```
+
+And as you can see, as a final step we wait for the user to stop the file providing side by hitting `Ctrl+C` in the console and once they do so, we shut down the router gracefully.
+
+
+### Connecting to the other side to receive
+
+On the connection side, we got the `ticket` and the `path` from the CLI arguments and we can parse them into their `struct` versions.
+
+With them parsed
+- we first construct a `Downloader` (that can help us coordinate multiple downloads from multiple peers if we'd want to)
+- and then call `.download` with the information contained in the ticket and wait for the download to finish:
+
+<Note>
+Reusing the same downloader across multiple downloads can be more efficient, e.g. by reusing existing connections.
+In this example we don't see this, but it might come in handy for your use case.
+</Note>
+
+```rust
+let filename: PathBuf = filename.parse()?;
+let abs_path = std::path::absolute(filename)?;
+let ticket: BlobTicket = ticket.parse()?;
+
+// For receiving files, we create a "downloader" that allows us to fetch files
+// from other endpoints via iroh connections
+let downloader = store.downloader(&endpoint);
+
+println!("Starting download.");
+
+downloader
+    .download(ticket.hash(), Some(ticket.endpoint_addr().id)
+    .await?;
+
+println!("Finished download.");
+```
+
+<Note>
+The return value of `.download()` is [`DownloadProgress`](https://docs.rs/iroh-blobs/latest/iroh_blobs/api/downloader/struct.DownloadProgress.html).
+You can either `.await` it to wait for the download to finish, or you can stream out progress events instead, e.g. if you wanted to use this for showing a nice progress bar!
+</Note>
+
+As a final step, we'll export the file we just downloaded into our in-memory blobs database to the desired file path:
+
+```rust
+println!("Copying to destination.");
+
+store.blobs().export(ticket.hash(), abs_path).await?;
+
+println!("Finished copying.");
+```
+
+<Note>
+This first downloads the file completely into memory, then copies it from memory to file in a second step.
+
+There's ways to make this work without having to store the whole file in memory!
+This would involve setting up an `FsStore` instead of a `MemStore` and using `.export_with_opts` with `ExportMode::TryReference`.
+Something similar can be done on the sending side!
+We'll leave these changes as an exercise to the reader 😉
+</Note>
+
+Before we leave, we'll gracefully shut down our endpoint in the receive branch, too:
+
+```rs
+// Gracefully shut down the endpoint
+println!("Shutting down.");
+endpoint.close().await;
+```
+
+
+## That's it!
+
+You've now successfully built a small tool for file transfers! 🎉
+
+The full example with the very latest version of iroh and iroh-blobs can be [viewed on github](https://github.com/n0-computer/iroh-blobs/blob/main/examples/transfer.rs).
+
+If you're hungry for more, check out
+- the [iroh rust documentation](https://docs.rs/iroh),
+- Video streaming with [iroh-roq](/protocols/streaming),
+- Writing your [own protocols](/protocols/writing-a-protocol.mdx),
+- [other examples](/examples), or

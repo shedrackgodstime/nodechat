@@ -17,19 +17,21 @@
 //   6 = Contacts
 //   7 = SelectMembers
 //   8 = CreateGroup
+//   9 = ContactDetails
 
+import { ScrollView }      from "std-widgets.slint";
 import { AppTheme }           from "./theme.slint";
 import { SetupNameScreen }    from "./screens/setup_name.slint";
 import { IdentityCardScreen } from "./screens/identity_card.slint";
 import { WelcomeScreen }      from "./screens/welcome.slint";
-import { ChatListScreen }     from "./screens/chat_list.slint";
-import { ChatViewScreen }     from "./screens/chat_view.slint";
-import { GroupViewScreen }    from "./screens/group_view.slint";
+import { ChatListScreen, ChatPreview }     from "./screens/chat_list.slint";
+import { ChatViewScreen, MessageData }     from "./screens/chat_view.slint";
+import { GroupViewScreen, GroupMessageData }    from "./screens/group_view.slint";
 import { AddContactScreen }   from "./screens/add_contact.slint";
-import { VerifyKeyScreen }    from "./screens/verify_key.slint";
 import { SettingsScreen }     from "./screens/settings.slint";
-import { ContactsScreen }     from "./screens/contacts.slint";
-import { SelectMembersScreen } from "./screens/select_members.slint";
+import { ContactsScreen, ContactData }     from "./screens/contacts.slint";
+import { ContactDetailsScreen } from "./screens/contact_details.slint";
+import { SelectMembersScreen, SelectionData } from "./screens/select_members.slint";
 import { CreateGroupScreen }  from "./screens/create_group.slint";
 
 export component AppWindow inherits Window {
@@ -58,28 +60,40 @@ export component AppWindow inherits Window {
     in-out property <bool> is-locked: false;
 
     // ── Setup overlay internal state ──────────────────────────────────────
-    /// 0 = name input, 1 = generating (loading), 2 = identity card
+    /// 0 = welcome, 1 = name input, 2 = generating (loading), 3 = identity card
     in-out property <int> setup-step: 0;
 
     // ── Main app navigation ───────────────────────────────────────────────
     in-out property <int> current-screen: 0;
+    in-out property <int> contact-details-return-screen: 0;
 
     // ── Shared app state ──────────────────────────────────────────────────
     in property <string>  my-display-name: "";
     in property <string>  my-node-id: "";
+    in property <string>  my-endpoint-ticket: "";
     in property <int>     direct-peers: 0;
     in property <int>     relay-peers: 0;
     in property <bool>    is-offline: false;
+    in-out property <string> runtime-error-log: "";
+    in property <[ChatPreview]> chats: [];
+    in property <[ContactData]> contact-directory: [];
+    in property <[SelectionData]> group-member-candidates: [];
+    in property <int> selected-group-member-count: 0;
 
     // ── Active chat context ───────────────────────────────────────────────
     in-out property <string> active-peer-name: "";
     in-out property <string> active-peer-initials: "";
     in-out property <string> active-peer-node-id: "";
+    in-out property <string> active-peer-ticket: "";
     in-out property <string> active-connection-mode: "direct";
     in-out property <bool>   active-peer-verified: false;
     in-out property <bool>   active-peer-online: false;
+    in-out property <string> active-peer-connection-stage: "";
     in-out property <string> active-group-name: "";
+    in-out property <string> active-group-topic-id: "";
     in-out property <string> active-group-members: "0";
+    in property <[MessageData]> active-direct-messages: [];
+    in property <[GroupMessageData]> active-group-messages: [];
 
     /// Fired when the user confirms their display name during setup.
     /// Rust: kicks off identity generation, then sets setup-step=2, my-display-name, my-node-id.
@@ -94,8 +108,15 @@ export component AppWindow inherits Window {
     callback add-contact(string, string);
     callback mark-verified();
     callback copy-node-id();
+    callback copy-runtime-error(string);
+    callback delete-conversation(string, bool);
+    callback clear-chat();
+    callback remove-contact();
+    callback retry-queued();
     callback launch-group(string);
-    callback unlock(string);  // password string → Rust verifies and sets is-locked=false
+    callback toggle-group-member(string);
+    callback unlock();        // placeholder unlock action for now
+    callback load-conversation(string, bool);
     callback clear-messages();
     callback delete-identity();
 
@@ -103,11 +124,11 @@ export component AppWindow inherits Window {
     forward-focus: back-handler;
     back-handler := FocusScope {
         key-pressed(event) => {
-            if event.text == "\u{001b}" || event.text == Key.Escape {
+                if event.text == "\u{001b}" || event.text == Key.Escape {
+                if current-screen == 9 { current-screen = contact-details-return-screen; return accept; }
                 if current-screen == 1 { current-screen = 0; return accept; }
                 if current-screen == 2 { current-screen = 0; return accept; }
                 if current-screen == 3 { current-screen = 0; return accept; }
-                if current-screen == 4 { current-screen = 1; return accept; }
                 if current-screen == 5 { current-screen = 0; return accept; }
                 if current-screen == 6 { current-screen = 0; return accept; }
                 if current-screen == 7 { current-screen = 6; return accept; }
@@ -133,13 +154,31 @@ export component AppWindow inherits Window {
                 background: AppTheme.surface-primary;
 
                 if is-desktop || current-screen == 0: ChatListScreen {
+                    chats:            root.chats;
                     is-desktop:        root.is-desktop;
                     safe-area-top:     root.safe-area-top;
                     safe-area-bottom:  root.safe-area-bottom;
                     direct-peers:      root.direct-peers;
                     relay-peers:       root.relay-peers;
                     is-offline:        root.is-offline;
-                    open-chat(id) =>  { current-screen = 1; }
+                    open-chat(id, name, initials, is-group, is-online, is-relay, is-verified) => {
+                        if is-group {
+                            root.active-group-name = name;
+                            root.active-group-topic-id = id;
+                            root.active-group-members = "0";
+                            root.active-peer-connection-stage = "";
+                            current-screen = 2;
+                        } else {
+                            root.active-peer-name = name;
+                            root.active-peer-initials = initials;
+                            root.active-peer-node-id = id;
+                            root.active-connection-mode = is-relay ? "relay" : "direct";
+                            root.active-peer-online = is-online;
+                            root.active-peer-verified = is-verified;
+                            current-screen = 1;
+                        }
+                        root.load-conversation(id, is-group);
+                    }
                     add-contact =>    { current-screen = 3; }
                     open-contacts =>  { current-screen = 6; }
                     open-settings =>  { current-screen = 5; }
@@ -148,8 +187,26 @@ export component AppWindow inherits Window {
                 if !is-desktop && current-screen == 6: ContactsScreen {
                     is-desktop:    false;
                     safe-area-top: root.safe-area-top;
+                    contacts:       root.contact-directory;
                     go-back =>     { current-screen = 0; }
-                    open-chat(id) => { current-screen = 1; }
+                    open-contact(id, name, initials, is-group, is-online, is-relay, is-verified) => {
+                        if is-group {
+                            root.active-group-name = name;
+                            root.active-group-topic-id = id;
+                            root.active-group-members = "0";
+                            root.active-peer-connection-stage = "";
+                        } else {
+                            root.active-peer-name = name;
+                            root.active-peer-initials = initials;
+                            root.active-peer-node-id = id;
+                            root.active-connection-mode = is-relay ? "relay" : "direct";
+                            root.active-peer-online = is-online;
+                            root.active-peer-verified = is-verified;
+                        }
+                        root.contact-details-return-screen = 6;
+                        current-screen = 9;
+                        root.load-conversation(id, is-group);
+                    }
                     add-contact => { current-screen = 3; }
                     new-group =>   { current-screen = 7; }
                 }
@@ -182,8 +239,25 @@ export component AppWindow inherits Window {
                 if is-desktop && current-screen == 6: ContactsScreen {
                     is-desktop:    true;
                     safe-area-top: 0px;
+                    contacts:       root.contact-directory;
                     go-back =>     { current-screen = 0; }
-                    open-chat(id) => { current-screen = 1; }
+                    open-contact(id, name, initials, is-group, is-online, is-relay, is-verified) => {
+                        if is-group {
+                            root.active-group-name = name;
+                            root.active-group-members = "0";
+                            root.active-peer-connection-stage = "";
+                        } else {
+                            root.active-peer-name = name;
+                            root.active-peer-initials = initials;
+                            root.active-peer-node-id = id;
+                            root.active-connection-mode = is-relay ? "relay" : "direct";
+                            root.active-peer-online = is-online;
+                            root.active-peer-verified = is-verified;
+                        }
+                        root.contact-details-return-screen = 6;
+                        current-screen = 9;
+                        root.load-conversation(id, is-group);
+                    }
                     add-contact => { current-screen = 3; }
                     new-group =>   { current-screen = 7; }
                 }
@@ -197,12 +271,16 @@ export component AppWindow inherits Window {
                     connection-mode:          root.active-connection-mode;
                     is-verified:              root.active-peer-verified;
                     is-online:                root.active-peer-online;
+                    connection-stage:         root.active-peer-connection-stage;
+                    messages:                 root.active-direct-messages;
                     safe-area-top:            is-desktop ? 0px : root.safe-area-top;
                     safe-area-bottom:         root.safe-area-bottom;
                     virtual-keyboard-height:  root.kb-height;
                     go-back =>                { current-screen = 0; }
                     send-message(msg) =>      { root.send-message(msg); }
-                    open-verify =>            { current-screen = 4; }
+                    open-contact-info =>      { root.contact-details-return-screen = 1; current-screen = 9; }
+                    retry-queued =>           { root.retry-queued(); }
+                    delete-conversation =>    { root.delete-conversation(root.active-peer-node-id, false); }
                 }
 
                 // Screen 2 — Group Chat View
@@ -210,6 +288,7 @@ export component AppWindow inherits Window {
                     is-desktop:              root.is-desktop;
                     group-name:              root.active-group-name;
                     member-count:            root.active-group-members;
+                    messages:                root.active-group-messages;
                     safe-area-top:           is-desktop ? 0px : root.safe-area-top;
                     safe-area-bottom:        root.safe-area-bottom;
                     virtual-keyboard-height: root.kb-height;
@@ -228,16 +307,26 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // Screen 4 — Verify Key
-                if current-screen == 4: VerifyKeyScreen {
+                // Screen 9 — Contact Details
+                if current-screen == 9: ContactDetailsScreen {
                     is-desktop:    root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
                     peer-name:     root.active-peer-name;
-                    go-back =>     { current-screen = 1; }
-                    mark-verified => {
-                        root.mark-verified();
+                    peer-initials: root.active-peer-initials;
+                    peer-node-id:  root.active-peer-node-id;
+                    endpoint-ticket: root.active-peer-ticket;
+                    connection-mode: root.active-connection-mode;
+                    connection-stage: root.active-peer-connection-stage;
+                    is-online:     root.active-peer-online;
+                    is-verified:   root.active-peer-verified;
+                    go-back =>     { current-screen = root.contact-details-return-screen; }
+                    chat-now =>    {
                         current-screen = 1;
+                        root.load-conversation(root.active-peer-node-id, false);
                     }
+                    mark-verified => { root.mark-verified(); }
+                    clear-chat =>  { root.clear-chat(); }
+                    remove-contact => { root.remove-contact(); }
                 }
 
                 // Screen 5 — Settings
@@ -245,6 +334,7 @@ export component AppWindow inherits Window {
                     is-desktop:    root.is-desktop;
                     display-name:  root.my-display-name;
                     node-id:       root.my-node-id;
+                    endpoint-ticket: root.my-endpoint-ticket;
                     direct-peers:  root.direct-peers;
                     relay-peers:   root.relay-peers;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
@@ -258,7 +348,10 @@ export component AppWindow inherits Window {
                 if current-screen == 7: SelectMembersScreen {
                     is-desktop:    root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    contacts:      root.group-member-candidates;
+                    selected-count: root.selected-group-member-count;
                     go-back =>     { current-screen = 6; }
+                    toggle-selection(id) => { root.toggle-group-member(id); }
                     next-step =>   { current-screen = 8; }
                 }
 
@@ -266,6 +359,7 @@ export component AppWindow inherits Window {
                 if current-screen == 8: CreateGroupScreen {
                     is-desktop:    root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    member-count:  root.selected-group-member-count;
                     go-back =>     { current-screen = 7; }
                     launch-group(name) => {
                         root.launch-group(name);
@@ -285,25 +379,36 @@ export component AppWindow inherits Window {
         width: parent.width; height: parent.height;
         background: AppTheme.surface-primary;
 
-        // Step 0 or 1 — Name input (setup-step == 1 shows loading state)
-        if setup-step != 2: SetupNameScreen {
-            generating:    root.setup-step == 1;
-            is-desktop:    root.is-desktop;
-            safe-area-top: root.safe-area-top;
-            go-back => {} // no back on first onboarding step
-
-            confirm-name(name) => {
-                // Show loading state immediately; Rust generates the identity.
+        // Step 0 — Welcome
+        if setup-step == 0: WelcomeScreen {
+            is-locked: false;
+            get-started => {
                 root.setup-step = 1;
-                root.confirm-name(name);
-                // Rust callback: sets my-display-name, my-node-id, then setup-step = 2.
             }
         }
 
-        // Step 2 — Identity card (shown after Rust confirms identity generated)
-        if setup-step == 2: IdentityCardScreen {
+        // Step 1 or 2 — Name input (setup-step == 2 shows loading state)
+        if setup-step == 1 || setup-step == 2: SetupNameScreen {
+            generating:    root.setup-step == 2;
+            is-desktop:    root.is-desktop;
+            safe-area-top: root.safe-area-top;
+            go-back => {
+                root.setup-step = 0;
+            }
+
+            confirm-name(name) => {
+                // Show loading state immediately; Rust generates the identity.
+                root.setup-step = 2;
+                root.confirm-name(name);
+                // Rust callback: sets my-display-name, my-node-id, then setup-step = 3.
+            }
+        }
+
+        // Step 3 — Identity card (shown after Rust confirms identity generated)
+        if setup-step == 3: IdentityCardScreen {
             display-name: root.my-display-name;
             node-id:      root.my-node-id;
+            endpoint-ticket: root.my-endpoint-ticket;
             copy-node-id => { root.copy-node-id(); }
             go-to-chats => {
                 root.setup-complete();
@@ -314,8 +419,7 @@ export component AppWindow inherits Window {
 
     // ════════════════════════════════════════════════════════════════════
     // LAYER 3 — LOCK OVERLAY (shown when is-locked = true)
-    // Covers the entire window. Dismissed when Rust verifies password
-    // and sets is-locked = false.
+    // Covers the entire window. Dismissed when Rust clears the lock flag.
     // ════════════════════════════════════════════════════════════════════
     if is-locked: Rectangle {
         width: parent.width; height: parent.height;
@@ -324,7 +428,118 @@ export component AppWindow inherits Window {
         WelcomeScreen {
             is-locked: true;
             get-started => {} // unused in locked mode
-            // WIRE: on-unlock callback (password gate — future feature)
+            unlock => { root.unlock(); }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // LAYER 4 — RUNTIME ERROR PANEL (non-modal, copyable, responsive)
+    // ════════════════════════════════════════════════════════════════════
+    if runtime-error-log != "": Rectangle {
+        property <length> panel-width: is-desktop ? 420px : root.width - 24px;
+        property <length> panel-height: is-desktop ? 220px : 300px;
+        x: is-desktop ? parent.width - panel-width - 16px : 12px;
+        y: is-desktop ? parent.height - panel-height - safe-area-bottom - 12px : safe-area-top + 12px;
+        width: panel-width;
+        height: panel-height;
+        background: is-desktop ? #151922 : #2D1010;
+        border-radius: 18px;
+        border-width: 1px;
+        border-color: is-desktop ? #39424f : AppTheme.accent-danger;
+        clip: true;
+
+        HorizontalLayout {
+            padding: 14px;
+            spacing: 12px;
+            alignment: start;
+
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 8px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text {
+                        text: "Runtime Errors";
+                        font-size: 15px;
+                        font-weight: 700;
+                        color: #FFFFFF;
+                    }
+                    Text {
+                        text: "Copyable";
+                        font-size: 11px;
+                        color: is-desktop ? #9AA6B2 : #FFB4B0;
+                    }
+                }
+
+                ScrollView {
+                    vertical-stretch: 1;
+                    mouse-drag-pan-enabled: true;
+
+                    Text {
+                        text: runtime-error-log;
+                        font-size: 13px;
+                        color: #FCEEEE;
+                        wrap: word-wrap;
+                        horizontal-stretch: 1;
+                    }
+                }
+            }
+
+            VerticalLayout {
+                alignment: start;
+                spacing: 10px;
+
+                TouchArea {
+                    width: 84px;
+                    height: 36px;
+                    clicked => {
+                        runtime-error-log = "";
+                    }
+                    Rectangle {
+                        width: 100%; height: 100%;
+                        border-radius: 10px;
+                        background: AppTheme.surface-tertiary;
+                        border-width: 1px;
+                        border-color: AppTheme.divider;
+                        Text {
+                            text: "Close";
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: #FFFFFF;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                copy-error-input := TextInput { width: 0px; height: 0px; opacity: 0; }
+
+                TouchArea {
+                    width: 84px;
+                    height: 36px;
+                    clicked => {
+                        copy-error-input.text = runtime-error-log;
+                        copy-error-input.select-all();
+                        copy-error-input.copy();
+                        copy-error-input.clear-selection();
+                        root.copy-runtime-error(runtime-error-log);
+                    }
+                    Rectangle {
+                        width: 100%; height: 100%;
+                        border-radius: 10px;
+                        background: AppTheme.accent-danger;
+                        Text {
+                            text: "Copy";
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: #FFFFFF;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
         }
     }
 }

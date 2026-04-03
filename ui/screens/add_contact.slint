@@ -95,6 +95,12 @@ export component AddContactScreen inherits Rectangle {
                     VerticalLayout {
                         spacing: 10px;
                         Text { text: "PEER DISCOVERY"; font-size: 11px; font-weight: 700; color: AppTheme.text-tertiary; letter-spacing: 0.5px; }
+                        Text {
+                            text: "Paste a peer ticket. Tickets carry the endpoint address iroh needs to discover the peer.";
+                            font-size: 12px;
+                            color: AppTheme.text-secondary;
+                            wrap: word-wrap;
+                        }
                         
                         Rectangle {
                             border-radius: 18px;
@@ -124,9 +130,9 @@ export component AddContactScreen inherits Rectangle {
                                     }
                                 }
 
-                                Text { text: "OR ENTER NODE ID"; font-size: 10px; font-weight: 800; color: AppTheme.text-tertiary; horizontal-alignment: center; }
+                                Text { text: "OR PASTE PEER TICKET"; font-size: 10px; font-weight: 800; color: AppTheme.text-tertiary; horizontal-alignment: center; }
 
-                                // Node ID Input
+                                // Ticket input
                                 Rectangle {
                                     height: 52px;
                                     border-radius: 12px;
@@ -145,7 +151,7 @@ export component AddContactScreen inherits Rectangle {
 
                                     if id-input.text == "": Text {
                                         padding-left: 14px; height: parent.height;
-                                        text: "nBq3p...Kx7R"; font-size: 14px;
+                                        text: "docaa...ticket"; font-size: 14px;
                                         color: AppTheme.text-tertiary; vertical-alignment: center; opacity: 0.4;
                                     }
                                 }
@@ -184,13 +190,13 @@ export component AddContactScreen inherits Rectangle {
 
                                     if name-input.text == "": Text {
                                         padding-left: 14px; height: parent.height;
-                                        text: "Friend's name (e.g. Satoshi)"; font-size: 15px;
+                                        text: "Local label (e.g. Satoshi)"; font-size: 15px;
                                         color: AppTheme.text-tertiary; vertical-alignment: center; opacity: 0.4;
                                     }
                                 }
                                 
                                 Text { 
-                                    text: "Private name, stored locally only."; 
+                                    text: "Private label for your own contact list."; 
                                     font-size: 10px; color: AppTheme.text-tertiary; horizontal-alignment: right;
                                 }
                             }
@@ -209,7 +215,7 @@ export component AddContactScreen inherits Rectangle {
                             enabled: root.can-add;
                             clicked => { root.add-contact(root.node-id-input, root.display-name-input); }
                             Text {
-                                text: "Add Peer to Phonebook";
+                                text: "Add Peer";
                                 font-size: 17px; font-weight: 700;
                                 color: root.can-add ? #FFFFFF : AppTheme.text-tertiary;
                                 horizontal-alignment: center; vertical-alignment: center;
@@ -218,7 +224,7 @@ export component AddContactScreen inherits Rectangle {
                     }
                     
                     Text {
-                        text: "Added peers are verified via Pkarr.";
+                        text: "Once added, open the chat list and start chatting.";
                         font-size: 11px; color: AppTheme.text-tertiary; horizontal-alignment: center;
                     }
                     

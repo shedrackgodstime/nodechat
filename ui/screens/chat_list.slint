@@ -33,7 +33,7 @@ export component ChatListScreen inherits Rectangle {
     in property <length> safe-area-top: 0px;
     in property <length> safe-area-bottom: 0px;
 
-    callback open-chat(string);
+    callback open-chat(string, string, string, bool, bool, bool, bool);
     callback add-contact();
     callback open-contacts();
     callback open-settings();
@@ -97,51 +97,6 @@ export component ChatListScreen inherits Rectangle {
             }
         }
 
-        // --- Search/Peers Section ──────────────────────────────────────────
-        Rectangle {
-            height: 64px;
-            background: AppTheme.surface-secondary;
-            
-            VerticalLayout {
-                padding-left: 16px;
-                padding-right: 16px;
-                padding-bottom: 14px;
-                alignment: center;
-
-                Rectangle {
-                    border-radius: 16px;
-                    background: AppTheme.surface-tertiary;
-                    height: 48px;
-
-                    HorizontalLayout {
-                        padding-left: 18px;
-                        alignment: start;
-                        spacing: 12px;
-
-                        Text { text: "⚲"; font-size: 18px; color: AppTheme.text-tertiary; vertical-alignment: center; }
-
-                        search := TextInput {
-                            font-size: 17px;
-                            color: AppTheme.text-primary;
-                            horizontal-stretch: 1;
-                            vertical-alignment: center;
-                            single-line: true;
-                        }
-                    }
-
-                    if search.text == "": Text {
-                        x: 48px;
-                        height: parent.height;
-                        text: "Search for peers...";
-                        font-size: 17px;
-                        color: AppTheme.text-tertiary;
-                        vertical-alignment: center;
-                        opacity: 0.5;
-                    }
-                }
-            }
-        }
-
         // --- Message Stream ───────────────────────────────────────────────
         ScrollView {
             vertical-stretch: 1;
@@ -161,7 +116,17 @@ export component ChatListScreen inherits Rectangle {
                     is-relay:     chat.is-relay;
                     is-queued:    chat.is-queued;
                     is-verified:  chat.is-verified;
-                    clicked => { root.open-chat(chat.id); }
+                    clicked => {
+                        root.open-chat(
+                            chat.id,
+                            chat.name,
+                            chat.initials,
+                            chat.is-group,
+                            chat.is-online,
+                            chat.is-relay,
+                            chat.is-verified,
+                        );
+                    }
                 }
             }
         }

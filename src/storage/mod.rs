@@ -61,6 +61,7 @@ fn apply_schema(conn: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS peers (
             node_id       TEXT PRIMARY KEY,
             display_name  TEXT NOT NULL,
+            endpoint_ticket TEXT NOT NULL DEFAULT '',
             x25519_pubkey TEXT NOT NULL,
             verified      INTEGER NOT NULL DEFAULT 0
         );
@@ -88,4 +89,30 @@ fn apply_schema(conn: &Connection) -> Result<()> {
         );",
     )
     .context("failed to apply database schema")
+    .and_then(|_| ensure_peer_schema(conn))
+}
+
+fn ensure_peer_schema(conn: &Connection) -> Result<()> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(peers)")
+        .context("failed to inspect peers schema")?;
+    let mut rows = stmt.query([])?;
+    let mut has_endpoint_ticket = false;
+
+    while let Some(row) = rows.next().context("failed to read peers schema row")? {
+        let name: String = row.get(1).context("schema column name")?;
+        if name == "endpoint_ticket" {
+            has_endpoint_ticket = true;
+            break;
+        }
+    }
+
+    if !has_endpoint_ticket {
+        conn.execute_batch(
+            "ALTER TABLE peers ADD COLUMN endpoint_ticket TEXT NOT NULL DEFAULT '';",
+        )
+        .context("failed to add endpoint_ticket column to peers")?;
+    }
+
+    Ok(())
 }
