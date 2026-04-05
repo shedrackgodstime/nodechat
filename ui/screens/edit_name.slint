@@ -1,0 +1,85 @@
+import { AppTheme } from "../theme.slint";
+import { BaseScreen } from "../components/base_screen.slint";
+
+export component EditNameScreen inherits Rectangle {
+    in-out property <string> display-name: "";
+    in property <bool>       is-desktop: false;
+    in property <length>     safe-area-top: 0px;
+    in property <length>     safe-area-bottom: 0px;
+
+    callback confirm-name(string); // string: new name
+    callback go-back();
+
+    property <bool> valid: display-name.character-count >= 1 && display-name.character-count <= 32;
+
+    BaseScreen {
+        title: "Edit Profile";
+        is-desktop: root.is-desktop;
+        safe-area-top: root.safe-area-top;
+        safe-area-bottom: root.safe-area-bottom;
+        go-back => { root.go-back(); }
+
+        VerticalLayout {
+            spacing: AppTheme.sp-xl;
+            padding-top: AppTheme.sp-lg;
+
+            VerticalLayout {
+                spacing: AppTheme.sp-sm;
+                Text { text: "Change Your Name"; font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px; }
+                Text { text: "This will update your local identity and the name others see during secure P2P handshakes."; font-size: 14px; color: AppTheme.text-tertiary; wrap: word-wrap; }
+            }
+
+            // --- Input Field ---
+            VerticalLayout {
+                spacing: AppTheme.sp-md;
+                Text { text: "DISPLAY NAME"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+                
+                Rectangle {
+                    height: 64px;
+                    border-radius: AppTheme.radius-lg;
+                    background: AppTheme.surface-secondary;
+                    border-width: 1px;
+                    border-color: name-input.has-focus ? AppTheme.accent : transparent;
+                    animate border-color { duration: AppTheme.dur-short; }
+
+                    HorizontalLayout {
+                        padding-left: AppTheme.sp-lg; padding-right: AppTheme.sp-lg;
+                        name-input := TextInput {
+                            text <=> root.display-name;
+                            font-size: 20px; font-weight: 600; color: AppTheme.text-primary;
+                            vertical-alignment: center; single-line: true;
+                            accepted => { if (root.valid) { root.confirm-name(self.text); } }
+                        }
+                    }
+
+                    if name-input.text == "": Text {
+                        x: AppTheme.sp-lg; height: parent.height;
+                        text: "e.g. Satoshi Nakamoto"; font-size: 20px;
+                        color: AppTheme.text-tertiary; vertical-alignment: center; opacity: 0.3;
+                    }
+                }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            // --- Action ---
+            Rectangle {
+                height: 60px;
+                background: valid ? @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%) : AppTheme.surface-tertiary;
+                border-radius: 30px;
+                animate background { duration: AppTheme.dur-short; }
+
+                TouchArea {
+                    enabled: root.valid;
+                    clicked => { root.confirm-name(root.display-name); }
+                    Text {
+                        text: "Save Changes";
+                        font-size: 17px; font-weight: 800;
+                        color: root.valid ? #FFFFFF : AppTheme.text-tertiary;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

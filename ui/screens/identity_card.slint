@@ -1,144 +1,84 @@
 import { AppTheme } from "../theme.slint";
+import { BaseScreen } from "../components/base_screen.slint";
 
 export component IdentityCardScreen inherits Rectangle {
     in property <string> display-name: "";
     in property <string> node-id: "";
     in property <string> endpoint-ticket: "";
+    in property <length> safe-area-top: 0px;
+    in property <length> safe-area-bottom: 0px;
 
     callback go-to-chats();
     callback copy-node-id();
 
-    background: AppTheme.surface-primary;
+    BaseScreen {
+        title: "Your Identity";
+        safe-area-top: root.safe-area-top;
+        safe-area-bottom: root.safe-area-bottom;
+        show-back-button: false;
 
-    VerticalLayout {
-        padding: AppTheme.sp-lg;
-        spacing: AppTheme.sp-lg;
-        alignment: center;
-
-        // --- Success Branding ---
         VerticalLayout {
-            spacing: AppTheme.sp-sm;
-            Text {
-                text: "Hi, " + display-name + "!";
-                font-size: 34px;
-                font-weight: 800;
-                color: AppTheme.text-primary;
-                horizontal-alignment: center;
-            }
+            spacing: AppTheme.sp-xl;
+            padding-top: AppTheme.sp-lg;
 
-            Text {
-                text: "Your decentralized identity is ready.";
-                font-size: 17px;
-                color: AppTheme.text-secondary;
-                horizontal-alignment: center;
-            }
-        }
-
-        Rectangle { height: AppTheme.sp-lg; }
-
-        // --- Card-like Identity Container ---
-        Rectangle {
-            width: 320px;
-            background: AppTheme.surface-secondary;
-            border-radius: 24px;
-            border-width: 1px;
-            border-color: AppTheme.surface-tertiary;
-
+            // --- Success Message ---
             VerticalLayout {
-                spacing: AppTheme.sp-md;
-                padding: AppTheme.sp-lg; // Moved here from Rectangle
+                spacing: AppTheme.sp-sm;
+                Text { text: "Welcome, " + display-name + "!"; font-size: 32px; font-weight: 900; color: #FFFFFF; horizontal-alignment: center; letter-spacing: -0.5px; }
+                Text { text: "Your decentralized P2P vault is ready."; font-size: 16px; color: AppTheme.text-tertiary; horizontal-alignment: center; }
+            }
 
-                // QR Code Area
-                Rectangle {
-                    height: 200px;
-                    width: 200px;
-                    border-radius: AppTheme.radius-md;
-                    background: #FFFFFF;
-                    // Centering
-                    x: (parent.width - self.width) / 2;
-
-                    // Mock QR styling
-                    Rectangle {
-                        width: 170px; height: 170px;
-                        background: #F0F0F0;
-                        border-radius: 4px;
-                        
-                        Text {
-                            text: "QR";
-                            font-size: 40px;
-                            font-weight: 700;
-                            color: #222222;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
-
-                // Hidden input for native clipboard operations
-                copy-input := TextInput { width: 0px; height: 0px; opacity: 0; }
-
-                // Node ID Display
+            // --- The Identity Card ---
+            Rectangle {
+                background: AppTheme.surface-secondary;
+                border-radius: AppTheme.radius-lg;
+                border-width: 1px;
+                border-color: AppTheme.divider;
+                
                 VerticalLayout {
-                    spacing: AppTheme.sp-xs;
-                    Text {
-                        text: "SHAREABLE TICKET";
-                        font-size: 11px;
-                        font-weight: 700;
-                        color: AppTheme.text-tertiary;
-                        letter-spacing: 0.5px;
-                    }
-                    
+                    padding: AppTheme.sp-xl;
+                    spacing: AppTheme.sp-xl;
+                    alignment: center;
+
+                    // Mock QR Area
                     Rectangle {
-                        height: 48px;
-                        border-radius: 12px;
-                        background: AppTheme.surface-tertiary;
+                        width: 180px; height: 180px;
+                        background: #FFFFFF;
+                        border-radius: AppTheme.radius-md;
+                        
+                        Text { text: "QR"; font-size: 48px; font-weight: 900; color: #000000; horizontal-alignment: center; vertical-alignment: center; }
+                        
+                        // Corner Accents
+                        Rectangle { x: 0; y: 0; width: 40px; height: 4px; background: AppTheme.accent; border-radius: 2px; }
+                        Rectangle { x: 0; y: 0; width: 4px; height: 40px; background: AppTheme.accent; border-radius: 2px; }
+                    }
 
-                        HorizontalLayout {
-                            padding-left: AppTheme.sp-md;
-                            padding-right: 8px;
-                            alignment: center;
+                    // Ticket Area
+                    VerticalLayout {
+                        spacing: AppTheme.sp-sm;
+                        Text { text: "SHAREABLE PEER TICKET"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; horizontal-alignment: center; }
+                        
+                        Rectangle {
+                            height: 52px;
+                            background: AppTheme.surface-tertiary;
+                            border-radius: AppTheme.radius-md;
+                            
+                            HorizontalLayout {
+                                padding-left: AppTheme.sp-md; padding-right: AppTheme.sp-md; spacing: AppTheme.sp-md;
+                                Text {
+                                    text: endpoint-ticket;
+                                    font-size: 13px; font-family: "monospace"; color: AppTheme.text-secondary;
+                                    vertical-alignment: center; horizontal-stretch: 1; overflow: elide;
+                                }
 
-                            Text {
-                                text: endpoint-ticket;
-                                font-size: 13px;
-                                font-family: "monospace";
-                                color: AppTheme.text-secondary;
-                                horizontal-stretch: 1;
-                                overflow: elide;
-                                vertical-alignment: center;
-                            }
-
-                            // Compact Copy Button
-                            Rectangle {
-                                width: 56px; height: 32px;
-                                border-radius: 8px;
-                                background: node-id-touch.copied ? #25D366 : AppTheme.accent;
-                                animate background { duration: 150ms; }
-
-                                node-id-touch := TouchArea {
-                                    property <bool> copied: false;
-                                    clicked => { 
-                                        copy-input.text = endpoint-ticket;
-                                        copy-input.select-all();
-                                        copy-input.copy();
-                                        copy-input.clear-selection();
-                                        self.copied = true;
-                                        root.copy-node-id(); 
-                                    }
-                                    
-                                    Timer {
-                                        interval: 2s;
-                                        running: node-id-touch.copied;
-                                        triggered => { node-id-touch.copied = false; }
-                                    }
-
-                                    Text {
-                                        text: node-id-touch.copied ? "✅" : "Copy";
-                                        font-size: 13px;
-                                        font-weight: 600;
-                                        color: #FFFFFF;
-                                        horizontal-alignment: center;
-                                        vertical-alignment: center;
+                                copy-area := TouchArea {
+                                    width: 44px; height: 32px;
+                                    clicked => { root.copy-node-id(); }
+                                    Rectangle {
+                                        background: copy-area.has-hover ? AppTheme.accent : AppTheme.surface-hover;
+                                        border-radius: AppTheme.radius-sm;
+                                        animate background { duration: AppTheme.dur-short; }
+                                        Text { text: "📄"; font-size: 14px; horizontal-alignment: center; vertical-alignment: center; }
                                     }
                                 }
                             }
@@ -146,36 +86,26 @@ export component IdentityCardScreen inherits Rectangle {
                     }
                 }
             }
-        }
 
-        Text {
-            text: "Share your ticket or QR code with friends to start chatting securely and privately.";
-            font-size: 13px;
-            color: AppTheme.text-tertiary;
-            horizontal-alignment: center;
-            width: 300px;
-        }
+            Rectangle { vertical-stretch: 1; }
 
-        Rectangle { vertical-stretch: 1; }
-
-        // --- Main CTA ---
-        Rectangle {
-            width: 320px;
-            height: 56px;
-            border-radius: 18px;
-            background: AppTheme.accent;
-
-            TouchArea {
-                clicked => { root.go-to-chats(); }
-                Text {
-                    text: "Launch Chats";
-                    font-size: 17px;
-                    font-weight: 700;
-                    color: #FFFFFF;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+            // --- Final Action ---
+            Rectangle {
+                height: 60px;
+                background: @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%);
+                border-radius: 30px;
+                
+                TouchArea {
+                    clicked => { root.go-to-chats(); }
+                    Text {
+                        text: "Launch Conversations";
+                        font-size: 18px; font-weight: 800;
+                        color: #FFFFFF;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
                 }
             }
         }
     }
 }
+

@@ -1,30 +1,11 @@
 import { ScrollView } from "std-widgets.slint";
 import { AppTheme } from "../theme.slint";
 import { AppHeader } from "../components/app_header.slint";
-import { ContactRow } from "../components/contact_row.slint";
-import { StatusDot } from "../components/status_dot.slint";
-
-export struct ChatPreview {
-    id: string,
-    name: string,
-    initials: string,
-    last-message: string,
-    timestamp: string,
-    unread: int,
-    is-group: bool,
-    is-online: bool,
-    is-relay: bool,
-    is-queued: bool,
-    is-verified: bool,
-}
+import { ContactRow, ChatPreview } from "../components/contact_row.slint";
+export { ChatPreview }
 
 export component ChatListScreen inherits Rectangle {
-    in property <[ChatPreview]> chats: [
-        { id: "1", name: "Eric O.", initials: "EO", last-message: "Sent the ref doc ✓", timestamp: "12:41", unread: 0, is-online: true, is-verified: true, is-group: false, is-relay: false, is-queued: false },
-        { id: "2", name: "Mama", initials: "MA", last-message: "", timestamp: "09:12", unread: 2, is-online: false, is-verified: true, is-group: false, is-relay: false, is-queued: true },
-        { id: "3", name: "Project Group", initials: "PG", last-message: "You: Let's ship it", timestamp: "Tue", unread: 0, is-online: false, is-verified: true, is-group: true, is-relay: false, is-queued: false },
-        { id: "4", name: "Anon 4f7c…", initials: "AN", last-message: "", timestamp: "Mon", unread: 1, is-online: true, is-verified: false, is-group: false, is-relay: true, is-queued: false },
-    ];
+    in property <[ChatPreview]> chats: [];
     in property <int>  direct-peers: 8;
     in property <int>  relay-peers: 1;
     in property <int>  queued-messages: 2;
@@ -45,20 +26,55 @@ export component ChatListScreen inherits Rectangle {
         padding: 0;
         spacing: 0;
 
-        AppHeader {
-            is-desktop: root.is-desktop;
-            safe-area-top: root.safe-area-top;
-            show-brand: true;
-            brand-source: @image-url("../../assets/icons/app_logo_with_name_transparent_bg.png");
-            brand-height: 52px;
+        // --- Standard Sidebar Header ---
+        Rectangle {
+            height: 72px + root.safe-area-top;
+            background: AppTheme.surface-primary;
+            
+            HorizontalLayout {
+                padding-top: root.safe-area-top;
+                padding-left: AppTheme.sp-lg;
+                padding-right: AppTheme.sp-lg;
+                alignment: space-between;
+
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: "Messages";
+                        font-size: 24px;
+                        font-weight: 800;
+                        color: AppTheme.text-primary;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    TouchArea {
+                        width: 40px; height: 40px;
+                        clicked => { root.add-contact(); }
+                        Rectangle {
+                            background: AppTheme.surface-secondary;
+                            border-radius: 20px;
+                            Text {
+                                text: "+";
+                                font-size: 24px;
+                                color: AppTheme.accent;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        // --- Message Stream ───────────────────────────────────────────────
+        // --- Chat Stream ───────────────────────────────────────────────
         ScrollView {
             vertical-stretch: 1;
             mouse-drag-pan-enabled: true;
 
             VerticalLayout {
+                padding: AppTheme.sp-sm;
                 alignment: start;
 
                 for chat[i] in chats: ContactRow {
@@ -84,53 +100,66 @@ export component ChatListScreen inherits Rectangle {
                         );
                     }
                 }
+
+                if chats.length == 0: Rectangle {
+                    height: 300px;
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: AppTheme.sp-md;
+                        Text { text: "💬"; font-size: 48px; horizontal-alignment: center; }
+                        Text {
+                            text: "No chats yet. Connect with a Node ID.";
+                            font-size: 14px; color: AppTheme.text-tertiary;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
             }
         }
 
         // --- Bottom Navigation Navigation (Always on Sidebar) ────────────────────────────────
         Rectangle {
-            height: (is-desktop ? 80px : 76px) + root.safe-area-bottom;
+            height: 80px + root.safe-area-bottom;
             background: AppTheme.surface-secondary;
             
-            // Divider
             Rectangle {
                 y: 0; width: 100%; height: 1px;
                 background: AppTheme.divider; 
             }
 
             HorizontalLayout {
-                padding-bottom: is-desktop ? 14px : root.safe-area-bottom;
+                padding-bottom: root.safe-area-bottom;
                 alignment: space-around;
                 padding-top: 10px;
 
                 TouchArea {
-                    width: 90px;
+                    width: 70px;
                     VerticalLayout {
                         alignment: center;
                         spacing: 8px;
-                        Text { text: "●"; font-size: 26px; color: AppTheme.accent; horizontal-alignment: center; }
+                        Text { text: "●"; font-size: 24px; color: AppTheme.accent; horizontal-alignment: center; }
                         Text { text: "Chats"; font-size: 11px; font-weight: 800; color: AppTheme.accent; horizontal-alignment: center; }
                     }
                 }
 
                 TouchArea {
-                    width: 90px;
+                    width: 70px;
                     clicked => { root.open-contacts(); }
                     VerticalLayout {
                         alignment: center;
                         spacing: 8px;
-                        Text { text: "○"; font-size: 26px; color: AppTheme.text-tertiary; horizontal-alignment: center; }
+                        Text { text: "○"; font-size: 24px; color: AppTheme.text-tertiary; horizontal-alignment: center; }
                         Text { text: "Contacts"; font-size: 11px; font-weight: 600; color: AppTheme.text-tertiary; horizontal-alignment: center; }
                     }
                 }
 
                 TouchArea {
-                    width: 90px;
+                    width: 70px;
                     clicked => { root.open-settings(); }
                     VerticalLayout {
                         alignment: center;
                         spacing: 8px;
-                        Text { text: "⊕"; font-size: 26px; color: AppTheme.text-tertiary; horizontal-alignment: center; }
+                        Text { text: "⚙"; font-size: 24px; color: AppTheme.text-tertiary; horizontal-alignment: center; }
                         Text { text: "Settings"; font-size: 11px; font-weight: 600; color: AppTheme.text-tertiary; horizontal-alignment: center; }
                     }
                 }
@@ -138,3 +167,4 @@ export component ChatListScreen inherits Rectangle {
         }
     }
 }
+

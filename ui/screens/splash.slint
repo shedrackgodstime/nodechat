@@ -3,56 +3,53 @@ import { AppTheme } from "../theme.slint";
 export component SplashScreen inherits Rectangle {
     background: AppTheme.surface-primary;
     
-    // Callback to trigger transition after "loading"
     callback finished();
 
-    // Auto-transition after 2 seconds for UI flow
-    // In a production app, the backend would trigger this.
-    timer := Timer {
-        interval: 2500ms;
-        triggered => {
-            root.finished();
-        }
-    }
-
     VerticalLayout {
-        alignment: center; // Vertical centering
-        spacing: AppTheme.sp-lg;
+        alignment: center;
+        spacing: AppTheme.sp-xl;
 
-        // Horizontally center the image
-        HorizontalLayout {
-            alignment: center;
-            Image {
-                source: @image-url("../../assets/icons/app_logo_with_name_transparent_bg.png");
-                width: 280px;
-                height: 280px;
-                image-fit: contain;
+        // --- Logo Glow Spot ---
+        Rectangle {
+            width: 200px; height: 200px;
+            
+            // Subtle Glow
+            Rectangle {
+                width: 140%; height: 140%;
+                background: @radial-gradient(circle, rgba(0, 122, 255, 0.15) 0%, transparent 70%);
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Text { text: "💬"; font-size: 80px; horizontal-alignment: center; }
             }
         }
 
-        // Horizontally center the loading bar
-        HorizontalLayout {
-            alignment: center;
+        VerticalLayout {
+            spacing: AppTheme.sp-md;
+            Text { text: "NodeChat"; font-size: 32px; font-weight: 900; color: #FFFFFF; horizontal-alignment: center; letter-spacing: -1px; }
+            Text { text: "Secure P2P Mesh Network"; font-size: 14px; font-weight: 700; color: AppTheme.text-tertiary; horizontal-alignment: center; letter-spacing: 1px; }
+        }
+
+        // --- Minimal Loading Bar ---
+        Rectangle {
+            width: 120px; height: 4px;
+            background: AppTheme.surface-secondary;
+            border-radius: 2px;
+            clip: true;
+
             Rectangle {
-                height: 6px;
-                width: 140px;
-                background: AppTheme.surface-secondary;
-                border-radius: 3px;
-                Rectangle {
-                    x: 0;
-                    height: 100%;
-                    width: 50px;
-                    background: AppTheme.accent;
-                    border_radius: 3px;
-                    
-                    // Simple animation for the loading bar
-                    animate width {
-                        duration: 1500ms;
-                        easing: ease-in-out;
-                        iteration-count: -1;
-                    }
+                x: 0; width: 40px; height: 100%;
+                background: AppTheme.accent;
+                border-radius: 2px;
+                
+                animate x {
+                    duration: 1000ms;
+                    easing: ease-in-out;
+                    iteration-count: -1;
                 }
             }
         }
     }
 }
+

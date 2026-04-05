@@ -1,10 +1,6 @@
-import { ScrollView } from "std-widgets.slint";
 import { AppTheme } from "../theme.slint";
-import { AppHeader } from "../components/app_header.slint";
+import { BaseScreen } from "../components/base_screen.slint";
 import { ContactRow } from "../components/contact_row.slint";
-
-// ContactsScreen — Pro Integrated P2P Phonebook
-// Designed for strict 'straight line' alignment and desktop-adaptive width.
 
 export struct ContactData {
     id: string,
@@ -17,165 +13,121 @@ export struct ContactData {
 }
 
 export component ContactsScreen inherits Rectangle {
-    in property <[ContactData]> contacts: [
-        { id: "1", name: "Eric O.",   initials: "EO", node-id: "nBq3p6X…C72E", is-online: true,  is-relay: false, is-verified: true },
-        { id: "2", name: "Mama",      initials: "MA", node-id: "x9B1C2…44FA", is-online: false, is-relay: false, is-verified: true },
-        { id: "3", name: "Anon 4f7c", initials: "AN", node-id: "k4F7C9…0012", is-online: true,  is-relay: true,  is-verified: false },
-    ];
+    in property <[ContactData]> contacts: [];
     in property <bool>   is-desktop: false;
     in property <length> safe-area-top: 0px;
+    in property <length> safe-area-bottom: 0px;
 
     callback go-back();
     callback open-contact(string, string, string, bool, bool, bool, bool);
     callback add-contact();
     callback new-group();
 
-    background: AppTheme.surface-primary;
+    BaseScreen {
+        title: "Contacts";
+        is-desktop: root.is-desktop;
+        safe-area-top: root.safe-area-top;
+        safe-area-bottom: root.safe-area-bottom;
+        go-back => { root.go-back(); }
 
-    VerticalLayout {
-        padding: 0;
-        spacing: 0;
+        // --- Quick Actions ---
+        VerticalLayout {
+            spacing: AppTheme.sp-md;
+            Text {
+                text: "QUICK ACTIONS";
+                font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px;
+            }
 
-        AppHeader {
-            is-desktop: root.is-desktop;
-            safe-area-top: root.safe-area-top;
-            show-back: true;
-            title: "Select Peer";
-            subtitle: contacts.length + " decentralized contacts";
-            go-back => { root.go-back(); }
-        }
+            Rectangle {
+                background: AppTheme.surface-secondary;
+                border-radius: AppTheme.radius-lg;
+                clip: true;
 
-        // --- Scrollable Directory (Desktop-Adaptive) ─────────────────────
-        ScrollView {
-            vertical-stretch: 1;
-            mouse-drag-pan-enabled: true;
-
-            HorizontalLayout {
-                alignment: start; // Left-aligned on desktop
                 VerticalLayout {
-                    width: is-desktop ? 800px : root.width - 32px;
-                    horizontal-stretch: 1;
-                    alignment: start;
-
-                    // Header: Direct Actions
-                    VerticalLayout {
-                        padding-left: 16px; padding-top: 24px; padding-bottom: 12px;
-                        Text { text: "DIRECT ACTIONS"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 0.8px; }
-                    }
-
                     TouchArea {
-                        height: 64px;
-                        clicked => { root.new-group(); }
-                        HorizontalLayout {
-                            padding-left: 16px; padding-right: 16px; spacing: 14px;
-                            alignment: start;
-                            VerticalLayout {
-                                alignment: center;
-                                Rectangle {
-                                    width: 52px; height: 52px; border-radius: 26px;
-                                    background: AppTheme.surface-tertiary;
-                                    Text { text: "👥"; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
-                                }
-                            }
-                            VerticalLayout {
-                                alignment: center;
-                                Text { text: "Create New P2P Group"; font-size: 16px; font-weight: 700; color: AppTheme.accent; }
-                            }
-                        }
-                    }
-
-                    // Divider with standard 82px indent
-                    HorizontalLayout {
-                        padding-left: 82px;
-                        Rectangle { height: 1px; background: AppTheme.divider; opacity: 0.15; horizontal-stretch: 1; }
-                    }
-
-                    TouchArea {
-                        height: 64px;
+                        height: 72px;
                         clicked => { root.add-contact(); }
                         HorizontalLayout {
-                            padding-left: 16px; padding-right: 16px; spacing: 14px;
-                            alignment: start;
-                            VerticalLayout {
-                                alignment: center;
-                                Rectangle {
-                                    width: 52px; height: 52px; border-radius: 26px;
-                                    background: AppTheme.surface-tertiary;
-                                    Text { text: "👤"; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
-                                }
+                            padding: AppTheme.sp-md; spacing: AppTheme.sp-md; alignment: center;
+                            Rectangle {
+                                width: 44px; height: 44px; border-radius: 22px;
+                                background: AppTheme.accent-soft;
+                                Text { text: "+👤"; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
                             }
-                            VerticalLayout {
-                                alignment: center;
-                                Text { text: "Add Peer by Ticket"; font-size: 16px; font-weight: 700; color: AppTheme.accent; }
-                            }
+                            Text { text: "Add Peer by Ticket"; font-size: 16px; font-weight: 600; color: AppTheme.accent; horizontal-stretch: 1; vertical-alignment: center; }
+                            Text { text: "›"; font-size: 24px; color: AppTheme.text-tertiary; vertical-alignment: center; }
                         }
                     }
 
-                    // Header: Peer Directory
+                    HorizontalLayout {
+                        padding-left: 68px;
+                        Rectangle { height: 1px; background: AppTheme.divider; }
+                    }
+
+                    TouchArea {
+                        height: 72px;
+                        clicked => { root.new-group(); }
+                        HorizontalLayout {
+                            padding: AppTheme.sp-md; spacing: AppTheme.sp-md; alignment: center;
+                            Rectangle {
+                                width: 44px; height: 44px; border-radius: 22px;
+                                background: rgba(255, 149, 0, 0.15);
+                                Text { text: "👥"; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
+                            }
+                            Text { text: "Start New Group"; font-size: 16px; font-weight: 600; color: #FF9500; horizontal-stretch: 1; vertical-alignment: center; }
+                            Text { text: "›"; font-size: 24px; color: AppTheme.text-tertiary; vertical-alignment: center; }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Directory ---
+        VerticalLayout {
+            spacing: AppTheme.sp-md;
+            Text {
+                text: "PEER DIRECTORY";
+                font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px;
+            }
+
+            VerticalLayout {
+                spacing: AppTheme.sp-xs;
+                
+                for contact[i] in contacts: ContactRow {
+                    name:        contact.name;
+                    initials:    contact.initials;
+                    last-message: contact.node-id;
+                    timestamp:   "";
+                    is-online:   contact.is-online;
+                    is-relay:    contact.is-relay;
+                    is-verified: contact.is-verified;
+                    clicked => {
+                        root.open-contact(
+                            contact.id,
+                            contact.name,
+                            contact.initials,
+                            false,
+                            contact.is-online,
+                            contact.is-relay,
+                            contact.is-verified,
+                        );
+                    }
+                }
+
+                if contacts.length == 0: Rectangle {
+                    height: 200px;
+                    border-radius: AppTheme.radius-lg;
+                    background: AppTheme.surface-secondary;
+                    
                     VerticalLayout {
-                        padding-left: 16px; padding-top: 32px; padding-bottom: 12px;
-                        Text { text: "PEER DIRECTORY"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 0.8px; }
-                    }
-
-                    // The actual contact list
-                    for contact[i] in contacts: ContactRow {
-                        name:        contact.name;
-                        initials:    contact.initials;
-                        last-message: contact.node-id; // Keep showing the peer identifier for now
-                        timestamp:   "";
-                        is-online:   contact.is-online;
-                        is-relay:    contact.is-relay;
-                        is-verified: contact.is-verified;
-                        clicked => {
-                            root.open-contact(
-                                contact.id,
-                                contact.name,
-                                contact.initials,
-                                false,
-                                contact.is-online,
-                                contact.is-relay,
-                                contact.is-verified,
-                            );
-                        }
-                    }
-
-                    if contacts.length == 0: VerticalLayout {
-                        padding-left: 16px;
-                        padding-right: 16px;
-                        padding-top: 24px;
-                        padding-bottom: 24px;
-                        alignment: center;
-
-                        Rectangle {
-                            height: 120px;
-                            horizontal-stretch: 1;
-                            border-radius: 20px;
-                            background: AppTheme.surface-secondary;
-                            border-width: 1px;
-                            border-color: AppTheme.divider;
-
-                            VerticalLayout {
-                                alignment: center;
-                                spacing: 8px;
-
-                                Text {
-                                    text: "No contacts match this search";
-                                    font-size: 16px;
-                                    font-weight: 700;
-                                    color: AppTheme.text-primary;
-                                    horizontal-alignment: center;
-                                }
-                                Text {
-                                    text: "Try a name, ticket, or node id.";
-                                    font-size: 12px;
-                                    color: AppTheme.text-tertiary;
-                                    horizontal-alignment: center;
-                                }
-                            }
-                        }
+                        alignment: center; spacing: AppTheme.sp-sm;
+                        Text { text: "👤"; font-size: 32px; horizontal-alignment: center; }
+                        Text { text: "No contacts found"; font-size: 16px; font-weight: 700; color: AppTheme.text-primary; horizontal-alignment: center; }
+                        Text { text: "Your peer book is currently empty."; font-size: 13px; color: AppTheme.text-tertiary; horizontal-alignment: center; }
                     }
                 }
             }
         }
     }
 }
+

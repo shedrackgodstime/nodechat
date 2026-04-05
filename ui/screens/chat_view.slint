@@ -1,21 +1,10 @@
 import { ScrollView } from "std-widgets.slint";
 import { AppTheme } from "../theme.slint";
-import { MessageBubble } from "../components/message_bubble.slint";
+import { MessageBubble, MessageData } from "../components/message_bubble.slint";
+export { MessageData }
 import { ChatInput } from "../components/chat_input.slint";
 
-export struct MessageData {
-    id: string,
-    text: string,
-    timestamp: string,
-    is-mine: bool,
-    status: string,
-    is-ephemeral: bool,
-    ttl-seconds: int,
-}
-
 export component ChatViewScreen inherits Rectangle {
-    min-width: 0px;
-    min-height: 0px;
     in property <string> peer-name: "";
     in property <string> peer-initials: "";
     in property <string> peer-node-id: "";
@@ -39,72 +28,77 @@ export component ChatViewScreen inherits Rectangle {
     background: AppTheme.surface-primary; 
 
     VerticalLayout {
-        width: 100%; height: 100%;
         padding: 0;
         spacing: 0;
 
-        // --- Immersive Precision Header (Adaptive Height) ────────────────
+        // --- Premium Chat Header ---
         Rectangle {
-            height: (is-desktop ? 64px : 72px) + root.safe-area-top;
-            background: AppTheme.surface-secondary;
+            height: (is-desktop ? 72px : 86px) + root.safe-area-top;
+            background: AppTheme.surface-primary;
             
-            Rectangle {
-                y: parent.height - 1px;
-                width: 100%; height: 1px;
-                background: AppTheme.divider; 
-            }
-
             HorizontalLayout {
-                y: root.safe-area-top;
-                height: is-desktop ? 64px : 72px;
-                padding-left: 12px;
-                padding-right: 16px;
-                alignment: space-between;
+                padding-top: root.safe-area-top;
+                padding-left: AppTheme.sp-lg;
+                padding-right: AppTheme.sp-lg;
+                spacing: AppTheme.sp-md;
 
-                HorizontalLayout {
-                    spacing: 12px;
-                    alignment: start;
-
-                    if !is-desktop: VerticalLayout {
-                        alignment: center;
-                        TouchArea {
-                            width: 32px; height: 32px;
-                            clicked => { root.go-back(); }
-                            Text { text: "←"; font-size: 22px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
-                        }
+                if !is-desktop: VerticalLayout {
+                    alignment: center;
+                    TouchArea {
+                        width: 40px; height: 40px;
+                        clicked => { root.go-back(); }
+                        Text { text: "←"; font-size: 24px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
                     }
+                }
 
-                    VerticalLayout {
-                        alignment: center;
-                        TouchArea {
-                            width: 38px; height: 38px;
-                            clicked => { root.open-contact-info(); }
-                            Rectangle {
-                                width: 38px; height: 38px;
-                                border-radius: 19px;
-                                background: AppTheme.accent;
-                                Text {
-                                    text: peer-initials != "" ? peer-initials : "?";
-                                    font-size: 14px; font-weight: 700; color: #FFFFFF;
-                                    horizontal-alignment: center; vertical-alignment: center;
-                                }
+                VerticalLayout {
+                    alignment: center;
+                    TouchArea {
+                        width: 48px; height: 48px;
+                        clicked => { root.open-contact-info(); }
+                        Rectangle {
+                            width: 48px; height: 48px;
+                            border-radius: 24px;
+                            background: @linear-gradient(135deg, AppTheme.accent 0%, #0056b3 100%);
+                            Text {
+                                text: peer-initials != "" ? peer-initials : "?";
+                                font-size: 16px; font-weight: 800; color: #FFFFFF;
+                                horizontal-alignment: center; vertical-alignment: center;
                             }
                         }
                     }
+                }
 
-                    VerticalLayout {
-                        alignment: center;
-                        spacing: 2px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    spacing: 2px;
+                    HorizontalLayout {
+                        spacing: AppTheme.sp-xs;
+                        alignment: start;
                         Text {
                             text: peer-name;
-                            font-size: 16px; font-weight: 600;
+                            font-size: 18px; font-weight: 700;
                             color: AppTheme.text-primary;
                             overflow: elide;
                         }
+                        if is-verified: Text { text: "✅"; font-size: 12px; vertical-alignment: center; }
+                    }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 8px; height: 8px;
+                                border-radius: 4px;
+                                background: is-online ? AppTheme.accent-success : AppTheme.text-tertiary;
+                            }
+                        }
                         Text {
-                            text: is-online ? "online" : "offline";
-                            font-size: 11px;
-                            color: is-online ? AppTheme.accent-success : AppTheme.text-secondary;
+                            text: is-online ? "Connected via " + connection-mode : "Offline";
+                            font-size: 12px;
+                            color: AppTheme.text-tertiary;
                         }
                     }
                 }
@@ -114,169 +108,45 @@ export component ChatViewScreen inherits Rectangle {
                     TouchArea {
                         width: 44px; height: 44px;
                         clicked => { root.open-contact-info(); }
-                        Text { text: "⋮"; font-size: 22px; color: AppTheme.text-secondary; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                    TouchArea {
-                        width: 78px; height: 28px;
-                        clicked => { root.retry-queued(); }
-                        Rectangle {
-                            width: 100%; height: 100%;
-                            border-radius: 14px;
-                            background: AppTheme.accent-warning;
-                            Text {
-                                text: "Retry now";
-                                font-size: 11px;
-                                font-weight: 700;
-                                color: #1B1B1B;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-                    TouchArea {
-                        width: 58px; height: 28px;
-                        clicked => { root.delete-conversation(); }
-                        Rectangle {
-                            width: 100%; height: 100%;
-                            border-radius: 14px;
-                            background: AppTheme.accent-danger;
-                            Text {
-                                text: "Delete";
-                                font-size: 11px;
-                                font-weight: 700;
-                                color: #FFFFFF;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
+                        Text { text: "⋮"; font-size: 24px; color: AppTheme.text-tertiary; horizontal-alignment: center; vertical-alignment: center; }
                     }
                 }
             }
-        }
 
-        Rectangle {
-            height: 54px;
-            background: is-online ? AppTheme.surface-primary : #2D1010;
-            border-width: 1px;
-            border-color: is-online ? AppTheme.divider : AppTheme.accent-danger;
-
-            VerticalLayout {
-                padding-left: 16px;
-                padding-right: 16px;
-                spacing: 2px;
-                alignment: center;
-
-                HorizontalLayout {
-                    spacing: 10px;
-                    alignment: space-between;
-
-                    HorizontalLayout {
-                        spacing: 8px;
-                        alignment: start;
-
-                        Rectangle {
-                            width: 10px;
-                            height: 10px;
-                            border-radius: 5px;
-                            background:
-                                is-online
-                                ? (is-verified ? AppTheme.accent-success : AppTheme.accent-warning)
-                                : AppTheme.accent-danger;
-                        }
-
-                        Text {
-                            text:
-                                is-online
-                                ? (is-verified ? "Connected · verified peer" : "Connected · verification pending")
-                                : "Handshake pending";
-                            font-size: 12px;
-                            font-weight: 700;
-                            color: is-online ? AppTheme.accent-success : AppTheme.accent-danger;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    Text {
-                        text: connection-mode + " route";
-                        font-size: 11px;
-                        color: is-online ? AppTheme.text-secondary : #FFB4B0;
-                        vertical-alignment: center;
-                    }
-                }
-
-                Text {
-                    text: connection-stage == "" ? "waiting for peer response" : connection-stage;
-                    font-size: 11px;
-                    color: is-online ? AppTheme.text-secondary : #FFB4B0;
-                    vertical-alignment: center;
-                }
+            Rectangle {
+                y: parent.height - 1px;
+                width: 100%; height: 1px;
+                background: AppTheme.divider; 
             }
         }
 
-        // --- Chat Content Area (Binding-Safe Width) ───────────────────────
+        // --- Connection Status Bar ---
+        if !is-verified || connection-mode == "relay": Rectangle {
+            height: 32px;
+            background: connection-mode == "relay" ? AppTheme.accent-warning : AppTheme.accent-soft;
+            Text {
+                text: connection-mode == "relay" ? "⚠️ Relay path: Messages are encrypted but slow." : "🔒 Identity verification pending.";
+                font-size: 11px; font-weight: 700; color: connection-mode == "relay" ? #1B1B1B : AppTheme.accent;
+                horizontal-alignment: center; vertical-alignment: center;
+            }
+        }
+
+        // --- Messages Scroll Area ---
         Rectangle {
             vertical-stretch: 1;
             clip: true;
 
-            TouchArea {
-                width: 100%; height: 100%;
-                clicked => { input-bar.clear-input-focus(); }
-            }
-
             ScrollView {
-                mouse-drag-pan-enabled: true;
-                
-                // Stable Parent-to-Viewport anchoring
-                Rectangle {
-                    width: parent.width;
+                VerticalLayout {
+                    padding-top: AppTheme.sp-lg;
+                    padding-bottom: AppTheme.sp-lg;
                     
                     HorizontalLayout {
-                        alignment: center;
-                        
                         VerticalLayout {
-                            // Constraint-based centering: no parent width references
-                            max-width: 800px;
                             horizontal-stretch: 1;
-                            padding: 16px;
-                            padding-top: 24px;
-                            spacing: 12px;
+                            padding: AppTheme.sp-md;
+                            spacing: AppTheme.sp-md;
                             alignment: start;
-
-                            // Security Banner
-                            Rectangle {
-                                width: 100%; height: 32px;
-                                background: rgba(255, 255, 255, 0.05);
-                                border-radius: 8px;
-                                HorizontalLayout {
-                                    alignment: center; spacing: 4px;
-                                    Text { text: "🔒"; font-size: 10px; vertical-alignment: center; }
-                                    Text {
-                                        text: "Directly encrypted & decentralized. No central servers.";
-                                        font-size: 11px; color: AppTheme.text-secondary;
-                                        horizontal-alignment: center; vertical-alignment: center;
-                                    }
-                                }
-                            }
-
-                            if messages.length == 0: VerticalLayout {
-                                width: 100%;
-                                padding-top: 40px;
-                                spacing: 10px;
-                                alignment: center;
-                                Text {
-                                    text: "No messages yet";
-                                    font-size: 18px;
-                                    font-weight: 700;
-                                    color: AppTheme.text-primary;
-                                    horizontal-alignment: center;
-                                }
-                                Text {
-                                    text: "Say hello to start the conversation.";
-                                    font-size: 13px;
-                                    color: AppTheme.text-secondary;
-                                    horizontal-alignment: center;
-                                }
-                            }
 
                             for msg[i] in messages: MessageBubble {
                                 text:         msg.text;
@@ -292,41 +162,30 @@ export component ChatViewScreen inherits Rectangle {
             }
         }
 
-        // --- Adaptive Immersive Footer ──────────────────────────────────────────
+        // --- Composer / Input Bar ---
         Rectangle {
-            width: 100%;
-            background: AppTheme.surface-secondary; 
+            background: AppTheme.surface-primary;
             
-            Rectangle {
-                y: 0; width: 100%; height: 1px;
-                background: AppTheme.divider; 
-            }
-            
-            HorizontalLayout {
-                alignment: center;
+            VerticalLayout {
+                padding-bottom: Math.max(root.safe-area-bottom, virtual-keyboard-height);
+                animate padding-bottom { duration: AppTheme.dur-short; }
+                
+                Rectangle {
+                    height: 1px;
+                    background: AppTheme.divider;
+                }
 
-                VerticalLayout {
-                    // Constraint-based centering for footer
-                    max-width: 800px;
-                    horizontal-stretch: 1;
-                    padding: 10px;
-                    padding-left: 10px; padding-right: 10px;
-                    alignment: center;
-
-                    input-bar := ChatInput {
-                        width: 100%;
-                        is-mobile: !root.is-desktop;
-                        send-message(msg) => { root.send-message(msg); }
+                HorizontalLayout {
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        padding: AppTheme.sp-md;
+                        ChatInput {
+                            is-mobile: !is-desktop;
+                            send-message(msg) => { root.send-message(msg); }
+                        }
                     }
                 }
             }
-        }
-
-        // --- Immersive Keyboard/Safe-Area Spacer ────────────────────────────
-        Rectangle {
-            height: Math.max(root.safe-area-bottom, virtual-keyboard-height) + 12px;
-            background: AppTheme.surface-secondary;
-            animate height { duration: 150ms; easing: ease-out; }
         }
     }
 }

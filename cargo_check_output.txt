@@ -1,0 +1,283 @@
+   Compiling NodeChat v0.1.0 (/home/kristency/Projects/nodechat)
+error: failed to run custom build command for `NodeChat v0.1.0 (/home/kristency/Projects/nodechat)`
+
+Caused by:
+  process didn't exit successfully: `/home/kristency/Projects/nodechat/target/debug/build/NodeChat-d266b0bb300537aa/build-script-build` (exit status: 101)
+  --- stderr
+  warning: padding-top only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/chat_list.slint:33:26
+      |
+   33 |             padding-top: root.safe-area-top;
+      |                          ^^^^^^^^^^^^^^^^^^^
+      |
+  warning: padding-bottom only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/chat_list.slint:124:29
+      |
+  124 |             padding-bottom: root.safe-area-bottom;
+      |                             ^^^^^^^^^^^^^^^^^^^^^^
+  warning: padding-top only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/chat_view.slint:38:26
+      |
+   38 |             padding-top: root.safe-area-top;
+      |                          ^^^^^^^^^^^^^^^^^^^
+  warning: padding-bottom only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/chat_view.slint:142:33
+      |
+  142 |                 padding-bottom: AppTheme.sp-lg;
+      |                                 ^^^^^^^^^^^^^^^
+  warning: padding-top only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/chat_view.slint:141:30
+      |
+  141 |                 padding-top: AppTheme.sp-lg;
+      |                              ^^^^^^^^^^^^^^^
+  warning: padding-bottom only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/chat_view.slint:168:29
+      |
+  168 |             padding-bottom: Math.max(root.safe-area-bottom, virtual-keyboard-height);
+      |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  warning: padding only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/add_contact.slint:40:22
+      |
+   40 |             padding: AppTheme.sp-lg;
+      |                      ^^^^^^^^^^^^^^^
+  warning: padding only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/add_contact.slint:78:26
+      |
+   78 |                 padding: AppTheme.sp-md;
+      |                          ^^^^^^^^^^^^^^^
+  warning: padding only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/contact_details.slint:67:22
+      |
+   67 |             padding: AppTheme.sp-md;
+      |                      ^^^^^^^^^^^^^^^
+  warning: padding only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/contact_details.slint:95:26
+      |
+   95 |                 padding: AppTheme.sp-md;
+      |                          ^^^^^^^^^^^^^^^
+  warning: padding only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/conversation_actions.slint:59:22
+      |
+   59 |             padding: AppTheme.sp-md;
+      |                      ^^^^^^^^^^^^^^^
+  warning: padding only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/conversation_actions.slint:76:26
+      |
+   76 |                 padding: AppTheme.sp-md;
+      |                          ^^^^^^^^^^^^^^^
+  warning: padding only has effect on layout elements
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:34:22
+      |
+   34 |             padding: AppTheme.sp-lg;
+      |                      ^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+  error: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:81:17
+      |
+   81 |                 HorizontalLayout {
+      |                 ^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'layout-cache' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:81:17
+      |
+   81 |                 HorizontalLayout {
+      |                 ^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:81:17
+      |
+   81 |                 HorizontalLayout {
+      |                 ^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/screens/contacts.slint:34:9
+      |
+   34 |         VerticalLayout {
+      |         ^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/screens/contacts.slint:41:13
+      |
+   41 |             Rectangle {
+      |             ^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/screens/contacts.slint:46:17
+      |
+   46 |                 VerticalLayout {
+      |                 ^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/screens/contacts.slint:62:92
+      |
+   62 |                     Rectangle { height: 1px; background: AppTheme.divider; x: 68px; width: parent.width - 68px; }
+      |                                                                                            ^^^^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/screens/contacts.slint:46:17
+      |
+   46 |                 VerticalLayout {
+      |                 ^^^^^^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/screens/contacts.slint:41:13
+      |
+   41 |             Rectangle {
+      |             ^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/screens/contacts.slint:34:9
+      |
+   34 |         VerticalLayout {
+      |         ^^^^^^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:83:21
+      |
+   83 |                     VerticalLayout {
+      |                     ^^^^^^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:81:17
+      |
+   81 |                 HorizontalLayout {
+      |                 ^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'min-width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:81:17
+      |
+   81 |                 HorizontalLayout {
+      |                 ^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'viewport-width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)
+     --> builtin:/fluent/scrollview.slint:174:18
+      |
+  174 |     flickable := Flickable {
+      |                  ^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:97:92
+      |
+   97 |                     Rectangle { height: 1px; background: AppTheme.divider; x: 56px; width: parent.width - 56px; }
+      |                                                                                            ^^^^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:81:17
+      |
+   81 |                 VerticalLayout {
+      |                 ^^^^^^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:76:13
+      |
+   76 |             Rectangle {
+      |             ^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:68:9
+      |
+   68 |         VerticalLayout {
+      |         ^^^^^^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:83:21
+      |
+   83 |                     VerticalLayout {
+      |                     ^^^^^^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:81:17
+      |
+   81 |                 HorizontalLayout {
+      |                 ^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'min-width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:81:17
+      |
+   81 |                 HorizontalLayout {
+      |                 ^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'viewport-width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> builtin:/fluent/scrollview.slint:174:18
+      |
+  174 |     flickable := Flickable {
+      |                  ^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+  error: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:81:17
+      |
+   81 |                 HorizontalLayout {
+      |                 ^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'layout-cache' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:81:17
+      |
+   81 |                 HorizontalLayout {
+      |                 ^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/components/base_screen.slint:81:17
+      |
+   81 |                 HorizontalLayout {
+      |                 ^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:68:9
+      |
+   68 |         VerticalLayout {
+      |         ^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:76:13
+      |
+   76 |             Rectangle {
+      |             ^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:81:17
+      |
+   81 |                 VerticalLayout {
+      |                 ^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:135:9
+      |
+  135 |         VerticalLayout {
+      |         ^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:143:13
+      |
+  143 |             Rectangle {
+      |             ^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:148:17
+      |
+  148 |                 VerticalLayout {
+      |                 ^^^^^^^^^^^^^^^
+  error: The binding for the property 'width' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:160:92
+      |
+  160 |                     Rectangle { height: 1px; background: AppTheme.divider; x: 56px; width: parent.width - 56px; }
+      |                                                                                            ^^^^^^^^^^^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:148:17
+      |
+  148 |                 VerticalLayout {
+      |                 ^^^^^^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:143:13
+      |
+  143 |             Rectangle {
+      |             ^^^^^^^^^^
+  error: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)
+     --> /home/kristency/Projects/nodechat/ui/screens/settings.slint:135:9
+      |
+  135 |         VerticalLayout {
+      |         ^^^^^^^^^^^^^^^
+  warning: The binding for the property 'layoutinfo-h' is part of a binding loop (layoutinfo-h -> layoutinfo-h -> root.layoutinfo-h -> root.is-desktop).
+           This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+     --> /home/kristency/Projects/nodechat/ui/app.slint:162:9
+      |
+  162 |         HorizontalLayout {
+      |         ^^^^^^^^^^^^^^^^^
+  warning: The binding for the property 'layoutinfo-h' is part of a binding loop (layoutinfo-h -> layoutinfo-h -> root.layoutinfo-h -> root.is-desktop).
+           This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+     --> /home/kristency/Projects/nodechat/ui/app.slint:158:5
+      |
+  158 |     Rectangle {
+      |     ^^^^^^^^^^
+  warning: The binding for the property 'layoutinfo-h' is part of a binding loop (layoutinfo-h -> layoutinfo-h -> root.layoutinfo-h -> root.is-desktop).
+           This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+     --> /home/kristency/Projects/nodechat/ui/app.slint:50:37
+      |
+   50 | export component AppWindow inherits Window {
+      |                                     ^^^^^^^
+  warning: The binding for the property 'is-desktop' is part of a binding loop (layoutinfo-h -> layoutinfo-h -> root.layoutinfo-h -> root.is-desktop).
+           This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+     --> /home/kristency/Projects/nodechat/ui/app.slint:59:33
+      |
+   59 |     property <bool> is-desktop: root.width >= 750px;
+      |                                 ^^^^^^^^^^^^^^^^^^^^
+  warning: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> root.layoutinfo-h -> root.is-desktop).
+           This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+     --> /home/kristency/Projects/nodechat/ui/app.slint:167:24
+      |
+  167 |                 width: is-desktop ? 340px : root.width; 
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  thread 'main' (162374) panicked at build.rs:2:42:
+  Failed to compile Slint UI: CompileError(["/home/kristency/Projects/nodechat/ui/screens/chat_list.slint:33: padding-top only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/chat_list.slint:124: padding-bottom only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/chat_view.slint:38: padding-top only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/chat_view.slint:142: padding-bottom only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/chat_view.slint:141: padding-top only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/chat_view.slint:168: padding-bottom only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/add_contact.slint:40: padding only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/add_contact.slint:78: padding only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/contact_details.slint:67: padding only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/contact_details.slint:95: padding only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/conversation_actions.slint:59: padding only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/conversation_actions.slint:76: padding only has effect on layout elements", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:34: padding only has effect on layout elements", "The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:81: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:81: The binding for the property 'layout-cache' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:81: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/screens/contacts.slint:34: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/screens/contacts.slint:41: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/screens/contacts.slint:46: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/screens/contacts.slint:62: The binding for the property 'width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/screens/contacts.slint:46: The binding for the property 'layoutinfo-h' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/screens/contacts.slint:41: The binding for the property 'layoutinfo-h' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/screens/contacts.slint:34: The binding for the property 'layoutinfo-h' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:83: The binding for the property 'layoutinfo-h' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:81: The binding for the property 'layoutinfo-h' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:81: The binding for the property 'min-width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "builtin:/fluent/scrollview.slint:174: The binding for the property 'viewport-width' is part of a binding loop (flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:97: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:81: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:76: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:68: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:83: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:81: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:81: The binding for the property 'min-width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "builtin:/fluent/scrollview.slint:174: The binding for the property 'viewport-width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:81: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:81: The binding for the property 'layout-cache' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/components/base_screen.slint:81: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:68: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:76: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:81: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width -> width -> width -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:135: The binding for the property 'width' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:143: The binding for the property 'width' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:148: The binding for the property 'width' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:160: The binding for the property 'width' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:148: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:143: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)", "/home/kristency/Projects/nodechat/ui/screens/settings.slint:135: The binding for the property 'layoutinfo-h' is part of a binding loop (width -> width -> width -> width -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> layoutinfo-h -> min-width -> flickable.viewport-width -> flickable-viewport.width -> width -> layout-cache -> width)", "/home/kristency/Projects/nodechat/ui/app.slint:162: The binding for the property 'layoutinfo-h' is part of a binding loop (layoutinfo-h -> layoutinfo-h -> root.layoutinfo-h -> root.is-desktop).\nThis was allowed in previous version of Slint, but is deprecated and may cause panic at runtime", "/home/kristency/Projects/nodechat/ui/app.slint:158: The binding for the property 'layoutinfo-h' is part of a binding loop (layoutinfo-h -> layoutinfo-h -> root.layoutinfo-h -> root.is-desktop).\nThis was allowed in previous version of Slint, but is deprecated and may cause panic at runtime", "/home/kristency/Projects/nodechat/ui/app.slint:50: The binding for the property 'layoutinfo-h' is part of a binding loop (layoutinfo-h -> layoutinfo-h -> root.layoutinfo-h -> root.is-desktop).\nThis was allowed in previous version of Slint, but is deprecated and may cause panic at runtime", "/home/kristency/Projects/nodechat/ui/app.slint:59: The binding for the property 'is-desktop' is part of a binding loop (layoutinfo-h -> layoutinfo-h -> root.layoutinfo-h -> root.is-desktop).\nThis was allowed in previous version of Slint, but is deprecated and may cause panic at runtime", "/home/kristency/Projects/nodechat/ui/app.slint:167: The binding for the property 'width' is part of a binding loop (width -> layoutinfo-h -> layoutinfo-h -> root.layoutinfo-h -> root.is-desktop).\nThis was allowed in previous version of Slint, but is deprecated and may cause panic at runtime"])
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

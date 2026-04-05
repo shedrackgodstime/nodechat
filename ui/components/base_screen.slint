@@ -1,0 +1,105 @@
+import { AppTheme } from "../theme.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component BaseScreen inherits Rectangle {
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <bool> is-desktop: false;
+    in property <length> safe-area-top: 0px;
+    in property <length> safe-area-bottom: 0px;
+    in property <bool> show-back-button: true;
+    in property <bool> scrollable: true;
+
+    callback go-back();
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        padding-top: root.safe-area-top;
+        padding-bottom: root.safe-area-bottom;
+
+        // --- Standardized Header ---
+        Rectangle {
+            height: 64px;
+            background: AppTheme.surface-primary;
+            
+            Rectangle {
+                y: parent.height - 1px;
+                width: 100%; height: 1px;
+                background: AppTheme.divider;
+            }
+
+            HorizontalLayout {
+                padding-left: AppTheme.sp-lg;
+                padding-right: AppTheme.sp-lg;
+                spacing: AppTheme.sp-md;
+                alignment: start;
+
+                if show-back-button: VerticalLayout {
+                    alignment: center;
+                    TouchArea {
+                        width: 40px; height: 40px;
+                        clicked => { root.go-back(); }
+                        Rectangle {
+                            background: AppTheme.surface-secondary;
+                            border-radius: 20px;
+                            Text {
+                                text: "←";
+                                font-size: 20px;
+                                color: AppTheme.accent;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    spacing: 2px;
+                    Text {
+                        text: root.title;
+                        font-size: 18px;
+                        font-weight: 800;
+                        color: AppTheme.text-primary;
+                    }
+                    if root.subtitle != "": Text {
+                        text: root.subtitle;
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: AppTheme.text-tertiary;
+                    }
+                }
+            }
+        }
+
+        // --- Content Area ---
+        Rectangle {
+            vertical-stretch: 1;
+            
+            flick := ScrollView {
+                VerticalLayout {
+                    width: 100%;
+                    padding-left: AppTheme.sp-md;
+                    padding-right: AppTheme.sp-md;
+                    padding-top: AppTheme.sp-lg;
+                    padding-bottom: AppTheme.sp-xl;
+                    spacing: AppTheme.sp-lg;
+                    alignment: start;
+                    @children
+
+                    // --- Smart Global Footer ---
+                    VerticalLayout {
+                        padding-top: AppTheme.sp-xl;
+                        padding-bottom: AppTheme.sp-lg;
+                        spacing: AppTheme.sp-xs;
+                        alignment: center;
+                        Text { text: "NodeChat v1.2.0-beta"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; opacity: 0.6; horizontal-alignment: center; }
+                        Text { text: "P2P ENCRYPTED GOSSIP NETWORK"; font-size: 9px; font-weight: 800; color: AppTheme.text-tertiary; opacity: 0.4; horizontal-alignment: center; letter-spacing: 1px; }
+                    }
+                }
+            }
+        }
+    }
+}
