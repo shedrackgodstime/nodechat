@@ -5,14 +5,16 @@ export component IdentityCardScreen inherits Rectangle {
     in property <string> display-name: "";
     in property <string> node-id: "";
     in property <string> endpoint-ticket: "";
+    in property <bool>   is-desktop: false;
     in property <length> safe-area-top: 0px;
     in property <length> safe-area-bottom: 0px;
 
     callback go-to-chats();
-    callback copy-node-id();
+    callback copy-ticket(string);
 
     BaseScreen {
         title: "Your Identity";
+        is-desktop: root.is-desktop;
         safe-area-top: root.safe-area-top;
         safe-area-bottom: root.safe-area-bottom;
         show-back-button: false;
@@ -29,56 +31,97 @@ export component IdentityCardScreen inherits Rectangle {
             }
 
             // --- The Identity Card ---
-            Rectangle {
-                background: AppTheme.surface-secondary;
-                border-radius: AppTheme.radius-lg;
-                border-width: 1px;
-                border-color: AppTheme.divider;
-                
-                VerticalLayout {
-                    padding: AppTheme.sp-xl;
-                    spacing: AppTheme.sp-xl;
-                    alignment: center;
-
-                    // Mock QR Area
-                    Rectangle {
-                        width: 180px; height: 180px;
-                        background: #FFFFFF;
-                        border-radius: AppTheme.radius-md;
-                        
-                        Text { text: "QR"; font-size: 48px; font-weight: 900; color: #000000; horizontal-alignment: center; vertical-alignment: center; }
-                        
-                        // Corner Accents
-                        Rectangle { x: 0; y: 0; width: 40px; height: 4px; background: AppTheme.accent; border-radius: 2px; }
-                        Rectangle { x: 0; y: 0; width: 4px; height: 40px; background: AppTheme.accent; border-radius: 2px; }
-                    }
-
-                    // Ticket Area
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    width: root.is-desktop ? 400px : parent.width;
+                    background: AppTheme.surface-secondary;
+                    border-radius: AppTheme.radius-lg;
+                    border-width: 1px;
+                    border-color: AppTheme.divider;
+                    
                     VerticalLayout {
-                        spacing: AppTheme.sp-sm;
-                        Text { text: "SHAREABLE PEER TICKET"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; horizontal-alignment: center; }
-                        
-                        Rectangle {
-                            height: 52px;
-                            background: AppTheme.surface-tertiary;
-                            border-radius: AppTheme.radius-md;
-                            
-                            HorizontalLayout {
-                                padding-left: AppTheme.sp-md; padding-right: AppTheme.sp-md; spacing: AppTheme.sp-md;
-                                Text {
-                                    text: endpoint-ticket;
-                                    font-size: 13px; font-family: "monospace"; color: AppTheme.text-secondary;
-                                    vertical-alignment: center; horizontal-stretch: 1; overflow: elide;
+                        padding: AppTheme.sp-xl;
+                        spacing: AppTheme.sp-xl;
+                        alignment: center;
+
+                        // Elevated Mock QR Area
+                        HorizontalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 220px; height: 220px;
+                                background: AppTheme.surface-primary;
+                                border-radius: AppTheme.radius-md;
+                                border-width: 2px;
+                                border-color: AppTheme.accent;
+
+                                VerticalLayout {
+                                    alignment: center; spacing: 10px;
+                                    HorizontalLayout {
+                                        alignment: center; spacing: 10px;
+                                        Rectangle { width: 44px; height: 44px; background: AppTheme.text-primary; border-radius: 8px; }
+                                        Rectangle { width: 24px; height: 44px; background: AppTheme.text-secondary; border-radius: 4px; }
+                                        Rectangle { width: 44px; height: 44px; background: AppTheme.text-primary; border-radius: 8px; }
+                                    }
+                                    HorizontalLayout {
+                                        alignment: center; spacing: 10px;
+                                        Rectangle { width: 24px; height: 24px; background: AppTheme.text-secondary; border-radius: 4px; }
+                                        Rectangle { width: 44px; height: 24px; background: AppTheme.accent; border-radius: 4px; }
+                                        Rectangle { width: 24px; height: 24px; background: AppTheme.text-secondary; border-radius: 4px; }
+                                    }
+                                    HorizontalLayout {
+                                        alignment: center; spacing: 10px;
+                                        Rectangle { width: 44px; height: 44px; background: AppTheme.text-primary; border-radius: 8px; }
+                                        Rectangle { width: 24px; height: 44px; background: AppTheme.text-secondary; border-radius: 4px; }
+                                        Rectangle { width: 44px; height: 44px; background: AppTheme.text-primary; border-radius: 8px; }
+                                    }
                                 }
 
-                                copy-area := TouchArea {
-                                    width: 44px; height: 32px;
-                                    clicked => { root.copy-node-id(); }
-                                    Rectangle {
-                                        background: copy-area.has-hover ? AppTheme.accent : AppTheme.surface-hover;
-                                        border-radius: AppTheme.radius-sm;
-                                        animate background { duration: AppTheme.dur-short; }
-                                        Text { text: "📄"; font-size: 14px; horizontal-alignment: center; vertical-alignment: center; }
+                                // Glowing Overlay
+                                Rectangle {
+                                    width: 100%; height: 100%;
+                                    background: @radial-gradient(circle, rgba(10, 132, 255, 0.15) 0%, transparent 75%);
+                                }
+                            }
+                        }
+
+                        // Premium Ticket Area
+                        VerticalLayout {
+                            spacing: AppTheme.sp-sm;
+                            Text { text: "RAW ENDPOINT TICKET"; font-size: 11px; font-weight: 800; color: AppTheme.accent; letter-spacing: 1px; horizontal-alignment: center; }
+                            
+                            Rectangle {
+                                height: 56px;
+                                background: @radial-gradient(circle, rgba(10, 132, 255, 0.1) 0%, rgba(10, 132, 255, 0.02) 100%);
+                                border-radius: AppTheme.radius-md;
+                                border-width: 1px;
+                                border-color: rgba(10, 132, 255, 0.3); // Subtle accent border
+                                
+                                HorizontalLayout {
+                                    padding-left: AppTheme.sp-md; padding-right: AppTheme.sp-sm; spacing: AppTheme.sp-md;
+                                    Text {
+                                        text: endpoint-ticket == "" ? "Generating encrypted tunnel ticket..." : endpoint-ticket;
+                                        font-size: 13px; font-family: "monospace"; color: AppTheme.text-primary;
+                                        vertical-alignment: center; horizontal-stretch: 1; overflow: elide;
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        copy-area := TouchArea {
+                                            width: 70px; height: 36px;
+                                            clicked => { 
+                                                hidden-input.select-all();
+                                                hidden-input.copy();
+                                                root.copy-ticket(root.endpoint-ticket); 
+                                            }
+                                            Rectangle {
+                                                background: copy-area.pressed ? AppTheme.accent.transparentize(0.2) : (copy-area.has-hover ? AppTheme.accent : AppTheme.surface-tertiary);
+                                                border-radius: AppTheme.radius-sm;
+                                                animate background { duration: AppTheme.dur-short; }
+                                                Text { text: copy-area.pressed ? "COPIED!" : "COPY"; font-size: 12px; font-weight: 800; color: copy-area.has-hover ? #FFFFFF : AppTheme.text-primary; horizontal-alignment: center; vertical-alignment: center; }
+                                            }
+                                        }
+                                        hidden-input := TextInput { width: 0px; height: 0px; text: root.endpoint-ticket; }
                                     }
                                 }
                             }
@@ -90,22 +133,27 @@ export component IdentityCardScreen inherits Rectangle {
             Rectangle { vertical-stretch: 1; }
 
             // --- Final Action ---
-            Rectangle {
-                height: 60px;
-                background: @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%);
-                border-radius: 30px;
-                
-                TouchArea {
-                    clicked => { root.go-to-chats(); }
-                    Text {
-                        text: "Launch Conversations";
-                        font-size: 18px; font-weight: 800;
-                        color: #FFFFFF;
-                        horizontal-alignment: center; vertical-alignment: center;
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    height: 60px;
+                    width: root.is-desktop ? 400px : parent.width;
+                    background: @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%);
+                    border-radius: 30px;
+                    
+                    TouchArea {
+                        clicked => { root.go-to-chats(); }
+                        Text {
+                            text: "Launch Conversations";
+                            font-size: 18px; font-weight: 800;
+                            color: #FFFFFF;
+                            horizontal-alignment: center; vertical-alignment: center;
+                        }
                     }
                 }
             }
         }
     }
 }
+
 

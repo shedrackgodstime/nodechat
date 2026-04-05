@@ -35,6 +35,7 @@ import { ConversationActionsScreen } from "./screens/conversation_actions.slint"
 import { SelectMembersScreen, SelectionData } from "./screens/select_members.slint";
 import { CreateGroupScreen }  from "./screens/create_group.slint";
 import { EditNameScreen }    from "./screens/edit_name.slint";
+import { DiagnosticsScreen, LogEntry } from "./screens/diagnostics.slint";
 
 export struct ConversationContext {
     kind: string,
@@ -85,12 +86,29 @@ export component AppWindow inherits Window {
 
     // ── Shared app state ──────────────────────────────────────────────────
     in property <string>  my-display-name: "";
+    in property <string>  my-initials: "";
     in property <string>  my-node-id: "";
     in property <string>  my-endpoint-ticket: "";
     in property <int>     direct-peers: 0;
     in property <int>     relay-peers: 0;
     in property <bool>    is-offline: false;
+    in property <[LogEntry]> debug-logs: [];
+    in property <string>  relay-url: "";
     in-out property <string> runtime-error-log: "";
+    in-out property <string> lock-pin: "";
+    in-out property <string> lock-error: "";
+    in-out property <string> change-pw-error: "";
+
+    // --- Confirmation Modal State ---
+    in-out property <string> confirm-modal-title: "";
+    in-out property <string> confirm-modal-subtitle: "";
+    in-out property <string> confirm-modal-action: "";
+    in-out property <string> confirm-modal-target: "";
+    in-out property <string> confirm-modal-pin: "";
+    in-out property <string> confirm-modal-error: "";
+    in-out property <bool>   is-confirm-modal-group: false;
+    in-out property <bool>   show-confirm-modal: false;
+
     in property <[ChatPreview]> chats: [];
     in property <[ContactData]> contact-directory: [];
     in property <[SelectionData]> group-member-candidates: [];
@@ -113,7 +131,9 @@ export component AppWindow inherits Window {
 
     /// Fired when the user confirms their display name during setup.
     /// Rust: kicks off identity generation, then sets setup-step=2, my-display-name, my-node-id.
-    callback confirm-name(string);
+    callback create-identity(string, string);
+    /// Fired when user changes their name in settings.
+    callback confirm-name-change(string);
 
     /// Fired when the user taps "Launch Chats" on the identity card.
     /// Rust: persists the has-identity flag, sets has-identity=true on the UI.
@@ -126,16 +146,18 @@ export component AppWindow inherits Window {
     callback mark-verified();
     callback copy-node-id();
     callback copy-runtime-error(string);
-    callback delete-conversation(string, bool);
-    callback clear-conversation(string, bool);
+    callback delete-conversation(string, bool, string);
+    callback clear-conversation(string, bool, string);
     callback remove-contact();
     callback retry-queued();
     callback launch-group(string);
     callback toggle-group-member(string);
-    callback unlock();        // placeholder unlock action for now
+    callback unlock(string);        // placeholder unlock action for now
     callback load-conversation(string, bool);
-    callback clear-messages();
-    callback delete-identity();
+    callback clear-messages(string);
+    callback delete-identity(string);
+    callback clear-debug-logs();
+    callback change-password(string, string);
     callback copy-text(string);
 
     // ── Android back button ───────────────────────────────────────────────
@@ -320,7 +342,14 @@ export component AppWindow inherits Window {
                         current-screen = 9;
                     }
                     retry-queued =>           { root.retry-queued(); }
-                    delete-conversation =>    { root.delete-conversation(root.active-conversation.id, false); }
+                    request-delete-conversation =>    {
+                        root.confirm-modal-title = "Delete Conversation";
+                        root.confirm-modal-subtitle = "Everything in this thread will be permanently deleted.";
+                        root.confirm-modal-action = "delete-conversation";
+                        root.confirm-modal-target = root.active-conversation.id;
+                        root.is-confirm-modal-group = false;
+                        root.show-confirm-modal = true;
+                    }
                 }
 
                 // Screen 2 — Group Chat View
@@ -343,8 +372,13 @@ export component AppWindow inherits Window {
                         active-conversation.return-screen = 2;
                         current-screen = 10;
                     }
-                    delete-conversation =>   {
-                        root.delete-conversation(root.active-conversation.id, true);
+                    request-delete-conversation =>   {
+                        root.confirm-modal-title = "Delete Group Thread";
+                        root.confirm-modal-subtitle = "This will remove the group from your list. Other members will remain.";
+                        root.confirm-modal-action = "delete-conversation";
+                        root.confirm-modal-target = root.active-conversation.id;
+                        root.is-confirm-modal-group = true;
+                        root.show-confirm-modal = true;
                     }
                     retry-queued =>          { root.retry-queued(); }
                 }
@@ -376,9 +410,23 @@ export component AppWindow inherits Window {
                         root.load-conversation(root.active-conversation.id, root.active-conversation.kind == "group");
                         current-screen = root.active-conversation.kind == "group" ? 2 : 1;
                     }
-                    mark-verified => { root.mark-verified(); }
-                    clear-conversation(peer_id, is_group) =>  { root.clear-conversation(peer_id, is_group); }
-                    remove-contact => { root.remove-contact(); }
+                    request-verification => { current-screen = 13; }
+                    request-clear-history =>  {
+                        root.confirm-modal-title = "Clear Chat History";
+                        root.confirm-modal-subtitle = "All messages with " + root.active-conversation.title + " will be wiped.";
+                        root.confirm-modal-action = "clear-conversation";
+                        root.confirm-modal-target = root.active-conversation.id;
+                        root.is-confirm-modal-group = false;
+                        root.show-confirm-modal = true;
+                    }
+                    request-delete-conversation => {
+                        root.confirm-modal-title = "Remove Contact";
+                        root.confirm-modal-subtitle = "This will remove them from your list and delete the chat logs.";
+                        root.confirm-modal-action = "delete-conversation";
+                        root.confirm-modal-target = root.active-conversation.id;
+                        root.is-confirm-modal-group = false;
+                        root.show-confirm-modal = true;
+                    }
                     copy-text(text) => { root.copy-text(text); }
                 }
 
@@ -406,11 +454,21 @@ export component AppWindow inherits Window {
                         current-screen = root.active-conversation.kind == "group" ? 2 : 1;
                     }
                     retry-queued => { root.retry-queued(); }
-                    clear-conversation(peer_id, is_group) => {
-                        root.clear-conversation(peer_id, is_group);
+                    request-clear-history => {
+                        root.confirm-modal-title = "Clear Local History";
+                        root.confirm-modal-subtitle = "Wipe all messages in this " + (root.active-conversation.kind == "group" ? "group" : "chat") + ".";
+                        root.confirm-modal-action = "clear-conversation";
+                        root.confirm-modal-target = root.active-conversation.id;
+                        root.is-confirm-modal-group = root.active-conversation.kind == "group";
+                        root.show-confirm-modal = true;
                     }
-                    delete-conversation(peer_id, is_group) => {
-                        root.delete-conversation(peer_id, is_group);
+                    request-delete-conversation => {
+                        root.confirm-modal-title = root.active-conversation.kind == "group" ? "Leave Group" : "Remove Peer";
+                        root.confirm-modal-subtitle = "Permanently remove this conversation thread.";
+                        root.confirm-modal-action = "delete-conversation";
+                        root.confirm-modal-target = root.active-conversation.id;
+                        root.is-confirm-modal-group = root.active-conversation.kind == "group";
+                        root.show-confirm-modal = true;
                     }
                 }
 
@@ -426,9 +484,20 @@ export component AppWindow inherits Window {
                     safe-area-bottom: root.safe-area-bottom;
                     go-back =>     { current-screen = 0; }
                     copy-node-id => { root.copy-node-id(); }
+                    open-debug-console => { current-screen = 14; }
                     edit-display-name => { current-screen = 11; }
-                    clear-messages => { root.clear-messages(); }
-                    delete-identity => { root.delete-identity(); }
+                    request-clear-history => { 
+                        root.confirm-modal-title = "Clear All Messages";
+                        root.confirm-modal-subtitle = "This will permanently delete all chat history. Your identity and contacts will remain.";
+                        root.confirm-modal-action = "clear-messages";
+                        root.show-confirm-modal = true;
+                    }
+                    request-reset-identity => { 
+                        root.confirm-modal-title = "Delete Vault Identity";
+                        root.confirm-modal-subtitle = "CRITICAL: This will destroy your private keys and all contacts. NO RECOVERY POSSIBLE.";
+                        root.confirm-modal-action = "delete-identity";
+                        root.show-confirm-modal = true;
+                    }
                 }
 
                 // Screen 7 — Select Members (for new group)
@@ -464,9 +533,23 @@ export component AppWindow inherits Window {
                     safe-area-bottom: root.safe-area-bottom;
                     go-back =>     { current-screen = 5; }
                     confirm-name(name) => {
-                        root.confirm-name(name);
+                        root.confirm-name-change(name);
                         current-screen = 5; // Return to settings
                     }
+                }
+
+                // Screen 14 — Debug Console
+                if current-screen == 14: DiagnosticsScreen {
+                    is-desktop:    root.is-desktop;
+                    node-id:       root.my-node-id;
+                    relay-url:     root.relay-url;
+                    direct-peers:  root.direct-peers;
+                    relay-peers:   root.relay-peers;
+                    logs:          root.debug-logs;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
+                    go-back =>     { current-screen = 5; }
+                    clear-logs =>  { root.clear-debug-logs(); }
                 }
             }
         }
@@ -499,10 +582,10 @@ export component AppWindow inherits Window {
                 root.setup-step = 0;
             }
 
-            confirm-name(name) => {
+            confirm-name(name, pin) => {
                 // Show loading state immediately; Rust generates the identity.
                 root.setup-step = 2;
-                root.confirm-name(name);
+                root.create-identity(name, pin);
                 // Rust callback: sets my-display-name, my-node-id, then setup-step = 3.
             }
         }
@@ -514,7 +597,7 @@ export component AppWindow inherits Window {
             endpoint-ticket: root.my-endpoint-ticket;
             safe-area-top: root.safe-area-top;
             safe-area-bottom: root.safe-area-bottom;
-            copy-node-id => { root.copy-node-id(); }
+            copy-ticket(ticket) => { root.copy-node-id(); }
             go-to-chats => {
                 root.setup-complete();
                 // Rust sets has-identity = true, which dismisses this overlay.
@@ -533,10 +616,10 @@ export component AppWindow inherits Window {
         WelcomeScreen {
             is-locked: true;
             get-started => {} // unused in locked mode
-            unlock => {
+            unlock(pin) => {
                 root.is-locked = false;
                 root.current-screen = 0;
-                root.unlock();
+                root.unlock(pin);
             }
         }
     }

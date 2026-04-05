@@ -81,10 +81,13 @@ pub struct NodeChatWorker {
     peer_last_seen: HashMap<String, Instant>,
     peer_next_probe_at: HashMap<String, Instant>,
     peer_probe_failures: HashMap<String, u32>,
+    failed_unlock_attempts: u32,
+    lock_cooldown_until: Option<tokio::time::Instant>,
     peer_via_relay: HashMap<String, bool>,
     group_member_selection: Vec<String>,
     local_display_name: String,
     app_foreground: bool,
+    last_background_at: Option<tokio::time::Instant>,
     rx_commands: mpsc::Receiver<Command>,
     tx_events:  broadcast::Sender<AppEvent>,
     rx_network: mpsc::Receiver<NetworkEvent>,
@@ -158,10 +161,13 @@ impl NodeChatWorker {
             peer_last_seen: HashMap::new(),
             peer_next_probe_at: HashMap::new(),
             peer_probe_failures: HashMap::new(),
+            failed_unlock_attempts: 0,
+            lock_cooldown_until: None,
             peer_via_relay: HashMap::new(),
             group_member_selection: Vec::new(),
             local_display_name,
             app_foreground: true,
+            last_background_at: None,
             rx_commands,
             tx_events,
             rx_network,
@@ -244,8 +250,8 @@ impl NodeChatWorker {
             Command::MarkVerified { node_id } => {
                 self.cmd_mark_verified(node_id).await
             }
-            Command::CreateIdentity { name } => {
-                self.cmd_create_identity(name).await
+            Command::CreateIdentity { name, pin } => {
+                self.cmd_create_identity(name, pin).await
             }
             Command::FinaliseIdentity => {
                 self.cmd_finalise_identity().await
@@ -253,23 +259,29 @@ impl NodeChatWorker {
             Command::AddContact { ticket_or_id } => {
                 self.cmd_add_contact(ticket_or_id).await
             }
-            Command::ClearMessages => {
-                self.cmd_clear_messages().await
+            Command::ClearMessages { pin } => {
+                self.cmd_clear_messages(pin).await
             }
-            Command::ClearConversationHistory { target, is_group } => {
-                self.cmd_clear_conversation_history(target, is_group).await
+            Command::ClearConversationHistory { target, is_group, pin } => {
+                self.cmd_clear_conversation_history(target, is_group, pin).await
             }
-            Command::DeleteConversation { target, is_group } => {
-                self.cmd_delete_conversation(target, is_group).await
+            Command::DeleteConversation { target, is_group, pin } => {
+                self.cmd_delete_conversation(target, is_group, pin).await
             }
             Command::RetryQueuedMessages { target } => {
                 self.cmd_retry_queued_messages(target).await
             }
-            Command::DeleteIdentity => {
-                self.cmd_delete_identity().await
+            Command::DeleteIdentity { pin } => {
+                self.cmd_delete_identity(pin).await
             }
-            Command::UnlockApp => {
-                self.cmd_unlock_app().await
+            Command::ForceDeleteIdentity => {
+                self.cmd_force_delete_identity().await
+            }
+            Command::UnlockApp { pin } => {
+                self.cmd_unlock_app(pin).await
+            }
+            Command::ChangePassword { current_pin, new_pin } => {
+                self.cmd_change_password(current_pin, new_pin).await
             }
             Command::SetAppForeground { foreground } => {
                 self.cmd_set_app_foreground(foreground).await
@@ -279,6 +291,9 @@ impl NodeChatWorker {
             }
             Command::LoadConversation { target, is_group } => {
                 self.cmd_load_conversation(target, is_group).await
+            }
+            Command::UpdateDisplayName { name } => {
+                self.cmd_update_display_name(name).await
             }
         }
     }
@@ -564,11 +579,12 @@ impl NodeChatWorker {
     async fn cmd_mark_verified(&mut self, node_id: String) -> Result<()> {
         queries::mark_peer_verified(&self.db, &node_id)
             .context("failed to mark peer verified")?;
-        tracing::info!(peer = %node_id, "peer marked as key-verified");
+        self.emit(AppEvent::PeerVerified { peer: node_id.clone() });
+        self.emit_chat_list(); // Refresh badges
         Ok(())
     }
 
-    async fn cmd_create_identity(&mut self, name: String) -> Result<()> {
+    async fn cmd_create_identity(&mut self, name: String, pin: String) -> Result<()> {
         // 1. Generate Iroh identity (Ed25519)
         let mut iroh_seed = [0u8; 32];
         rand::prelude::RngCore::fill_bytes(&mut rand::rng(), &mut iroh_seed);
@@ -579,11 +595,20 @@ impl NodeChatWorker {
         let mut x25519_seed = [0u8; 32];
         rand::prelude::RngCore::fill_bytes(&mut rand::rng(), &mut x25519_seed);
         
-        // 3. Persist to DB
+        // 3. Hash the PIN
+        use sha2::{Digest, Sha256};
+        let mut hash = Sha256::digest(pin.as_bytes());
+        for _ in 0..15_000 {
+            hash = Sha256::digest(&hash);
+        }
+        let pin_hash = hex::encode(hash);
+
+        // 4. Persist to DB
         let record = queries::LocalIdentityRecord {
             display_name: name.clone(),
             node_id_bytes: iroh_seed.to_vec(), // We store the SEED to recover the secret key
             x25519_secret: x25519_seed.to_vec(),
+            pin_hash,
         };
         queries::insert_local_identity(&self.db, &record).context("failed to save identity")?;
         
@@ -598,6 +623,17 @@ impl NodeChatWorker {
             node_id: node_id.to_string(),
         });
         self.emit_chat_list();
+        Ok(())
+    }
+
+    async fn cmd_update_display_name(&mut self, name: String) -> Result<()> {
+        queries::update_local_identity_name(&self.db, &name).context("failed to update name in DB")?;
+        self.local_display_name = name.clone();
+        
+        // Notify UI so it can update immediately
+        // We'll reuse IdentityGenerated or just let it refresh on next state push
+        // Actually, we should probably have a more specific event, but for now we'll push local info.
+        self.cmd_refresh_local_info().await?;
         Ok(())
     }
 
@@ -977,15 +1013,16 @@ impl NodeChatWorker {
         tracing::info!(peer = %node_id, "added new contact");
 
         if let Err(e) = self.send_contact_handshake(&node_id, false).await {
-            tracing::error!(peer = %node_id, "failed to send contact handshake: {:?}", e);
+            tracing::warn!(peer = %node_id, "handshake timeout: {:?}", e);
             self.mark_peer_offline(&node_id);
-            self.emit(AppEvent::Error {
-                message: format!("Could not send handshake to {node_id}: {e}"),
+            self.emit(AppEvent::PeerHandshakeStage {
+                peer: node_id.clone(),
+                stage: "Handshake failed (timeout)".to_owned(),
             });
         } else {
             self.emit(AppEvent::PeerHandshakeStage {
                 peer: node_id.clone(),
-                stage: "handshake sent".to_owned(),
+                stage: "Handshake sent".to_owned(),
             });
         }
 
@@ -1012,26 +1049,43 @@ impl NodeChatWorker {
         });
     }
 
-    async fn cmd_clear_messages(&mut self) -> Result<()> {
+    async fn cmd_clear_messages(&mut self, pin: String) -> Result<()> {
+        if !self.verify_pin(&pin)? {
+            self.emit(AppEvent::ClearMessagesFailed { 
+                error: "Incorrect PIN. Message deletion aborted.".to_owned() 
+            });
+            return Ok(());
+        }
+
         queries::clear_all_messages(&self.db).context("failed to clear messages")?;
         self.emit(AppEvent::MessagesCleared);
         self.emit_chat_list();
         Ok(())
     }
+    async fn cmd_clear_conversation_history(&mut self, target: String, is_group: bool, pin: String) -> Result<()> {
+        if !self.verify_pin(&pin)? {
+            self.emit(AppEvent::ClearMessagesFailed { 
+                error: "Incorrect PIN. Action aborted.".to_owned() 
+            });
+            return Ok(());
+        }
 
-    async fn cmd_clear_conversation_history(&mut self, target: String, is_group: bool) -> Result<()> {
         queries::clear_conversation_messages(&self.db, &target)
             .context("failed to clear conversation history")?;
-        self.emit(AppEvent::ConversationCleared {
-            target: target.clone(),
-            is_group,
-        });
+        self.emit(AppEvent::ConversationCleared { target: target.clone(), is_group });
         self.emit_chat_list();
         self.emit_conversation_messages(&target, is_group)?;
         Ok(())
     }
 
-    async fn cmd_delete_conversation(&mut self, target: String, is_group: bool) -> Result<()> {
+    async fn cmd_delete_conversation(&mut self, target: String, is_group: bool, pin: String) -> Result<()> {
+        if !self.verify_pin(&pin)? {
+            self.emit(AppEvent::ClearMessagesFailed { 
+                error: "Incorrect PIN. Action aborted.".to_owned() 
+            });
+            return Ok(());
+        }
+
         queries::delete_conversation(&self.db, &target, is_group)
             .context("failed to delete conversation")?;
         if !is_group {
@@ -1054,22 +1108,188 @@ impl NodeChatWorker {
         Ok(())
     }
 
-    async fn cmd_delete_identity(&mut self) -> Result<()> {
+    async fn cmd_delete_identity(&mut self, pin: String) -> Result<()> {
+        if !self.verify_pin(&pin)? {
+            self.emit(AppEvent::DeleteIdentityFailed { 
+                error: "Incorrect PIN. Application reset aborted.".to_owned() 
+            });
+            return Ok(());
+        }
+
         queries::delete_local_identity(&self.db).context("failed to delete identity")?;
-        // Shutdown for now; onboarding will trigger on next launch.
-        std::process::exit(0);
+        self.crypto = None;
+        self.emit(AppEvent::IdentityDeleted);
+        Ok(())
     }
 
-    async fn cmd_unlock_app(&mut self) -> Result<()> {
-        self.emit(AppEvent::UnlockComplete);
+    async fn cmd_force_delete_identity(&mut self) -> Result<()> {
+        queries::delete_local_identity(&self.db).context("failed to force delete identity")?;
+        self.crypto = None;
+        self.emit(AppEvent::IdentityDeleted);
+        Ok(())
+    }
+
+    async fn cmd_unlock_app(&mut self, pin: String) -> Result<()> {
+        // Check if we're in a cooldown period
+        if let Some(until) = self.lock_cooldown_until {
+            let now = tokio::time::Instant::now();
+            if now < until {
+                let secs = (until - now).as_secs() + 1;
+                self.emit(AppEvent::UnlockFailed {
+                    error: format!("Too many attempts. Try again in {}s.", secs),
+                });
+                return Ok(());
+            } else {
+                // Cooldown expired — reset
+                self.lock_cooldown_until = None;
+                self.failed_unlock_attempts = 0;
+            }
+        }
+
+        // Load stored pin_hash from DB
+        let identity = queries::get_local_identity(&self.db)
+            .context("failed to load identity for unlock")?;
+
+        let stored_hash = match identity {
+            Some(ref id) => id.pin_hash.clone(),
+            None => {
+                // No identity — shouldn't happen, but let through
+                self.emit(AppEvent::UnlockComplete);
+                return Ok(());
+            }
+        };
+
+        // If no PIN was set during setup, allow empty pass-through
+        if stored_hash.is_empty() {
+            self.failed_unlock_attempts = 0;
+            self.emit(AppEvent::UnlockComplete);
+            return Ok(());
+        }
+
+        // Hash the submitted PIN using the same 15,000-round SHA-256 stretch
+        use sha2::{Digest, Sha256};
+        let mut hash = Sha256::digest(pin.as_bytes());
+        for _ in 0..15_000 {
+            hash = Sha256::digest(&hash);
+        }
+        let submitted_hash = hex::encode(hash);
+
+        if submitted_hash == stored_hash {
+            self.failed_unlock_attempts = 0;
+            self.lock_cooldown_until = None;
+            self.emit(AppEvent::UnlockComplete);
+        } else {
+            self.failed_unlock_attempts += 1;
+            tracing::warn!(attempts = self.failed_unlock_attempts, "wrong PIN entered");
+
+            if self.failed_unlock_attempts >= 5 {
+                self.lock_cooldown_until =
+                    Some(tokio::time::Instant::now() + tokio::time::Duration::from_secs(30));
+                self.failed_unlock_attempts = 0;
+                self.emit(AppEvent::UnlockFailed {
+                    error: "Too many failed attempts. Locked for 30 seconds.".to_owned(),
+                });
+            } else {
+                let remaining = 5 - self.failed_unlock_attempts;
+                self.emit(AppEvent::UnlockFailed {
+                    error: format!("Incorrect PIN. {} attempt(s) remaining.", remaining),
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    fn verify_pin(&self, pin: &str) -> Result<bool> {
+        use sha2::{Digest, Sha256};
+
+        let identity = queries::get_local_identity(&self.db)
+            .context("failed to load identity for verification")?;
+        
+        let stored_hash = match identity {
+            Some(id) => id.pin_hash,
+            None => return Ok(true), // No identity = nothing to verify
+        };
+
+        if stored_hash.is_empty() {
+            return Ok(true);
+        }
+
+        let mut hash = Sha256::digest(pin.as_bytes());
+        for _ in 0..15_000 {
+            hash = Sha256::digest(&hash);
+        }
+        let submitted_hash = hex::encode(hash);
+
+        Ok(submitted_hash == stored_hash)
+    }
+
+    async fn cmd_change_password(&mut self, current_pin: String, new_pin: String) -> Result<()> {
+        use sha2::{Digest, Sha256};
+
+        // Load stored identity
+        let identity = queries::get_local_identity(&self.db)
+            .context("failed to load identity for password change")?;
+
+        let stored_hash = match identity {
+            Some(ref id) => id.pin_hash.clone(),
+            None => {
+                self.emit(AppEvent::PasswordChangeFailed {
+                    error: "No identity found.".to_owned(),
+                });
+                return Ok(());
+            }
+        };
+
+        // Verify current PIN (allow bypass if no PIN was set)
+        if !stored_hash.is_empty() {
+            let mut hash = Sha256::digest(current_pin.as_bytes());
+            for _ in 0..15_000 {
+                hash = Sha256::digest(&hash);
+            }
+            let submitted_hash = hex::encode(hash);
+
+            if submitted_hash != stored_hash {
+                self.emit(AppEvent::PasswordChangeFailed {
+                    error: "Incorrect current password.".to_owned(),
+                });
+                return Ok(());
+            }
+        }
+
+        // Hash the new PIN
+        let mut new_hash = Sha256::digest(new_pin.as_bytes());
+        for _ in 0..15_000 {
+            new_hash = Sha256::digest(&new_hash);
+        }
+        let new_pin_hash = hex::encode(new_hash);
+
+        // Persist
+        queries::update_pin_hash(&self.db, &new_pin_hash)
+            .context("failed to save new pin_hash")?;
+
+        tracing::info!("access PIN updated successfully");
+        self.emit(AppEvent::PasswordChanged);
         Ok(())
     }
 
     async fn cmd_set_app_foreground(&mut self, foreground: bool) -> Result<()> {
+        let prev_foreground = self.app_foreground;
         self.app_foreground = foreground;
         tracing::info!(foreground, "android lifecycle state updated");
 
         if foreground {
+            // Check if we need to lock after returning from background
+            if !prev_foreground && self.crypto.is_some() {
+                if let Some(bg_time) = self.last_background_at {
+                    if bg_time.elapsed() >= tokio::time::Duration::from_secs(180) {
+                        tracing::info!("app backgrounded for >3 mins — re-locking");
+                        self.emit(AppEvent::AppLocked);
+                    }
+                }
+            }
+            self.last_background_at = None;
+
             self.emit_network_status().await;
             self.emit_chat_list();
             if let Err(e) = self.flush_offline_queue().await {
@@ -1078,6 +1298,9 @@ impl NodeChatWorker {
             for peer in self.network.active_connections() {
                 self.touch_peer_activity(&peer);
             }
+        } else {
+            // App backgrounded — record the timestamp
+            self.last_background_at = Some(tokio::time::Instant::now());
         }
 
         Ok(())

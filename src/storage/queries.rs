@@ -18,17 +18,19 @@ pub struct LocalIdentityRecord {
     pub display_name: String,
     pub node_id_bytes: Vec<u8>,
     pub x25519_secret: Vec<u8>,
+    pub pin_hash: String,
 }
 
 /// Insert the local identity. Only one can exist (id = 1).
 pub fn insert_local_identity(conn: &Connection, identity: &LocalIdentityRecord) -> Result<()> {
     conn.execute(
-        "INSERT INTO local_identity (id, display_name, node_id_bytes, x25519_secret)
-         VALUES (1, ?1, ?2, ?3)",
+        "INSERT INTO local_identity (id, display_name, node_id_bytes, x25519_secret, pin_hash)
+         VALUES (1, ?1, ?2, ?3, ?4)",
         params![
             identity.display_name,
             identity.node_id_bytes,
-            identity.x25519_secret
+            identity.x25519_secret,
+            identity.pin_hash
         ],
     )
     .context("failed to insert local identity")?;
@@ -38,7 +40,7 @@ pub fn insert_local_identity(conn: &Connection, identity: &LocalIdentityRecord) 
 /// Fetch the local identity if one exists.
 pub fn get_local_identity(conn: &Connection) -> Result<Option<LocalIdentityRecord>> {
     let mut stmt = conn
-        .prepare("SELECT display_name, node_id_bytes, x25519_secret FROM local_identity WHERE id = 1")
+        .prepare("SELECT display_name, node_id_bytes, x25519_secret, pin_hash FROM local_identity WHERE id = 1")
         .context("failed to prepare get_local_identity statement")?;
 
     let mut rows = stmt.query([])?;
@@ -47,13 +49,34 @@ pub fn get_local_identity(conn: &Connection) -> Result<Option<LocalIdentityRecor
             display_name:  row.get(0).context("display_name")?,
             node_id_bytes: row.get(1).context("node_id_bytes")?,
             x25519_secret: row.get(2).context("x25519_secret")?,
+            pin_hash:      row.get(3).context("pin_hash")?,
         }))
     } else {
         Ok(None)
     }
 }
 
-// ── Peer Records ──────────────────────────────────────────────────────────────
+/// Update the PIN hash for the local identity (used by Change Password flow).
+pub fn update_pin_hash(conn: &Connection, pin_hash: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE local_identity SET pin_hash = ?1 WHERE id = 1",
+        params![pin_hash],
+    )
+    .context("failed to update pin_hash")?;
+    Ok(())
+}
+
+/// Update the display name for the local identity.
+pub fn update_local_identity_name(conn: &Connection, name: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE local_identity SET display_name = ?1 WHERE id = 1",
+        params![name],
+    )
+    .context("failed to update local_identity display_name")?;
+    Ok(())
+}
+
+
 
 /// A peer as stored in the local contact book.
 #[derive(Debug, Clone)]
@@ -588,7 +611,7 @@ pub fn list_chat_previews(conn: &Connection) -> Result<Vec<ChatPreviewRecord>> {
 }
 
 /// Derive a two-letter avatar label from a display name.
-fn derive_initials(name: &str) -> String {
+pub(crate) fn derive_initials(name: &str) -> String {
     let mut initials = String::new();
     for part in name.split_whitespace() {
         if let Some(ch) = part.chars().next() {

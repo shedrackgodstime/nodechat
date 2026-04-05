@@ -3,12 +3,31 @@
 //! `apply_event` is the single point where backend data becomes UI state (RULES.md U-05).
 //! Only called from inside `slint::invoke_from_event_loop` closures — never directly.
 
-use slint::VecModel;
+use slint::{VecModel, Model};
 
 use crate::core::commands::AppEvent;
 use crate::{
-    AppWindow, ChatPreview, ContactData, MessageData, SelectionData,
+    AppWindow, ChatPreview, ContactData, MessageData, SelectionData, LogEntry,
 };
+
+fn push_log(ui: &AppWindow, level: &str, message: &str) {
+    let mut logs: Vec<LogEntry> = ui.get_debug_logs().iter().collect();
+    
+    // Fallback timestamp if chrono isn't available, but we'll try to use a simple one
+    let timestamp = format!("{:?}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() % 86400);
+
+    logs.insert(0, LogEntry {
+        timestamp: timestamp.into(),
+        level: level.into(),
+        message: message.into(),
+    });
+
+    if logs.len() > 50 {
+        logs.truncate(50);
+    }
+
+    ui.set_debug_logs(VecModel::from_slice(&logs));
+}
 
 fn active_conversation_matches(ui: &AppWindow, target: &str, is_group: bool) -> bool {
     let convo = ui.get_active_conversation();
@@ -40,8 +59,7 @@ fn reset_active_conversation(ui: &AppWindow) {
 pub fn apply_event(ui: &AppWindow, event: AppEvent) {
     match event {
         AppEvent::IncomingMessage { sender, id: _, plaintext: _, timestamp: _ } => {
-            // WIRE: push message into the active chat ListView model
-            tracing::debug!(peer = %sender, "incoming direct message — UI model update pending");
+            push_log(ui, "INFO", &format!("Incoming message from {sender}"));
         }
 
         AppEvent::IncomingGroupMessage { topic, sender, id: _, plaintext: _, timestamp: _ } => {
@@ -54,15 +72,8 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
             tracing::debug!(peer = %sender, file = %file_name, "incoming file — UI update pending");
         }
 
-        AppEvent::MessageStatusUpdate { id, target, is_group, status } => {
-            // WIRE: find bubble in model by id and update its status indicator
-            tracing::debug!(
-                msg = %id,
-                target = %target,
-                is_group,
-                status = %status.as_str(),
-                "status update — refreshing conversation view"
-            );
+        AppEvent::MessageStatusUpdate { id, target, is_group: _, status } => {
+            push_log(ui, "INFO", &format!("Message {id} in {target} changed to {status:?}"));
         }
 
         AppEvent::GroupInviteReceived { topic, group_name } => {
@@ -81,6 +92,7 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         }
 
         AppEvent::PeerHandshakeStage { peer, stage } => {
+            push_log(ui, if stage.contains("failed") { "WARN" } else { "INFO" }, &format!("Handshake with {peer}: {stage}"));
             tracing::debug!(peer = %peer, stage = %stage, "peer handshake stage update");
             let mut convo = ui.get_active_conversation();
             if convo.kind == "direct" && convo.id == peer {
@@ -108,36 +120,112 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
             ui.set_my_display_name(display_name.into());
             ui.set_my_node_id(node_id.into());
             ui.set_setup_step(3);
+            push_log(ui, "INFO", "New P2P identity generated.");
         }
 
         AppEvent::EndpointTicketUpdated { ticket } => {
-            ui.set_my_endpoint_ticket(ticket.into());
-            tracing::debug!("endpoint ticket updated");
+            ui.set_my_endpoint_ticket(ticket.clone().into());
+            // Extract relay URL from ticket for debug display
+            if let Ok(endpoint_ticket) = ticket.parse::<iroh_tickets::endpoint::EndpointTicket>() {
+                let relay = endpoint_ticket.endpoint_addr().relay_urls().map(|u| u.to_string()).collect::<Vec<_>>().join(", ");
+                ui.set_relay_url(relay.into());
+            }
+            push_log(ui, "INFO", "My endpoint ticket updated.");
         }
 
         AppEvent::MessagesCleared => {
+            ui.set_show_confirm_modal(false);
+            ui.set_confirm_modal_pin("".into());
+            ui.set_confirm_modal_error("".into());
+            ui.set_confirm_modal_action("".into());
             clear_active_conversation_messages(ui);
-            tracing::info!("messages cleared — active conversation models reset");
+            tracing::info!("messages cleared — modal closed and active conversation models reset");
         }
 
         AppEvent::ConversationDeleted { target, is_group } => {
+            ui.set_show_confirm_modal(false);
+            ui.set_confirm_modal_pin("".into());
+            ui.set_confirm_modal_error("".into());
+            ui.set_confirm_modal_action("".into());
             if active_conversation_matches(ui, &target, is_group) {
                 clear_active_conversation_messages(ui);
                 reset_active_conversation(ui);
                 ui.set_current_screen(0);
             }
+            tracing::info!("conversation deleted — modal closed and UI reset");
         }
 
         AppEvent::ConversationCleared { target, is_group } => {
+            ui.set_show_confirm_modal(false);
+            ui.set_confirm_modal_pin("".into());
+            ui.set_confirm_modal_error("".into());
+            ui.set_confirm_modal_action("".into());
             if active_conversation_matches(ui, &target, is_group) {
                 clear_active_conversation_messages(ui);
             }
+            tracing::info!("conversation history cleared — modal closed");
         }
 
         AppEvent::UnlockComplete => {
             ui.set_is_locked(false);
+            ui.set_lock_pin("".into());
+            ui.set_lock_error("".into());
             ui.set_current_screen(0);
             tracing::debug!("unlock complete — returning user into main app");
+        }
+
+        AppEvent::AppLocked => {
+            ui.set_is_locked(true);
+            ui.set_lock_error("".into());
+            ui.set_lock_pin("".into());
+            tracing::info!("app locked automatically (background/startup)");
+        }
+
+        AppEvent::UnlockFailed { error } => {
+            ui.set_lock_pin("".into());
+            ui.set_lock_error(error.into());
+            tracing::warn!("unlock failed — wrong PIN or cooldown active");
+        }
+
+        AppEvent::PasswordChanged => {
+            ui.set_change_pw_error("".into());
+            ui.set_current_screen(5);
+            tracing::info!("password changed successfully");
+        }
+
+        AppEvent::PasswordChangeFailed { error } => {
+            ui.set_change_pw_error(error.into());
+            tracing::warn!("password change failed");
+        }
+
+        AppEvent::ClearMessagesFailed { error } => {
+            tracing::warn!("clear messages failed: {}", error);
+            ui.set_confirm_modal_pin("".into());
+            ui.set_confirm_modal_error(error.into());
+        }
+
+        AppEvent::IdentityDeleted => {
+            ui.set_show_confirm_modal(false);
+            ui.set_has_identity(false);
+            ui.set_setup_step(0);
+            ui.set_current_screen(0);
+            tracing::info!("identity deleted — resetting app state");
+        }
+
+        AppEvent::DeleteIdentityFailed { error } => {
+            tracing::warn!("reset application failed: {}", error);
+            ui.set_confirm_modal_pin("".into());
+            ui.set_confirm_modal_error(error.into());
+        }
+
+        AppEvent::PeerVerified { peer } => {
+            push_log(ui, "INFO", &format!("Peer verified: {peer}"));
+            let mut active = ui.get_active_conversation();
+            if active.id == peer.as_str() {
+                active.is_verified = true;
+                ui.set_active_conversation(active);
+            }
+            tracing::info!(peer = %peer, "UI updated peer verification status");
         }
 
         AppEvent::ChatsUpdated { chats } => {
@@ -231,10 +319,10 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
             ui.set_active_conversation_messages(VecModel::from_slice(&rows));
         }
 
-        AppEvent::NetworkStatus { direct_peers, relay_peers, is_offline } => {
+        AppEvent::NetworkStatus { direct_peers, relay_peers, is_offline: _ } => {
             ui.set_direct_peers(direct_peers);
             ui.set_relay_peers(relay_peers);
-            ui.set_is_offline(is_offline);
+            push_log(ui, "INFO", &format!("Network status: {} direct / {} relay", direct_peers, relay_peers));
         }
 
         AppEvent::Error { message } => {

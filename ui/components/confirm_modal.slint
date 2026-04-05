@@ -1,0 +1,156 @@
+import { AppTheme } from "../theme.slint";
+
+export component ConfirmModal inherits Rectangle {
+    in-out property <string> title: "Confirm Action";
+    in-out property <string> subtitle: "This action cannot be undone.";
+    in-out property <string> confirm-text: "Confirm";
+    in-out property <string> action-slug: ""; // passed to help UI toggle
+    in-out property <string> error-msg: "";
+    in-out property <string> pin: "";
+    in-out property <bool> is-checked: false;
+
+    callback confirm(string);
+    callback cancel();
+
+    background: rgba(0, 0, 0, 0.7); // Backdrop dimming
+    
+    // --- Backdrop Dismissal ---
+    TouchArea {
+        clicked => { root.cancel(); }
+    }
+
+    Rectangle {
+        width: 320px;
+        height: inner-layout.preferred-height + 40px;
+        background: AppTheme.surface-secondary;
+        border-radius: AppTheme.radius-lg;
+        border-width: 1px;
+        border-color: AppTheme.divider;
+        
+        // --- Consume Clicks Inside the Card ---
+        // This prevents backdrop dismissal from firing when clicking/typing inside
+        TouchArea { }
+        
+        inner-layout := VerticalLayout {
+            padding: AppTheme.sp-lg;
+            spacing: AppTheme.sp-lg;
+            alignment: center;
+
+            // --- Header ---
+            VerticalLayout {
+                spacing: AppTheme.sp-xs;
+                Text {
+                    text: root.title;
+                    font-size: 20px; font-weight: 800; color: AppTheme.text-primary;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: root.subtitle;
+                    font-size: 14px; color: AppTheme.text-tertiary;
+                    horizontal-alignment: center; wrap: word-wrap;
+                }
+            }
+
+            // --- Checkbox ---
+            TouchArea {
+                clicked => { root.is-checked = !root.is-checked; }
+                HorizontalLayout {
+                    spacing: AppTheme.sp-md;
+                    alignment: start;
+                    Rectangle {
+                        width: 24px; height: 24px;
+                        background: root.is-checked ? AppTheme.accent : AppTheme.surface-tertiary;
+                        border-radius: AppTheme.radius-sm;
+                        animate background { duration: AppTheme.dur-short; }
+                        
+                        if root.is-checked: Text {
+                            text: "✓"; font-size: 14px; font-weight: 900; color: #FFFFFF;
+                            vertical-alignment: center; horizontal-alignment: center;
+                        }
+                    }
+                    Text {
+                        text: "I understand the consequences";
+                        font-size: 13px; color: AppTheme.text-secondary;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // --- Password Input ---
+    if root.action-slug != "force-reset": VerticalLayout {
+        spacing: AppTheme.sp-sm;
+        Text { text: "ENTER VAULT PIN"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; horizontal-alignment: center; }
+        
+        Rectangle {
+            height: 64px;
+            border-radius: AppTheme.radius-lg;
+            background: AppTheme.surface-secondary;
+            border-width: 1px;
+            border-color: root.error-msg != "" ? AppTheme.accent-danger : (pin-input.has-focus ? AppTheme.accent : AppTheme.divider);
+            animate border-color { duration: AppTheme.dur-short; }
+
+            TouchArea { width: 100%; height: 100%; clicked => { pin-input.focus(); } }
+
+            HorizontalLayout {
+                alignment: center;
+                pin-input := TextInput {
+                    width: self.text == "" ? 2px : parent.width;
+                    text <=> root.pin;
+                    font-size: 24px; font-weight: 800; color: #FFFFFF;
+                    vertical-alignment: center; single-line: true;
+                    horizontal-alignment: center;
+                    input-type: password;
+                    accepted => { if (root.is-checked && root.pin != "") { root.confirm(root.pin); } }
+                }
+            }
+
+            if pin-input.text == "": Text {
+                width: 100%; height: 100%;
+                text: "••••"; font-size: 24px;
+                color: AppTheme.text-tertiary; vertical-alignment: center; horizontal-alignment: center; opacity: 0.3;
+            }
+        }
+        
+        if root.error-msg != "": Text {
+            text: root.error-msg;
+            font-size: 12px; font-weight: 600; color: AppTheme.accent-danger;
+            horizontal-alignment: center;
+        }
+    }
+
+            // --- Actions ---
+            VerticalLayout {
+                spacing: AppTheme.sp-md;
+                
+                // Confirm Button
+                Rectangle {
+                    height: 50px;
+                    background: (root.is-checked && (root.pin != "" || root.action-slug == "force-reset")) ? AppTheme.accent-danger : AppTheme.surface-tertiary;
+                    border-radius: 25px;
+                    animate background { duration: AppTheme.dur-short; }
+                    
+                    TouchArea {
+                        enabled: root.is-checked && (root.pin != "" || root.action-slug == "force-reset");
+                        clicked => { root.confirm(root.pin); }
+                        Text {
+                            text: root.confirm-text;
+                            font-size: 16px; font-weight: 800;
+                            color: (root.is-checked && (root.pin != "" || root.action-slug == "force-reset")) ? #FFFFFF : AppTheme.text-tertiary;
+                            horizontal-alignment: center; vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Cancel Button
+                TouchArea {
+                    clicked => { root.cancel(); }
+                    Text {
+                        text: "Cancel";
+                        font-size: 14px; font-weight: 600; color: AppTheme.text-tertiary;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
