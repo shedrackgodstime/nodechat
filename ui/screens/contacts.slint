@@ -1,5 +1,6 @@
 import { ScrollView } from "std-widgets.slint";
 import { AppTheme } from "../theme.slint";
+import { AppHeader } from "../components/app_header.slint";
 import { ContactRow } from "../components/contact_row.slint";
 
 // ContactsScreen — Pro Integrated P2P Phonebook
@@ -35,61 +36,13 @@ export component ContactsScreen inherits Rectangle {
         padding: 0;
         spacing: 0;
 
-        // --- Pro Immersive Header ──────────────────────────────────
-        Rectangle {
-            height: (is-desktop ? 64px : 72px) + root.safe-area-top;
-            background: AppTheme.surface-secondary;
-            
-            Rectangle {
-                y: parent.height - 1px;
-                width: 100%; height: 1px;
-                background: AppTheme.divider; 
-            }
-
-            HorizontalLayout {
-                y: root.safe-area-top;
-                height: is-desktop ? 64px : 72px;
-                padding-left: 12px;
-                padding-right: 16px;
-                alignment: space-between;
-
-                HorizontalLayout {
-                    spacing: 12px;
-                    alignment: start;
-
-                    if !is-desktop: VerticalLayout {
-                        alignment: center;
-                        TouchArea {
-                            width: 32px; height: 32px;
-                            clicked => { root.go-back(); }
-                            Text { text: "←"; font-size: 22px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        Text {
-                            text: "Select Peer";
-                            font-size: 18px; font-weight: 700;
-                            color: AppTheme.text-primary;
-                        }
-                        Text {
-                            text: contacts.length + " decentralized contacts";
-                            font-size: 11px;
-                            color: AppTheme.text-tertiary;
-                        }
-                    }
-                }
-
-                VerticalLayout {
-                    alignment: center;
-                    TouchArea {
-                        width: 44px; height: 44px;
-                        clicked => { root.add-contact(); }
-                        Text { text: "⊕"; font-size: 22px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                }
-            }
+        AppHeader {
+            is-desktop: root.is-desktop;
+            safe-area-top: root.safe-area-top;
+            show-back: true;
+            title: "Select Peer";
+            subtitle: contacts.length + " decentralized contacts";
+            go-back => { root.go-back(); }
         }
 
         // --- Scrollable Directory (Desktop-Adaptive) ─────────────────────
@@ -100,7 +53,7 @@ export component ContactsScreen inherits Rectangle {
             HorizontalLayout {
                 alignment: start; // Left-aligned on desktop
                 VerticalLayout {
-                    max-width: 800px;
+                    width: is-desktop ? 800px : root.width - 32px;
                     horizontal-stretch: 1;
                     alignment: start;
 

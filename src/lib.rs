@@ -119,6 +119,19 @@ pub fn run_app(db_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
     }
 
     ui::wire_callbacks(&app, tx_commands.clone(), tx_events);
+    #[cfg(target_os = "android")]
+    {
+        let app_weak = app.as_weak();
+        app.window().on_close_requested(move || {
+            if let Some(app) = app_weak.upgrade() {
+                if app.get_has_identity() && !app.get_is_locked() && app.get_current_screen() != 0 {
+                    app.set_current_screen(0);
+                    return slint::CloseRequestResponse::KeepWindowShown;
+                }
+            }
+            slint::CloseRequestResponse::HideWindow
+        });
+    }
     let _ = tx_commands.try_send(Command::RefreshLocalInfo);
 
     #[cfg(target_os = "android")]

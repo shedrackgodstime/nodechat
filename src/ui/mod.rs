@@ -6,11 +6,36 @@
 
 pub mod models;
 
+use slint::VecModel;
 use slint::ComponentHandle;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::core::commands::{AppEvent, Command};
 use crate::AppWindow;
+
+fn active_conversation_id(app: &AppWindow) -> String {
+    app.get_active_conversation().id.to_string()
+}
+
+fn active_conversation_kind(app: &AppWindow) -> String {
+    app.get_active_conversation().kind.to_string()
+}
+
+fn clear_active_conversation(app: &AppWindow) {
+    let mut convo = app.get_active_conversation();
+    convo.kind = "direct".into();
+    convo.id = String::new().into();
+    convo.title = String::new().into();
+    convo.initials = String::new().into();
+    convo.ticket = String::new().into();
+    convo.is_online = false;
+    convo.is_verified = false;
+    convo.connection_stage = String::new().into();
+    convo.member_count = "0".into();
+    convo.return_screen = 0;
+    app.set_active_conversation(convo);
+    app.set_active_conversation_messages(VecModel::from_slice(&[]));
+}
 
 /// Wire all Slint callbacks to backend commands and start the AppEvent listener.
 ///
@@ -26,8 +51,9 @@ pub fn wire_callbacks(
     wire_send_message(app, tx.clone());
     wire_send_group_message(app, tx.clone());
     wire_add_contact(app, tx.clone());
+    wire_accept_group_invite(app, tx.clone());
     wire_mark_verified(app, tx.clone());
-    wire_clear_contact_chat(app, tx.clone());
+    wire_clear_conversation(app, tx.clone());
     wire_remove_contact(app, tx.clone());
     wire_toggle_group_member(app, tx.clone());
     wire_copy_node_id(app, tx.clone());
@@ -80,7 +106,10 @@ fn wire_send_message(app: &AppWindow, tx: mpsc::Sender<Command>) {
             if text.is_empty() {
                 return;
             }
-            let target = app.get_active_peer_node_id().to_string();
+            let target = active_conversation_id(&app);
+            if active_conversation_kind(&app) != "direct" {
+                return;
+            }
             if target.is_empty() {
                 return;
             }
@@ -100,22 +129,17 @@ fn wire_delete_conversation(app: &AppWindow, tx: mpsc::Sender<Command>) {
             if target.is_empty() {
                 return;
             }
+            let should_clear =
+                active_conversation_id(&app) == target
+                && (active_conversation_kind(&app) == "group") == is_group;
             let _ = tx.try_send(Command::DeleteConversation {
                 target,
                 is_group,
             });
-            if is_group {
-                app.set_active_group_topic_id(String::new().into());
-                app.set_active_group_name(String::new().into());
-                app.set_active_group_members(String::new().into());
-            } else {
-                app.set_active_peer_node_id(String::new().into());
-                app.set_active_peer_name(String::new().into());
-                app.set_active_peer_initials(String::new().into());
-                app.set_active_peer_online(false);
-                app.set_active_peer_verified(false);
+            if should_clear {
+                clear_active_conversation(&app);
+                app.set_current_screen(0);
             }
-            app.set_current_screen(0);
         }
     });
 }
@@ -125,7 +149,10 @@ fn wire_retry_queued_messages(app: &AppWindow, tx: mpsc::Sender<Command>) {
     let handle = app.as_weak();
     app.on_retry_queued(move || {
         if let Some(app) = handle.upgrade() {
-            let target = app.get_active_peer_node_id().to_string();
+            if active_conversation_kind(&app) != "direct" {
+                return;
+            }
+            let target = active_conversation_id(&app);
             if target.is_empty() {
                 return;
             }
@@ -144,7 +171,10 @@ fn wire_send_group_message(app: &AppWindow, tx: mpsc::Sender<Command>) {
             if text.is_empty() {
                 return;
             }
-            let topic = app.get_active_group_name().to_string();
+            if active_conversation_kind(&app) != "group" {
+                return;
+            }
+            let topic = active_conversation_id(&app);
             if topic.is_empty() {
                 return;
             }
@@ -159,10 +189,19 @@ fn wire_send_group_message(app: &AppWindow, tx: mpsc::Sender<Command>) {
 /// Fired when the user confirms adding a new contact.
 /// Rust: sends Command::SendDirectMessage with a handshake payload (to be defined).
 fn wire_add_contact(app: &AppWindow, tx: mpsc::Sender<Command>) {
-    app.on_add_contact(move |ticket_or_id, name| {
+    app.on_add_contact(move |ticket_or_id| {
         let _ = tx.try_send(Command::AddContact {
             ticket_or_id: ticket_or_id.to_string(),
-            display_name: name.to_string(),
+        });
+    });
+}
+
+fn wire_accept_group_invite(app: &AppWindow, tx: mpsc::Sender<Command>) {
+    app.on_accept_group_invite(move |topic, group_name, symmetric_key| {
+        let _ = tx.try_send(Command::AcceptGroupInvite {
+            topic: topic.to_string(),
+            group_name: group_name.to_string(),
+            symmetric_key: symmetric_key.to_string(),
         });
     });
 }
@@ -173,7 +212,10 @@ fn wire_mark_verified(app: &AppWindow, tx: mpsc::Sender<Command>) {
     let handle = app.as_weak();
     app.on_mark_verified(move || {
         if let Some(app) = handle.upgrade() {
-            let node_id = app.get_active_peer_node_id().to_string();
+            if active_conversation_kind(&app) != "direct" {
+                return;
+            }
+            let node_id = active_conversation_id(&app);
             if node_id.is_empty() {
                 return;
             }
@@ -182,19 +224,13 @@ fn wire_mark_verified(app: &AppWindow, tx: mpsc::Sender<Command>) {
     });
 }
 
-fn wire_clear_contact_chat(app: &AppWindow, tx: mpsc::Sender<Command>) {
-    let handle = app.as_weak();
-    app.on_clear_chat(move || {
-        if let Some(app) = handle.upgrade() {
-            let target = app.get_active_peer_node_id().to_string();
-            if target.is_empty() {
-                return;
-            }
-            let _ = tx.try_send(Command::ClearConversationHistory {
-                target,
-                is_group: false,
-            });
+fn wire_clear_conversation(app: &AppWindow, tx: mpsc::Sender<Command>) {
+    app.on_clear_conversation(move |target, is_group| {
+        let target = target.trim().to_owned();
+        if target.is_empty() {
+            return;
         }
+        let _ = tx.try_send(Command::ClearConversationHistory { target, is_group });
     });
 }
 
@@ -202,7 +238,10 @@ fn wire_remove_contact(app: &AppWindow, tx: mpsc::Sender<Command>) {
     let handle = app.as_weak();
     app.on_remove_contact(move || {
         if let Some(app) = handle.upgrade() {
-            let target = app.get_active_peer_node_id().to_string();
+            if active_conversation_kind(&app) != "direct" {
+                return;
+            }
+            let target = active_conversation_id(&app);
             if target.is_empty() {
                 return;
             }

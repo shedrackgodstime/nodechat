@@ -49,6 +49,11 @@ pub struct ChatMessageData {
     pub status: String,
     pub is_ephemeral: bool,
     pub ttl_seconds: i32,
+    pub is_group_invite: bool,
+    pub invite_group_name: String,
+    pub invite_topic_id: String,
+    pub invite_key: String,
+    pub invite_is_joined: bool,
 }
 
 /// A group-chat message row rendered in the active conversation view.
@@ -171,6 +176,16 @@ pub enum Command {
         name: String,
     },
 
+    /// Accept a group invitation and store the group locally.
+    AcceptGroupInvite {
+        /// Hex-encoded TopicId of the group.
+        topic: String,
+        /// Human-readable group name.
+        group_name: String,
+        /// Hex-encoded symmetric key.
+        symmetric_key: String,
+    },
+
     /// Toggle whether a peer is selected for a new group.
     ToggleGroupMemberSelection {
         /// Hex-encoded NodeId of the peer.
@@ -211,8 +226,6 @@ pub enum Command {
     AddContact {
         /// The Iroh ticket string (base32) or raw NodeId.
         ticket_or_id: String,
-        /// The local display name for this peer.
-        display_name: String,
     },
     /// Clear all messages from the local database.
     ClearMessages,
@@ -386,6 +399,8 @@ pub enum AppEvent {
     PeerContactDetails {
         /// Hex-encoded NodeId of the peer.
         peer: String,
+        /// Shared display name learned from the peer handshake.
+        display_name: String,
         /// Imported ticket or dial hint used to reach the peer.
         endpoint_ticket: String,
         /// `true` if the peer is key-verified.
