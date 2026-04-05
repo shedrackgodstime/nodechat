@@ -1,0 +1,80 @@
+import { AppTheme } from "../theme.slint";
+
+export component ConversationIdentityRow inherits HorizontalLayout {
+    in property <bool> is-group: false;
+    in property <string> title: "";
+    in property <string> initials: "";
+    in property <bool> is-online: false;
+    in property <bool> is-verified: false;
+    in property <string> member-count: "";
+    in property <string> connection-stage: "";
+    in property <string> connection-note: "";
+    in property <bool> clickable: false;
+
+    callback clicked();
+
+    spacing: 12px;
+    alignment: start;
+
+    if clickable: TouchArea {
+        width: 38px;
+        height: 38px;
+        clicked => { root.clicked(); }
+        Rectangle {
+            width: 38px;
+            height: 38px;
+            border-radius: 19px;
+            background: AppTheme.accent;
+            Text {
+                text: is-group ? "👥" : (initials != "" ? initials : "?");
+                font-size: is-group ? 16px : 14px;
+                font-weight: 700;
+                color: #FFFFFF;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    if !clickable: Rectangle {
+        width: 38px;
+        height: 38px;
+        border-radius: 19px;
+        background: AppTheme.accent;
+        Text {
+            text: is-group ? "👥" : (initials != "" ? initials : "?");
+            font-size: is-group ? 16px : 14px;
+            font-weight: 700;
+            color: #FFFFFF;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    VerticalLayout {
+        alignment: center;
+        spacing: 2px;
+        Text {
+            text: title;
+            font-size: 16px;
+            font-weight: 600;
+            color: AppTheme.text-primary;
+            overflow: elide;
+        }
+        Text {
+            text: is-group
+                ? (member-count == "" ? "group chat" : member-count + " members")
+                : (is-online ? "online" : "offline");
+            font-size: 11px;
+            color: is-group
+                ? AppTheme.accent
+                : (is-online ? AppTheme.accent-success : AppTheme.text-secondary);
+        }
+        if connection-note != "": Text {
+            text: connection-note;
+            font-size: 11px;
+            color: AppTheme.text-tertiary;
+            wrap: word-wrap;
+        }
+    }
+}

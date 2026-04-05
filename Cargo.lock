@@ -17,6 +17,7 @@ dependencies = [
  "rand 0.8.5",
  "rand 0.9.2",
  "rusqlite",
+ "serde_json",
  "sha2 0.10.8",
  "slint",
  "slint-build",

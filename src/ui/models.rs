@@ -7,8 +7,32 @@ use slint::VecModel;
 
 use crate::core::commands::AppEvent;
 use crate::{
-    AppWindow, ChatPreview, ContactData, GroupMessageData, MessageData, SelectionData,
+    AppWindow, ChatPreview, ContactData, MessageData, SelectionData,
 };
+
+fn active_conversation_matches(ui: &AppWindow, target: &str, is_group: bool) -> bool {
+    let convo = ui.get_active_conversation();
+    convo.id == target && (convo.kind == "group") == is_group
+}
+
+fn clear_active_conversation_messages(ui: &AppWindow) {
+    ui.set_active_conversation_messages(VecModel::from_slice(&[]));
+}
+
+fn reset_active_conversation(ui: &AppWindow) {
+    let mut convo = ui.get_active_conversation();
+    convo.kind = "direct".into();
+    convo.id = String::new().into();
+    convo.title = String::new().into();
+    convo.initials = String::new().into();
+    convo.ticket = String::new().into();
+    convo.is_online = false;
+    convo.is_verified = false;
+    convo.connection_stage = String::new().into();
+    convo.member_count = "0".into();
+    convo.return_screen = 0;
+    ui.set_active_conversation(convo);
+}
 
 /// Translate a backend `AppEvent` into Slint property/model updates.
 ///
@@ -49,22 +73,29 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         AppEvent::PeerOnlineStatus { peer, online, via_relay } => {
             // WIRE: update the status dot and connection mode label
             tracing::debug!(peer = %peer, online, via_relay, "peer status — UI update pending");
-            if ui.get_active_peer_node_id() == peer {
-                ui.set_active_peer_online(online);
+            let mut convo = ui.get_active_conversation();
+            if convo.kind == "direct" && convo.id == peer {
+                convo.is_online = online;
+                ui.set_active_conversation(convo);
             }
         }
 
         AppEvent::PeerHandshakeStage { peer, stage } => {
             tracing::debug!(peer = %peer, stage = %stage, "peer handshake stage update");
-            if ui.get_active_peer_node_id() == peer {
-                ui.set_active_peer_connection_stage(stage.into());
+            let mut convo = ui.get_active_conversation();
+            if convo.kind == "direct" && convo.id == peer {
+                convo.connection_stage = stage.into();
+                ui.set_active_conversation(convo);
             }
         }
 
-        AppEvent::PeerContactDetails { peer, endpoint_ticket, verified } => {
-            if ui.get_active_peer_node_id() == peer {
-                ui.set_active_peer_ticket(endpoint_ticket.into());
-                ui.set_active_peer_verified(verified);
+        AppEvent::PeerContactDetails { peer, display_name, endpoint_ticket, verified } => {
+            let mut convo = ui.get_active_conversation();
+            if convo.kind == "direct" && convo.id == peer {
+                convo.title = display_name.into();
+                convo.ticket = endpoint_ticket.into();
+                convo.is_verified = verified;
+                ui.set_active_conversation(convo);
             }
         }
 
@@ -85,40 +116,21 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         }
 
         AppEvent::MessagesCleared => {
-            // WIRE: clear the active message list model and notify user
-            tracing::info!("messages cleared — UI refresh pending");
+            clear_active_conversation_messages(ui);
+            tracing::info!("messages cleared — active conversation models reset");
         }
 
         AppEvent::ConversationDeleted { target, is_group } => {
-            if is_group {
-                if ui.get_active_group_topic_id() == target {
-                    ui.set_active_group_messages(slint::VecModel::from_slice(&[]));
-                    ui.set_active_group_topic_id(String::new().into());
-                    ui.set_active_group_name(String::new().into());
-                    ui.set_active_group_members(String::new().into());
-                    ui.set_active_peer_connection_stage(String::new().into());
-                    ui.set_current_screen(0);
-                }
-            } else if ui.get_active_peer_node_id() == target {
-                ui.set_active_direct_messages(slint::VecModel::from_slice(&[]));
-                ui.set_active_peer_node_id(String::new().into());
-                ui.set_active_peer_name(String::new().into());
-                ui.set_active_peer_initials(String::new().into());
-                ui.set_active_peer_online(false);
-                ui.set_active_peer_verified(false);
-                ui.set_active_peer_connection_stage(String::new().into());
-                ui.set_active_peer_ticket(String::new().into());
+            if active_conversation_matches(ui, &target, is_group) {
+                clear_active_conversation_messages(ui);
+                reset_active_conversation(ui);
                 ui.set_current_screen(0);
             }
         }
 
         AppEvent::ConversationCleared { target, is_group } => {
-            if is_group {
-                if ui.get_active_group_topic_id() == target {
-                    ui.set_active_group_messages(slint::VecModel::from_slice(&[]));
-                }
-            } else if ui.get_active_peer_node_id() == target {
-                ui.set_active_direct_messages(slint::VecModel::from_slice(&[]));
+            if active_conversation_matches(ui, &target, is_group) {
+                clear_active_conversation_messages(ui);
             }
         }
 
@@ -180,7 +192,8 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         }
 
         AppEvent::DirectConversationLoaded { target, messages } => {
-            if ui.get_active_peer_node_id() != target {
+            let convo = ui.get_active_conversation();
+            if convo.kind != "direct" || convo.id != target {
                 return;
             }
             let rows: Vec<MessageData> = messages
@@ -195,25 +208,27 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
                     ttl_seconds: msg.ttl_seconds,
                 })
                 .collect();
-            ui.set_active_direct_messages(VecModel::from_slice(&rows));
+            ui.set_active_conversation_messages(VecModel::from_slice(&rows));
         }
 
         AppEvent::GroupConversationLoaded { topic, messages } => {
-            if ui.get_active_group_topic_id() != topic {
+            let convo = ui.get_active_conversation();
+            if convo.kind != "group" || convo.id != topic {
                 return;
             }
-            let rows: Vec<GroupMessageData> = messages
+            let rows: Vec<MessageData> = messages
                 .into_iter()
-                .map(|msg| GroupMessageData {
+                .map(|msg| MessageData {
                     id: msg.id.into(),
                     text: msg.text.into(),
                     timestamp: msg.timestamp.into(),
                     is_mine: msg.is_mine,
-                    sender_name: msg.sender_name.into(),
                     status: msg.status.into(),
+                    is_ephemeral: false,
+                    ttl_seconds: 0,
                 })
                 .collect();
-            ui.set_active_group_messages(VecModel::from_slice(&rows));
+            ui.set_active_conversation_messages(VecModel::from_slice(&rows));
         }
 
         AppEvent::NetworkStatus { direct_peers, relay_peers, is_offline } => {

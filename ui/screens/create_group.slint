@@ -1,5 +1,6 @@
 import { AppTheme } from "../theme.slint";
 import { ScrollView } from "std-widgets.slint";
+import { AppHeader } from "../components/app_header.slint";
 
 // CreateGroupScreen — Group Creation Phase 2
 // Final onboarding step for decentralized Gossip groups.
@@ -21,64 +22,13 @@ export component CreateGroupScreen inherits Rectangle {
         padding: 0;
         spacing: 0;
 
-        // --- Pro Immersive Header ──────────────────────────────────
-        Rectangle {
-            height: (is-desktop ? 64px : 72px) + root.safe-area-top;
-            background: AppTheme.surface-secondary;
-            Rectangle {
-                y: parent.height - 1px;
-                width: 100%;
-                height: 1px;
-                background: AppTheme.divider;
-            }
-
-            HorizontalLayout {
-                y: root.safe-area-top;
-                height: is-desktop ? 64px : 72px;
-                padding-left: 12px;
-                padding-right: 16px;
-                alignment: space-between;
-
-                HorizontalLayout {
-                    spacing: 12px;
-                    alignment: start;
-
-                    VerticalLayout {
-                        alignment: center;
-                        TouchArea {
-                            width: 32px;
-                            height: 32px;
-                            clicked => {
-                                root.go-back();
-                            }
-                            Text {
-                                text: "✕";
-                                font-size: 22px;
-                                color: AppTheme.text-secondary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        Text {
-                            text: "New Group Info";
-                            font-size: 18px;
-                            font-weight: 700;
-                            color: AppTheme.text-primary;
-                        }
-
-                        Text {
-                            text: member-count + " members selected";
-                            font-size: 12px;
-                            color: AppTheme.accent;
-                            font-weight: 700;
-                        }
-                    }
-                }
-            }
+        AppHeader {
+            is-desktop: root.is-desktop;
+            safe-area-top: root.safe-area-top;
+            show-back: true;
+            title: "New Group Info";
+            subtitle: member-count + " members selected";
+            go-back => { root.go-back(); }
         }
 
         // --- Desktop-Adaptive Content ───────────────────────────────────────
@@ -87,10 +37,11 @@ export component CreateGroupScreen inherits Rectangle {
             mouse-drag-pan-enabled: true;
 
             HorizontalLayout {
-                alignment: center;
+                alignment: start;
+                padding-left: is-desktop ? 0px : 16px;
+                padding-right: is-desktop ? 0px : 16px;
                 VerticalLayout {
-                    width: is-desktop ? 640px : root.width;
-                    padding: 16px;
+                    width: is-desktop ? 640px : root.width - 32px;
                     padding-top: 32px;
                     alignment: start;
                     spacing: 24px;

@@ -16,6 +16,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use rusqlite::Connection;
+use serde_json::Value;
 use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
 
@@ -41,6 +42,8 @@ const CONTACT_HANDSHAKE_HELLO: u8 = 1;
 const CONTACT_HANDSHAKE_HELLO_ACK: u8 = 2;
 /// Maximum ticket bytes allowed in a direct-contact handshake frame.
 const CONTACT_HANDSHAKE_MAX_TICKET_BYTES: usize = 768;
+/// Maximum display-name bytes allowed in a direct-contact handshake frame.
+const CONTACT_HANDSHAKE_MAX_NAME_BYTES: usize = 128;
 /// How often to probe established direct peers for health.
 const PEER_HEALTH_PING_INTERVAL_SECS: u64 = 20;
 /// How long without any direct activity before we attempt a reconnect.
@@ -80,6 +83,7 @@ pub struct NodeChatWorker {
     peer_probe_failures: HashMap<String, u32>,
     peer_via_relay: HashMap<String, bool>,
     group_member_selection: Vec<String>,
+    local_display_name: String,
     app_foreground: bool,
     rx_commands: mpsc::Receiver<Command>,
     tx_events:  broadcast::Sender<AppEvent>,
@@ -111,6 +115,7 @@ impl NodeChatWorker {
         // Load identity if it exists.
         let local_identity = queries::get_local_identity(&db)?;
         let mut iroh_secret = None;
+        let local_display_name = local_identity.as_ref().map(|rec| rec.display_name.clone()).unwrap_or_default();
         let mut crypto = if let Some(rec) = local_identity {
             let mut iroh_seed = [0u8; 32];
             iroh_seed.copy_from_slice(&rec.node_id_bytes);
@@ -155,6 +160,7 @@ impl NodeChatWorker {
             peer_probe_failures: HashMap::new(),
             peer_via_relay: HashMap::new(),
             group_member_selection: Vec::new(),
+            local_display_name,
             app_foreground: true,
             rx_commands,
             tx_events,
@@ -223,6 +229,9 @@ impl NodeChatWorker {
             Command::CreateGroup { name } => {
                 self.cmd_create_group(name).await
             }
+            Command::AcceptGroupInvite { topic, group_name, symmetric_key } => {
+                self.cmd_accept_group_invite(topic, group_name, symmetric_key).await
+            }
             Command::ToggleGroupMemberSelection { peer_id } => {
                 self.cmd_toggle_group_member_selection(peer_id).await
             }
@@ -241,8 +250,8 @@ impl NodeChatWorker {
             Command::FinaliseIdentity => {
                 self.cmd_finalise_identity().await
             }
-            Command::AddContact { ticket_or_id, display_name } => {
-                self.cmd_add_contact(ticket_or_id, display_name).await
+            Command::AddContact { ticket_or_id } => {
+                self.cmd_add_contact(ticket_or_id).await
             }
             Command::ClearMessages => {
                 self.cmd_clear_messages().await
@@ -440,6 +449,43 @@ impl NodeChatWorker {
         Ok(())
     }
 
+    async fn cmd_accept_group_invite(
+        &mut self,
+        topic: String,
+        group_name: String,
+        symmetric_key: String,
+    ) -> Result<()> {
+        let crypto = match self.crypto.as_mut() {
+            Some(c) => c,
+            None => return Ok(()),
+        };
+        let key_bytes = hex::decode(&symmetric_key)
+            .with_context(|| format!("invalid group invite key for topic {topic:?}"))?;
+        if key_bytes.len() != 32 {
+            return Err(anyhow::anyhow!("invalid group invite key length for topic {topic}"));
+        }
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&key_bytes);
+        crypto.register_group_key(&topic, key);
+
+        if queries::get_group(&self.db, &topic)?.is_none() {
+            let record = queries::GroupRecord {
+                topic_id: topic.clone(),
+                group_name: group_name.clone(),
+                symmetric_key: key.to_vec(), // TODO: encrypt at rest (C-05)
+            };
+            queries::insert_group(&self.db, &record).context("failed to store accepted group invite")?;
+        }
+
+        self.network
+            .subscribe_group(&topic)
+            .await
+            .context("failed to subscribe to invited group topic")?;
+
+        self.emit_chat_list();
+        Ok(())
+    }
+
     async fn cmd_toggle_group_member_selection(&mut self, peer_id: String) -> Result<()> {
         if let Some(pos) = self.group_member_selection.iter().position(|id| id == &peer_id) {
             self.group_member_selection.remove(pos);
@@ -501,11 +547,16 @@ impl NodeChatWorker {
             .context("cannot invite — no group key found")?;
 
         // Encode invite as a JSON payload sent over the 1:1 E2EE channel.
-        let invite_payload = format!(
-            r#"{{"type":"group_invite","topic":"{}","key":"{}"}}"#,
-            topic,
-            hex::encode(key)
-        );
+        let group_name = queries::get_group(&self.db, &topic)?
+            .map(|group| group.group_name)
+            .unwrap_or_else(|| "Group Invite".to_owned());
+        let invite_payload = serde_json::json!({
+            "type": "group_invite",
+            "topic": topic,
+            "key": hex::encode(key),
+            "group_name": group_name,
+        })
+        .to_string();
         // Route through the normal send path so it benefits from queuing.
         self.cmd_send_direct_message(target, invite_payload).await
     }
@@ -539,6 +590,7 @@ impl NodeChatWorker {
         // 4. Initialize live crypto state
         let identity = crate::crypto::Identity::from_bytes(*node_id.as_bytes(), x25519_seed);
         self.crypto = Some(CryptoManager::new(identity));
+        self.local_display_name = name.clone();
 
         // 5. Tell UI we're done
         self.emit(AppEvent::IdentityGenerated {
@@ -593,7 +645,7 @@ impl NodeChatWorker {
     }
 
     async fn net_incoming_direct(&mut self, from: String, payload: Vec<u8>) -> Result<()> {
-        if let Some((is_ack, their_x25519_public, their_ticket)) = Self::parse_contact_handshake(&payload) {
+        if let Some((is_ack, their_x25519_public, their_ticket, their_display_name)) = Self::parse_contact_handshake(&payload) {
             let their_pub_hex = hex::encode(their_x25519_public);
             tracing::info!(peer = %from, ack = is_ack, "contact handshake received");
             self.touch_peer_activity(&from);
@@ -611,6 +663,17 @@ impl NodeChatWorker {
                         queries::update_peer_x25519_pubkey(&self.db, &from, &their_pub_hex)
                             .context("failed to store peer public key")?;
                     }
+                    if let Some(name) = &their_display_name {
+                        if peer.display_name != *name && peer.display_name == "Pending peer" {
+                            queries::insert_peer(&self.db, &storage::queries::PeerRecord {
+                                node_id: from.clone(),
+                                display_name: name.clone(),
+                                endpoint_ticket: peer.endpoint_ticket.clone(),
+                                x25519_pubkey: their_pub_hex.clone(),
+                                verified: peer.verified,
+                            }).context("failed to update handshake peer name")?;
+                        }
+                    }
                     if let Some(ticket) = &their_ticket {
                         if peer.endpoint_ticket != *ticket {
                             queries::update_peer_endpoint_ticket(&self.db, &from, ticket)
@@ -621,7 +684,7 @@ impl NodeChatWorker {
                 None => {
                     let record = storage::queries::PeerRecord {
                         node_id:         from.clone(),
-                        display_name:    from.clone(),
+                        display_name:    their_display_name.clone().unwrap_or_else(|| "Pending peer".to_owned()),
                         endpoint_ticket: their_ticket.clone().unwrap_or_default(),
                         x25519_pubkey:   their_pub_hex.clone(),
                         verified:        false,
@@ -643,6 +706,12 @@ impl NodeChatWorker {
                 peer: from.clone(),
                 online: true,
                 via_relay: false,
+            });
+            self.emit(AppEvent::PeerContactDetails {
+                peer: from.clone(),
+                display_name: their_display_name.clone().unwrap_or_else(|| "Pending peer".to_owned()),
+                endpoint_ticket: their_ticket.clone().unwrap_or_default(),
+                verified: false,
             });
             if let Err(e) = self.flush_offline_queue_for_peer(&from).await {
                 tracing::error!(peer = %from, "failed to flush queued messages after handshake: {:?}", e);
@@ -881,7 +950,7 @@ impl NodeChatWorker {
         Ok(())
     }
 
-    async fn cmd_add_contact(&mut self, ticket_or_id: String, display_name: String) -> Result<()> {
+    async fn cmd_add_contact(&mut self, ticket_or_id: String) -> Result<()> {
         let node_id = match iroh_tickets::endpoint::EndpointTicket::deserialize(&ticket_or_id) {
             Ok(ticket) => ticket.endpoint_addr().id.to_string(),
             Err(_) => {
@@ -894,7 +963,7 @@ impl NodeChatWorker {
 
         let record = storage::queries::PeerRecord {
             node_id:         node_id.clone(),
-            display_name:    display_name.clone(),
+            display_name:    "Pending peer".to_owned(),
             endpoint_ticket: ticket_or_id.clone(),
             x25519_pubkey:   "".to_owned(), // Placeholder until first handshake (C-04)
             verified:        false,
@@ -905,7 +974,7 @@ impl NodeChatWorker {
             queries::insert_peer(&self.db, &record).context("failed to update contact")?;
         }
 
-        tracing::info!(peer = %node_id, name = %display_name, "added new contact");
+        tracing::info!(peer = %node_id, "added new contact");
 
         if let Err(e) = self.send_contact_handshake(&node_id, false).await {
             tracing::error!(peer = %node_id, "failed to send contact handshake: {:?}", e);
@@ -922,6 +991,7 @@ impl NodeChatWorker {
 
         self.emit(AppEvent::PeerContactDetails {
             peer: node_id.clone(),
+            display_name: "Pending peer".to_owned(),
             endpoint_ticket: ticket_or_id,
             verified: false,
         });
@@ -1045,6 +1115,7 @@ impl NodeChatWorker {
             if let Some(peer) = queries::get_peer(&self.db, &target)? {
                 self.emit(AppEvent::PeerContactDetails {
                     peer: target.clone(),
+                    display_name: peer.display_name,
                     endpoint_ticket: peer.endpoint_ticket,
                     verified: peer.verified,
                 });
@@ -1082,14 +1153,21 @@ impl NodeChatWorker {
             .ok_or_else(|| anyhow::anyhow!("identity not initialised"))?;
         let ticket = self.network.endpoint_ticket()?;
         let ticket_bytes = ticket.as_bytes();
+        let display_name_bytes = self.local_display_name.as_bytes();
         if ticket_bytes.len() > CONTACT_HANDSHAKE_MAX_TICKET_BYTES {
             return Err(anyhow::anyhow!(
                 "endpoint ticket too large for handshake frame: {} bytes",
                 ticket_bytes.len()
             ));
         }
+        if display_name_bytes.len() > CONTACT_HANDSHAKE_MAX_NAME_BYTES {
+            return Err(anyhow::anyhow!(
+                "display name too large for handshake frame: {} bytes",
+                display_name_bytes.len()
+            ));
+        }
 
-        let mut frame = Vec::with_capacity(4 + 1 + 32 + 2 + ticket_bytes.len());
+        let mut frame = Vec::with_capacity(4 + 1 + 32 + 2 + ticket_bytes.len() + 2 + display_name_bytes.len());
         frame.extend_from_slice(CONTACT_HANDSHAKE_MAGIC);
         frame.push(if is_ack {
             CONTACT_HANDSHAKE_HELLO_ACK
@@ -1099,11 +1177,13 @@ impl NodeChatWorker {
         frame.extend_from_slice(&crypto.x25519_public_bytes());
         frame.extend_from_slice(&(ticket_bytes.len() as u16).to_be_bytes());
         frame.extend_from_slice(ticket_bytes);
+        frame.extend_from_slice(&(display_name_bytes.len() as u16).to_be_bytes());
+        frame.extend_from_slice(display_name_bytes);
         Ok(frame)
     }
 
     /// Parse a direct-contact handshake frame.
-    fn parse_contact_handshake(payload: &[u8]) -> Option<(bool, [u8; 32], Option<String>)> {
+    fn parse_contact_handshake(payload: &[u8]) -> Option<(bool, [u8; 32], Option<String>, Option<String>)> {
         if payload.len() < 4 + 1 + 32 + 2 || &payload[..4] != CONTACT_HANDSHAKE_MAGIC {
             return None;
         }
@@ -1132,7 +1212,25 @@ impl NodeChatWorker {
             Some(String::from_utf8(raw_ticket.to_vec()).ok()?)
         };
 
-        Some((is_ack, pubkey, ticket))
+        let name_offset = ticket_len_offset + 2 + ticket_len;
+        if payload.len() < name_offset + 2 {
+            return Some((is_ack, pubkey, ticket, None));
+        }
+        let display_name_len = u16::from_be_bytes([
+            payload[name_offset],
+            payload[name_offset + 1],
+        ]) as usize;
+        if payload.len() != name_offset + 2 + display_name_len {
+            return None;
+        }
+        let display_name = if display_name_len == 0 {
+            None
+        } else {
+            let raw_name = &payload[name_offset + 2..];
+            Some(String::from_utf8(raw_name.to_vec()).ok()?)
+        };
+
+        Some((is_ack, pubkey, ticket, display_name))
     }
 
     /// Build an encrypted direct-message frame that carries the message id.
@@ -1145,6 +1243,18 @@ impl NodeChatWorker {
         frame.extend_from_slice(&(plaintext.len() as u32).to_be_bytes());
         frame.extend_from_slice(plaintext);
         frame
+    }
+
+    /// Parse a JSON group invite payload carried over the direct channel.
+    fn parse_group_invite_payload(content: &str) -> Option<(String, String, String)> {
+        let value: Value = serde_json::from_str(content).ok()?;
+        if value.get("type")?.as_str()? != "group_invite" {
+            return None;
+        }
+        let topic = value.get("topic")?.as_str()?.to_owned();
+        let key = value.get("key")?.as_str()?.to_owned();
+        let group_name = value.get("group_name")?.as_str()?.to_owned();
+        Some((topic, group_name, key))
     }
 
     /// Build an encrypted direct receipt frame for delivery/read acknowledgments.
@@ -1603,14 +1713,31 @@ impl NodeChatWorker {
             let rows = queries::list_messages(&self.db, target)?
                 .into_iter()
                 .map(|msg| {
+                    let invite = Self::parse_group_invite_payload(&msg.content);
+                    let invite_group_name = invite.as_ref().map(|invite| invite.1.clone()).unwrap_or_default();
+                    let invite_topic_id = invite.as_ref().map(|invite| invite.0.clone()).unwrap_or_default();
+                    let invite_key = invite.as_ref().map(|invite| invite.2.clone()).unwrap_or_default();
+                    let invite_is_joined = invite
+                        .as_ref()
+                        .and_then(|invite| queries::get_group(&self.db, &invite.0).ok().flatten())
+                        .is_some();
                     Ok(ChatMessageData {
                         id: msg.id.to_string(),
-                        text: msg.content,
+                        text: if invite.is_some() {
+                            invite_group_name.clone()
+                        } else {
+                            msg.content.clone()
+                        },
                         timestamp: msg.timestamp.to_string(),
                         is_mine: msg.sender_id == local_node_id,
                         status: msg.status.as_str().to_owned(),
                         is_ephemeral: false,
                         ttl_seconds: 0,
+                        is_group_invite: invite.is_some(),
+                        invite_group_name,
+                        invite_topic_id,
+                        invite_key,
+                        invite_is_joined,
                     })
                 })
                 .collect::<Result<Vec<_>>>()?;

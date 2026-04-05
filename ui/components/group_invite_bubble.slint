@@ -1,0 +1,92 @@
+import { AppTheme } from "../theme.slint";
+
+export component GroupInviteBubble inherits Rectangle {
+    in property <string> group-name: "";
+    in property <string> topic-id: "";
+    in property <string> invite-key: "";
+    in property <string> timestamp: "";
+    in property <bool> is-mine: false;
+    in property <bool> is-joined: false;
+
+    callback open-group(string, string, string, bool);
+
+    background: transparent;
+    min-height: bubble-layout.preferred-height + 8px;
+
+    HorizontalLayout {
+        alignment: is-mine ? end : start;
+        padding-left: is-mine ? 48px : 0;
+        padding-right: is-mine ? 0 : 48px;
+
+        Rectangle {
+            background: is-mine ? AppTheme.bubble-out : AppTheme.bubble-in;
+            border-radius: 12px;
+            border-top-right-radius: is-mine ? 2px : 12px;
+            border-top-left-radius: is-mine ? 12px : 2px;
+
+            bubble-layout := VerticalLayout {
+                padding: 10px;
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 6px;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    Text { text: "👥"; font-size: 15px; vertical-alignment: center; }
+                    Text {
+                        text: is-mine ? "Group invite sent" : "Group invite";
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: AppTheme.accent;
+                    }
+                }
+
+                Text {
+                    text: group-name;
+                    font-size: 18px;
+                    font-weight: 800;
+                    color: AppTheme.text-primary;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    text: is-joined ? "Already in your chats." : "Tap to join this group.";
+                    font-size: 11px;
+                    color: AppTheme.text-secondary;
+                    wrap: word-wrap;
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: space-between;
+
+                    Text {
+                        text: timestamp;
+                        font-size: 11px;
+                        color: is-mine ? #BDC3C7 : AppTheme.text-secondary;
+                        vertical-alignment: center;
+                    }
+
+                    TouchArea {
+                        clicked => { root.open-group(topic-id, group-name, invite-key, is-joined); }
+                        Rectangle {
+                            min-width: 94px;
+                            height: 30px;
+                            border-radius: 15px;
+                            background: is-joined ? AppTheme.accent-success : AppTheme.accent;
+                            Text {
+                                text: is-joined ? "View group" : "Join group";
+                                font-size: 11px;
+                                font-weight: 800;
+                                color: #FFFFFF;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

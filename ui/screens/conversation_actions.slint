@@ -1,0 +1,168 @@
+import { ScrollView } from "std-widgets.slint";
+import { AppTheme } from "../theme.slint";
+import { AppHeader } from "../components/app_header.slint";
+import { ConversationIdentityRow } from "../components/conversation_identity_row.slint";
+import { ActionRow } from "../components/action_row.slint";
+
+export component ConversationActionsScreen inherits Rectangle {
+    in property <bool> is-desktop: false;
+    in property <bool> is-group: false;
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <string> primary-id: "";
+    in property <string> secondary-id: "";
+    in property <string> initials: "";
+    in property <string> connection-note: "";
+    in property <bool> is-online: false;
+    in property <bool> is-verified: false;
+    in property <string> member-count: "";
+    in property <length> safe-area-top: 0px;
+
+    callback go-back();
+    callback open-chat();
+    callback retry-queued();
+    callback clear-conversation(string, bool);
+    callback delete-conversation(string, bool);
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        padding: 0;
+        spacing: 0;
+
+        AppHeader {
+            is-desktop: root.is-desktop;
+            safe-area-top: root.safe-area-top;
+            show-back: true;
+            title: is-group ? "Group actions" : "Contact actions";
+            subtitle: subtitle;
+            go-back => { root.go-back(); }
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            mouse-drag-pan-enabled: true;
+
+            HorizontalLayout {
+                alignment: start;
+                padding-left: is-desktop ? 0px : 16px;
+                padding-right: is-desktop ? 0px : 16px;
+
+                    VerticalLayout {
+                        width: is-desktop ? 760px : root.width - 32px;
+                        horizontal-stretch: 1;
+                        padding-top: 24px;
+                        padding-bottom: 24px;
+                        spacing: 18px;
+
+                    ConversationIdentityRow {
+                        is-group: is-group;
+                        title: title;
+                        initials: initials;
+                        is-online: is-online;
+                        is-verified: is-verified;
+                        member-count: member-count;
+                        connection-stage: "";
+                        connection-note: connection-note;
+                        clickable: false;
+                    }
+
+                    VerticalLayout {
+                        spacing: 10px;
+                        Text {
+                            text: "ACTIONS";
+                            font-size: 11px;
+                            font-weight: 800;
+                            color: AppTheme.text-tertiary;
+                            letter-spacing: 0.8px;
+                        }
+
+                        ActionRow {
+                            label: "Open Chat";
+                            background-color: AppTheme.accent;
+                            text-color: #FFFFFF;
+                            font-size: 16px;
+                            clicked => { root.open-chat(); }
+                        }
+
+                        if !is-group: ActionRow {
+                            label: "Retry Queued Messages";
+                            background-color: AppTheme.surface-tertiary;
+                            text-color: AppTheme.text-primary;
+                            font-size: 15px;
+                            clicked => { root.retry-queued(); }
+                        }
+
+                        ActionRow {
+                            label: "Clear Chat History";
+                            background-color: AppTheme.accent-warning;
+                            text-color: #1B1B1B;
+                            font-size: 15px;
+                            clicked => { root.clear-conversation(primary-id, is-group); }
+                        }
+
+                        ActionRow {
+                            label: is-group ? "Exit Group" : "Delete Contact";
+                            background-color: AppTheme.accent-danger;
+                            text-color: #FFFFFF;
+                            font-size: 15px;
+                            clicked => { root.delete-conversation(primary-id, is-group); }
+                        }
+                    }
+
+                    if !is-group: VerticalLayout {
+                        spacing: 10px;
+
+                        Text {
+                            text: "CONTACT INFO";
+                            font-size: 11px;
+                            font-weight: 800;
+                            color: AppTheme.text-tertiary;
+                            letter-spacing: 0.8px;
+                        }
+
+                        VerticalLayout {
+                            spacing: 12px;
+
+                            VerticalLayout {
+                                spacing: 4px;
+                                Text {
+                                    text: "Node ID";
+                                    font-size: 10px;
+                                    color: AppTheme.text-tertiary;
+                                    font-weight: 700;
+                                }
+                                Text {
+                                    text: primary-id;
+                                    font-size: 12px;
+                                    color: AppTheme.text-primary;
+                                    font-family: "monospace";
+                                    wrap: word-wrap;
+                                }
+                            }
+
+                            Rectangle { height: 1px; background: AppTheme.divider; opacity: 0.4; }
+
+                            VerticalLayout {
+                                spacing: 4px;
+                                Text {
+                                    text: "Endpoint Ticket";
+                                    font-size: 10px;
+                                    color: AppTheme.text-tertiary;
+                                    font-weight: 700;
+                                }
+                                Text {
+                                    text: secondary-id == "" ? "Not stored yet." : secondary-id;
+                                    font-size: 11px;
+                                    color: AppTheme.text-primary;
+                                    font-family: "monospace";
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
