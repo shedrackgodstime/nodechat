@@ -1,33 +1,32 @@
 import { AppTheme } from "../theme.slint";
 import { BaseScreen } from "../components/base_screen.slint";
 
-export component SetupNameScreen inherits Rectangle {
-    in-out property <bool>   generating: false;
+export component EditNameScreen inherits Rectangle {
     in-out property <string> display-name: "";
     in property <bool>       is-desktop: false;
     in property <length>     safe-area-top: 0px;
     in property <length>     safe-area-bottom: 0px;
 
-    callback confirm-name(string);
+    callback confirm-name(string); // string: new name
     callback go-back();
 
     property <bool> valid: display-name.character-count >= 1 && display-name.character-count <= 32;
 
     BaseScreen {
-        title: "Create Identity";
+        title: "Edit Profile";
         is-desktop: root.is-desktop;
         safe-area-top: root.safe-area-top;
         safe-area-bottom: root.safe-area-bottom;
-        go-back => { if (!generating) { root.go-back(); } }
+        go-back => { root.go-back(); }
 
-        if !generating: VerticalLayout {
+        VerticalLayout {
             spacing: AppTheme.sp-xl;
             padding-top: AppTheme.sp-lg;
 
             VerticalLayout {
                 spacing: AppTheme.sp-sm;
-                Text { text: "What's your name?"; font-size: 32px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px; }
-                Text { text: "This will be your local display name. It's stored encrypted on your device and only shared during P2P handshakes."; font-size: 15px; color: AppTheme.text-tertiary; wrap: word-wrap; }
+                Text { text: "Change Your Name"; font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px; }
+                Text { text: "This will update your local identity and the name others see during secure P2P handshakes."; font-size: 14px; color: AppTheme.text-tertiary; wrap: word-wrap; }
             }
 
             // --- Input Field ---
@@ -74,7 +73,7 @@ export component SetupNameScreen inherits Rectangle {
                     enabled: root.valid;
                     clicked => { root.confirm-name(root.display-name); }
                     Text {
-                        text: "Create My Private Vault";
+                        text: "Save Changes";
                         font-size: 17px; font-weight: 800;
                         color: root.valid ? #FFFFFF : AppTheme.text-tertiary;
                         horizontal-alignment: center; vertical-alignment: center;
@@ -82,33 +81,5 @@ export component SetupNameScreen inherits Rectangle {
                 }
             }
         }
-
-        if generating: VerticalLayout {
-            alignment: center;
-            spacing: AppTheme.sp-xl;
-            padding: AppTheme.sp-xl;
-
-            Rectangle {
-                width: 120px; height: 120px;
-                
-                // Outer ring
-                Rectangle {
-                    width: 100%; height: 100%;
-                    border-radius: 60px;
-                    border-width: 4px;
-                    border-color: AppTheme.accent;
-                    opacity: 0.2;
-                }
-                
-                Text { text: "🔒"; font-size: 48px; horizontal-alignment: center; vertical-alignment: center; }
-            }
-
-            VerticalLayout {
-                spacing: AppTheme.sp-sm;
-                Text { text: "Generating Identity..."; font-size: 24px; font-weight: 900; color: #FFFFFF; horizontal-alignment: center; }
-                Text { text: "We're creating unique Ed25519 and X25519 keypairs for your decentralized E2EE communication."; font-size: 14px; color: AppTheme.text-tertiary; horizontal-alignment: center; wrap: word-wrap; }
-            }
-        }
     }
 }
-

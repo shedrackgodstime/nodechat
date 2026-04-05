@@ -1,195 +1,125 @@
 import { AppTheme } from "../theme.slint";
 
-// ContactRow — Professional Left-Aligned Messaging Row (Stability Fix)
-// Resolved non-layout padding warnings and potential width binding loops.
+export struct ChatPreview {
+    id: string,
+    name: string,
+    initials: string,
+    last-message: string,
+    timestamp: string,
+    unread: int,
+    is-group: bool,
+    is-online: bool,
+    is-relay: bool,
+    is-queued: bool,
+    is-verified: bool,
+}
 
 export component ContactRow inherits Rectangle {
-    in property <string>  name: "";
-    in property <string>  last-message: "";
-    in property <string>  timestamp: "";
-    in property <int>     unread: 0;
-    in property <bool>    is-group: false;
-    in property <bool>    is-online: false;
-    in property <bool>    is-relay: false;
-    in property <bool>    is-queued: false;
-    in property <bool>    is-verified: false;
-    in property <bool>    is-selected: false;
-    in property <string>  initials: "";
+    in property <string> name: "";
+    in property <string> initials: "";
+    in property <string> last-message: "";
+    in property <string> timestamp: "";
+    in property <int> unread: 0;
+    in property <bool> is-group: false;
+    in property <bool> is-online: false;
+    in property <bool> is-relay: false;
+    in property <bool> is-queued: false;
+    in property <bool> is-verified: false;
 
     callback clicked();
 
-    min-height: 74px;
-    background: is-selected ? AppTheme.surface-tertiary : AppTheme.surface-primary;
+    height: 84px;
+    background: touch.has-hover ? AppTheme.surface-hover : AppTheme.surface-primary;
+    border-radius: AppTheme.radius-md;
+    animate background { duration: AppTheme.dur-short; }
 
-    animate background { duration: 150ms; easing: ease-out; }
-
-    TouchArea {
+    touch := TouchArea {
         clicked => { root.clicked(); }
-
+        
         HorizontalLayout {
-            padding-left: 16px;
-            padding-right: 16px;
-            spacing: 14px;
-            alignment: start; 
+            padding-left: AppTheme.sp-md;
+            padding-right: AppTheme.sp-md;
+            spacing: AppTheme.sp-md;
+            alignment: start;
 
-            // ---- Avatar Section ----
+            // --- Avatar Section ---
             VerticalLayout {
                 alignment: center;
                 Rectangle {
-                    width: 52px;
-                    height: 52px;
+                    width: 56px; height: 56px;
+                    border-radius: 28px;
+                    background: is-group 
+                        ? @linear-gradient(135deg, #FF9500 0%, #FF3B30 100%)
+                        : @linear-gradient(135deg, AppTheme.accent 0%, #0056b3 100%);
                     
-                    Rectangle {
-                        width: 100%; height: 100%;
-                        border-radius: 26px;
-                        background: is-group ? AppTheme.surface-tertiary : AppTheme.accent;
-                    }
-
                     Text {
-                        text: initials != "" ? initials : (is-group ? "GR" : "?");
-                        font-size: 18px;
-                        font-weight: 700;
+                        text: is-group ? "👥" : initials;
+                        font-size: is-group ? 20px : 18px;
+                        font-weight: 800;
                         color: #FFFFFF;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
 
-                    if !is-group: Rectangle {
+                    if is-online: Rectangle {
                         x: parent.width - 14px;
                         y: parent.height - 14px;
-                        width: 16px;
-                        height: 16px;
-                        border-radius: 8px;
-                        background: AppTheme.surface-primary;
-
-                        Rectangle {
-                            x: 2px; y: 2px;
-                            width: 12px; height: 12px;
-                            border-radius: 6px;
-                            background:
-                                is-online && !is-relay ? AppTheme.accent-success :
-                                is-relay               ? AppTheme.accent-warning  :
-                                AppTheme.surface-tertiary;
-                        }
+                        width: 14px; height: 14px;
+                        border-radius: 7px;
+                        background: AppTheme.accent-success;
+                        border-width: 2px;
+                        border-color: root.background;
                     }
                 }
             }
 
-            // ---- Content Section ----
+            // --- Content Section ---
             VerticalLayout {
                 horizontal-stretch: 1;
-                spacing: 2px;
                 alignment: center;
+                spacing: AppTheme.sp-xs;
 
                 HorizontalLayout {
-                    spacing: 8px;
-                    alignment: start;
-
+                    alignment: space-between;
                     Text {
                         text: name;
                         font-size: 16px;
                         font-weight: 700;
                         color: AppTheme.text-primary;
-                        horizontal-stretch: 1;
                         overflow: elide;
-                        vertical-alignment: center;
                     }
-
-                    if is-verified: VerticalLayout {
-                        alignment: center;
-                        Rectangle {
-                            width: 14px; height: 14px;
-                            border-radius: 7px;
-                            background: AppTheme.accent-success;
-                            Text {
-                                text: "✓"; font-size: 9px; font-weight: 900; color: #FFFFFF;
-                                horizontal-alignment: center; vertical-alignment: center;
-                            }
-                        }
-                    }
-
                     Text {
                         text: timestamp;
                         font-size: 12px;
-                        color: unread > 0 ? AppTheme.accent-success : AppTheme.text-tertiary;
-                        vertical-alignment: center;
+                        color: unread > 0 ? AppTheme.accent : AppTheme.text-tertiary;
                     }
                 }
 
                 HorizontalLayout {
-                    spacing: 8px;
+                    spacing: AppTheme.sp-sm;
                     alignment: start;
 
+                    if is-verified: Text { text: "✓"; font-size: 13px; color: AppTheme.accent-success; vertical-alignment: center; }
+                    if is-relay: Text { text: "⇁"; font-size: 13px; color: AppTheme.accent-warning; vertical-alignment: center; }
+                    if is-queued: Text { text: "⏳"; font-size: 13px; color: AppTheme.accent-warning; vertical-alignment: center; }
+
                     Text {
-                        text:
-                            is-queued ? "Queued" :
-                            !is-online ? "Offline" :
-                            !is-verified ? "Safety keys not verified" :
-                            last-message;
-                        font-size: 14px;
-                        color:
-                            is-queued    ? AppTheme.accent-warning :
-                            !is-online   ? AppTheme.accent-danger :
-                            !is-verified ? AppTheme.accent-warning :
-                            AppTheme.text-secondary;
                         horizontal-stretch: 1;
+                        text: last-message != "" ? last-message : "P2P Handshake ready";
+                        font-size: 14px;
+                        color: AppTheme.text-tertiary;
                         overflow: elide;
                         vertical-alignment: center;
                     }
 
-                    if is-queued: VerticalLayout {
-                        alignment: center;
-                        Rectangle {
-                            min-width: 58px;
-                            height: 20px;
-                            border-radius: 10px;
-                            background: AppTheme.accent-warning;
-                            Text {
-                                text: "QUEUED";
-                                font-size: 9px;
-                                font-weight: 900;
-                                color: #1B1B1B;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-
-                    if !is-online: VerticalLayout {
-                        alignment: center;
-                        Rectangle {
-                            min-width: 62px;
-                            height: 20px;
-                            border-radius: 10px;
-                            background: AppTheme.accent-danger;
-                            Text {
-                                text: is-relay ? "OFFLINE · RELAY" : "OFFLINE";
-                                font-size: 9px;
-                                font-weight: 900;
-                                color: #FFFFFF;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-
-                    if unread > 0 && !is-queued: VerticalLayout {
-                        alignment: center;
-                        Rectangle {
-                            min-width: 20px;
-                            height: 20px;
-                            border-radius: 10px;
-                            background: AppTheme.accent-success;
-                            
-                            HorizontalLayout {
-                                padding-left: 6px;
-                                padding-right: 6px;
-                                Text {
-                                    text: unread > 99 ? "99+" : unread;
-                                    font-size: 10px; font-weight: 900; color: #FFFFFF;
-                                    horizontal-alignment: center; vertical-alignment: center;
-                                }
-                            }
+                    if unread > 0: Rectangle {
+                        width: 24px; height: 20px;
+                        border-radius: 10px;
+                        background: AppTheme.accent;
+                        Text {
+                            text: unread > 99 ? "99+" : unread;
+                            font-size: 10px; font-weight: 800; color: #FFFFFF;
+                            horizontal-alignment: center; vertical-alignment: center;
                         }
                     }
                 }
@@ -197,13 +127,12 @@ export component ContactRow inherits Rectangle {
         }
     }
 
-    // Divider (Stability Fix: No width-loop binding)
+    // --- Bottom Divider ---
     Rectangle {
         y: parent.height - 1px;
+        x: 84px;
+        width: parent.width - 84px;
         height: 1px;
-        x: 82px; 
-        width: root.width - 82px; // Binding to root (Rectangle) is safer than parent in loops
         background: AppTheme.divider;
-        opacity: 0.15;
     }
 }

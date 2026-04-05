@@ -1,11 +1,7 @@
-import { ScrollView } from "std-widgets.slint";
 import { AppTheme } from "../theme.slint";
-import { AppHeader } from "../components/app_header.slint";
-import { ConversationIdentityRow } from "../components/conversation_identity_row.slint";
-import { ActionRow } from "../components/action_row.slint";
+import { BaseScreen } from "../components/base_screen.slint";
 
 export component ConversationActionsScreen inherits Rectangle {
-    in property <bool> is-desktop: false;
     in property <bool> is-group: false;
     in property <string> title: "";
     in property <string> subtitle: "";
@@ -16,7 +12,9 @@ export component ConversationActionsScreen inherits Rectangle {
     in property <bool> is-online: false;
     in property <bool> is-verified: false;
     in property <string> member-count: "";
+    in property <bool> is-desktop: false;
     in property <length> safe-area-top: 0px;
+    in property <length> safe-area-bottom: 0px;
 
     callback go-back();
     callback open-chat();
@@ -24,142 +22,113 @@ export component ConversationActionsScreen inherits Rectangle {
     callback clear-conversation(string, bool);
     callback delete-conversation(string, bool);
 
-    background: AppTheme.surface-primary;
+    BaseScreen {
+        title: is-group ? "Group Info" : "Peer Info";
+        is-desktop: root.is-desktop;
+        safe-area-top: root.safe-area-top;
+        safe-area-bottom: root.safe-area-bottom;
+        go-back => { root.go-back(); }
 
-    VerticalLayout {
-        padding: 0;
-        spacing: 0;
+        // --- Profile Hero ---
+        VerticalLayout {
+            spacing: AppTheme.sp-lg;
+            alignment: center;
 
-        AppHeader {
-            is-desktop: root.is-desktop;
-            safe-area-top: root.safe-area-top;
-            show-back: true;
-            title: is-group ? "Group actions" : "Contact actions";
-            subtitle: subtitle;
-            go-back => { root.go-back(); }
+            Rectangle {
+                width: 100px; height: 100px;
+                border-radius: 50px;
+                background: is-group ? @linear-gradient(135deg, #FF9500 0%, #FFCC00 100%) : @linear-gradient(135deg, AppTheme.accent 0%, #0056b3 100%);
+                Text {
+                    text: initials != "" ? initials : (is-group ? "👥" : "?");
+                    font-size: 32px; font-weight: 800; color: #FFFFFF;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
+            }
+
+            VerticalLayout {
+                spacing: AppTheme.sp-xs;
+                Text { text: title; font-size: 24px; font-weight: 900; color: #FFFFFF; horizontal-alignment: center; }
+                Text { text: subtitle; font-size: 14px; font-weight: 600; color: AppTheme.text-tertiary; horizontal-alignment: center; }
+            }
         }
 
-        ScrollView {
-            vertical-stretch: 1;
-            mouse-drag-pan-enabled: true;
+        // --- Context Info ---
+        Rectangle {
+            background: AppTheme.surface-secondary;
+            border-radius: AppTheme.radius-lg;
 
-            HorizontalLayout {
-                alignment: start;
-                padding-left: is-desktop ? 0px : 16px;
-                padding-right: is-desktop ? 0px : 16px;
+            VerticalLayout {
+                padding: AppTheme.sp-md;
+                spacing: AppTheme.sp-sm;
+                Text { text: is-group ? "SECURE GROUP CHANNEL" : "P2P DIRECT ENCRYPTION"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; horizontal-alignment: center; }
+                Text { text: connection-note; font-size: 14px; color: AppTheme.text-secondary; horizontal-alignment: center; }
+            }
+        }
 
-                    VerticalLayout {
-                        width: is-desktop ? 760px : root.width - 32px;
-                        horizontal-stretch: 1;
-                        padding-top: 24px;
-                        padding-bottom: 24px;
-                        spacing: 18px;
+        // --- Identity Tray ---
+        VerticalLayout {
+            spacing: AppTheme.sp-md;
+            Text { text: is-group ? "GROUP IDENTIFIER" : "PEER IDENTIFIERS"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
 
-                    ConversationIdentityRow {
-                        is-group: is-group;
-                        title: title;
-                        initials: initials;
-                        is-online: is-online;
-                        is-verified: is-verified;
-                        member-count: member-count;
-                        connection-stage: "";
-                        connection-note: connection-note;
-                        clickable: false;
-                    }
+            Rectangle {
+                background: AppTheme.surface-secondary;
+                border-radius: AppTheme.radius-lg;
+
+                VerticalLayout {
+                    padding: AppTheme.sp-md;
+                    spacing: AppTheme.sp-lg;
 
                     VerticalLayout {
-                        spacing: 10px;
-                        Text {
-                            text: "ACTIONS";
-                            font-size: 11px;
-                            font-weight: 800;
-                            color: AppTheme.text-tertiary;
-                            letter-spacing: 0.8px;
-                        }
-
-                        ActionRow {
-                            label: "Open Chat";
-                            background-color: AppTheme.accent;
-                            text-color: #FFFFFF;
-                            font-size: 16px;
-                            clicked => { root.open-chat(); }
-                        }
-
-                        if !is-group: ActionRow {
-                            label: "Retry Queued Messages";
-                            background-color: AppTheme.surface-tertiary;
-                            text-color: AppTheme.text-primary;
-                            font-size: 15px;
-                            clicked => { root.retry-queued(); }
-                        }
-
-                        ActionRow {
-                            label: "Clear Chat History";
-                            background-color: AppTheme.accent-warning;
-                            text-color: #1B1B1B;
-                            font-size: 15px;
-                            clicked => { root.clear-conversation(primary-id, is-group); }
-                        }
-
-                        ActionRow {
-                            label: is-group ? "Exit Group" : "Delete Contact";
-                            background-color: AppTheme.accent-danger;
-                            text-color: #FFFFFF;
-                            font-size: 15px;
-                            clicked => { root.delete-conversation(primary-id, is-group); }
-                        }
+                        spacing: 4px;
+                        Text { text: is-group ? "Group ID" : "Node ID"; font-size: 10px; font-weight: 700; color: AppTheme.text-tertiary; }
+                        Text { text: primary-id; font-size: 12px; font-family: "monospace"; color: AppTheme.text-primary; wrap: word-wrap; }
                     }
 
-                    if !is-group: VerticalLayout {
-                        spacing: 10px;
+                    if secondary-id != "": Rectangle { height: 1px; background: AppTheme.divider; }
 
-                        Text {
-                            text: "CONTACT INFO";
-                            font-size: 11px;
-                            font-weight: 800;
-                            color: AppTheme.text-tertiary;
-                            letter-spacing: 0.8px;
-                        }
+                    if secondary-id != "": VerticalLayout {
+                        spacing: 4px;
+                        Text { text: "Secondary Handle"; font-size: 10px; font-weight: 700; color: AppTheme.text-tertiary; }
+                        Text { text: secondary-id; font-size: 12px; font-family: "monospace"; color: AppTheme.text-primary; wrap: word-wrap; }
+                    }
+                }
+            }
+        }
 
-                        VerticalLayout {
-                            spacing: 12px;
+        // --- Actions ---
+        VerticalLayout {
+            spacing: AppTheme.sp-md;
+            Text { text: "MANAGEMENT"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
 
-                            VerticalLayout {
-                                spacing: 4px;
-                                Text {
-                                    text: "Node ID";
-                                    font-size: 10px;
-                                    color: AppTheme.text-tertiary;
-                                    font-weight: 700;
-                                }
-                                Text {
-                                    text: primary-id;
-                                    font-size: 12px;
-                                    color: AppTheme.text-primary;
-                                    font-family: "monospace";
-                                    wrap: word-wrap;
-                                }
-                            }
+            VerticalLayout {
+                spacing: AppTheme.sp-md;
 
-                            Rectangle { height: 1px; background: AppTheme.divider; opacity: 0.4; }
+                Rectangle {
+                    height: 56px; border-radius: 28px;
+                    background: AppTheme.accent;
+                    TouchArea {
+                        clicked => { root.open-chat(); }
+                        Text { text: "Return to Conversation"; font-size: 16px; font-weight: 800; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
 
-                            VerticalLayout {
-                                spacing: 4px;
-                                Text {
-                                    text: "Endpoint Ticket";
-                                    font-size: 10px;
-                                    color: AppTheme.text-tertiary;
-                                    font-weight: 700;
-                                }
-                                Text {
-                                    text: secondary-id == "" ? "Not stored yet." : secondary-id;
-                                    font-size: 11px;
-                                    color: AppTheme.text-primary;
-                                    font-family: "monospace";
-                                    wrap: word-wrap;
-                                }
-                            }
-                        }
+                Rectangle {
+                    height: 56px; border-radius: 28px;
+                    background: AppTheme.surface-secondary;
+                    border-width: 1px; border-color: AppTheme.divider;
+                    TouchArea {
+                        clicked => { root.clear-conversation(primary-id, is-group); }
+                        Text { text: "Clear Local History"; font-size: 16px; font-weight: 800; color: AppTheme.text-primary; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+
+                Rectangle {
+                    height: 56px; border-radius: 28px;
+                    background: rgba(255, 69, 58, 0.1);
+                    border-width: 1px; border-color: AppTheme.accent-danger;
+                    TouchArea {
+                        clicked => { root.delete-conversation(primary-id, is-group); }
+                        Text { text: "Delete Stream Forever"; font-size: 16px; font-weight: 800; color: AppTheme.accent-danger; horizontal-alignment: center; vertical-alignment: center; }
                     }
                 }
             }

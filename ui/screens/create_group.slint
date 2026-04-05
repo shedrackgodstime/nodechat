@@ -1,179 +1,114 @@
 import { AppTheme } from "../theme.slint";
-import { ScrollView } from "std-widgets.slint";
-import { AppHeader } from "../components/app_header.slint";
-
-// CreateGroupScreen — Group Creation Phase 2
-// Final onboarding step for decentralized Gossip groups.
+import { BaseScreen } from "../components/base_screen.slint";
 
 export component CreateGroupScreen inherits Rectangle {
     in-out property <string> group-name-input: "";
     in property <int> member-count: 0;
     in property <bool> is-desktop: false;
     in property <length> safe-area-top: 0px;
+    in property <length> safe-area-bottom: 0px;
 
     callback go-back();
     callback launch-group(string); // group-name
 
-    background: AppTheme.surface-primary;
-
     property <bool> can-launch: group-name-input.character-count >= 2;
 
-    VerticalLayout {
-        padding: 0;
-        spacing: 0;
+    BaseScreen {
+        title: "New Group";
+        subtitle: member-count + " members selected";
+        is-desktop: root.is-desktop;
+        safe-area-top: root.safe-area-top;
+        safe-area-bottom: root.safe-area-bottom;
+        go-back => { root.go-back(); }
 
-        AppHeader {
-            is-desktop: root.is-desktop;
-            safe-area-top: root.safe-area-top;
-            show-back: true;
-            title: "New Group Info";
-            subtitle: member-count + " members selected";
-            go-back => { root.go-back(); }
-        }
+        VerticalLayout {
+            spacing: AppTheme.sp-xl;
+            padding-top: AppTheme.sp-lg;
 
-        // --- Desktop-Adaptive Content ───────────────────────────────────────
-        ScrollView {
-            vertical-stretch: 1;
-            mouse-drag-pan-enabled: true;
-
-            HorizontalLayout {
-                alignment: start;
-                padding-left: is-desktop ? 0px : 16px;
-                padding-right: is-desktop ? 0px : 16px;
-                VerticalLayout {
-                    width: is-desktop ? 640px : root.width - 32px;
-                    padding-top: 32px;
-                    alignment: start;
-                    spacing: 24px;
-
-                    // --- Group Avatar Spot ---
+            // --- Group Avatar Spot ---
+            VerticalLayout {
+                spacing: AppTheme.sp-md;
+                alignment: center;
+                Rectangle {
+                    width: 120px; height: 120px;
+                    border-radius: 60px;
+                    background: AppTheme.surface-secondary;
+                    border-width: 2px; border-color: AppTheme.divider;
+                    
+                    Text { text: "👥"; font-size: 48px; horizontal-alignment: center; vertical-alignment: center; }
+                    
+                    // Edit Overlay
                     Rectangle {
-                        width: 100%;
-                        HorizontalLayout {
-                            alignment: center;
-                            Rectangle {
-                                width: 100px;
-                                height: 100px;
-                                border-radius: 50px;
-                                background: AppTheme.surface-tertiary;
-                                border-width: 1px;
-                                border-color: AppTheme.divider;
-                                Text {
-                                    text: "📷";
-                                    font-size: 32px;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
-                            }
+                        y: parent.height - 32px; x: parent.width - 32px;
+                        width: 32px; height: 32px; border-radius: 16px;
+                        background: AppTheme.accent;
+                        Text { text: "+"; font-size: 20px; font-weight: 800; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+                Text { text: "TAP TO SET PHOTO"; font-size: 10px; font-weight: 800; color: AppTheme.text-tertiary; horizontal-alignment: center; letter-spacing: 1px; }
+            }
+
+            // --- Input Field ---
+            VerticalLayout {
+                spacing: AppTheme.sp-md;
+                Text { text: "GROUP NAME"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+                
+                Rectangle {
+                    height: 64px;
+                    border-radius: AppTheme.radius-lg;
+                    background: AppTheme.surface-secondary;
+                    border-width: 1px;
+                    border-color: name-input.has-focus ? AppTheme.accent : transparent;
+                    animate border-color { duration: AppTheme.dur-short; }
+
+                    HorizontalLayout {
+                        padding-left: AppTheme.sp-lg; padding-right: AppTheme.sp-lg;
+                        name-input := TextInput {
+                            text <=> root.group-name-input;
+                            font-size: 20px; font-weight: 600; color: AppTheme.text-primary;
+                            vertical-alignment: center; single-line: true;
+                            accepted => { if (root.can-launch) { root.launch-group(self.text); } }
                         }
                     }
 
-                    // --- SECTION: BASIC INFO ---
-                    VerticalLayout {
-                        spacing: 12px;
-                        VerticalLayout {
-                            padding-left: 8px;
-                            Text {
-                                text: "GROUP DETAILS";
-                                font-size: 11px;
-                                font-weight: 800;
-                                color: AppTheme.text-tertiary;
-                                letter-spacing: 0.8px;
-                            }
-                        }
+                    if name-input.text == "": Text {
+                        x: AppTheme.sp-lg; height: parent.height;
+                        text: "e.g. Project NodeChat"; font-size: 20px;
+                        color: AppTheme.text-tertiary; vertical-alignment: center; opacity: 0.3;
+                    }
+                }
+            }
 
-                        Rectangle {
-                            border-radius: 18px;
-                            background: AppTheme.surface-secondary;
-                            VerticalLayout {
-                                padding: 18px;
-                                spacing: 14px;
-                                Text {
-                                    text: "GROUP NAME";
-                                    font-size: 11px;
-                                    font-weight: 700;
-                                    color: AppTheme.text-secondary;
-                                }
+            Rectangle { vertical-stretch: 1; }
 
-                                Rectangle {
-                                    height: 52px;
-                                    border-radius: 12px;
-                                    background: AppTheme.surface-tertiary;
-                                    border-width: 1px;
-                                    border-color: name-input.has-focus ? AppTheme.accent : transparent;
+            // --- Action ---
+            VerticalLayout {
+                spacing: AppTheme.sp-md;
+                
+                Rectangle {
+                    height: 60px;
+                    background: can-launch ? @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%) : AppTheme.surface-tertiary;
+                    border-radius: 30px;
+                    animate background { duration: AppTheme.dur-short; }
 
-                                    HorizontalLayout {
-                                        padding-left: 14px;
-                                        padding-right: 14px;
-                                        name-input := TextInput {
-                                            text <=> root.group-name-input;
-                                            font-size: 16px;
-                                            color: AppTheme.text-primary;
-                                            vertical-alignment: center;
-                                            single-line: true;
-                                        }
-                                    }
-
-                                    if name-input.text == "": Text {
-                                        padding-left: 14px;
-                                        height: parent.height;
-                                        text: "Enter group name...";
-                                        font-size: 15px;
-                                        color: AppTheme.text-tertiary;
-                                        vertical-alignment: center;
-                                        opacity: 0.4;
-                                    }
-                                }
-
-                                Text {
-                                    text: "This will be the topic for the Gossip swarm.";
-                                    font-size: 10px;
-                                    color: AppTheme.text-tertiary;
-                                }
-                            }
+                    TouchArea {
+                        enabled: root.can-launch;
+                        clicked => { root.launch-group(root.group-name-input); }
+                        Text {
+                            text: "Build Cluster & Invite";
+                            font-size: 17px; font-weight: 800;
+                            color: root.can-launch ? #FFFFFF : AppTheme.text-tertiary;
+                            horizontal-alignment: center; vertical-alignment: center;
                         }
                     }
-
-                    Rectangle {
-                        vertical-stretch: 1;
-                    }
-
-                    // --- FINAL ACTION: LAUNCH GOSSIP ---
-                    Rectangle {
-                        height: 60px;
-                        border-radius: 20px;
-                        background: can-launch ? AppTheme.accent : AppTheme.surface-tertiary;
-                        animate background { duration: 150ms; }
-
-                        TouchArea {
-                            enabled: root.can-launch;
-                            clicked => {
-                                root.launch-group(root.group-name-input);
-                            }
-                            Text {
-                                text: "Build Peer Group & Invite Members";
-                                font-size: 16px;
-                                font-weight: 800;
-                                color: root.can-launch ? #FFFFFF : AppTheme.text-tertiary;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-
-                    Text {
-                        text: "Once built, invites will be sent via secure E2EE direct messages.";
-                        font-size: 11px;
-                        color: AppTheme.text-tertiary;
-                        horizontal-alignment: center;
-                        padding-top: 12px;
-                    }
-
-                    Rectangle {
-                        height: 32px;
-                    }
+                }
+                
+                Text {
+                    text: "Members will receive a secure gossip invite automatically.";
+                    font-size: 12px; color: AppTheme.text-tertiary; horizontal-alignment: center;
                 }
             }
         }
     }
 }
+

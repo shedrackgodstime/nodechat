@@ -18,6 +18,7 @@
 //   8 = CreateGroup
 //   9 = ContactDetails
 //   10 = ConversationActions
+//   11 = EditProfileName
 
 import { ScrollView }      from "std-widgets.slint";
 import { AppTheme }           from "./theme.slint";
@@ -33,6 +34,7 @@ import { ContactDetailsScreen } from "./screens/contact_details.slint";
 import { ConversationActionsScreen } from "./screens/conversation_actions.slint";
 import { SelectMembersScreen, SelectionData } from "./screens/select_members.slint";
 import { CreateGroupScreen }  from "./screens/create_group.slint";
+import { EditNameScreen }    from "./screens/edit_name.slint";
 
 export struct ConversationContext {
     kind: string,
@@ -78,6 +80,8 @@ export component AppWindow inherits Window {
 
     // ── Main app navigation ───────────────────────────────────────────────
     in-out property <int> current-screen: 0;
+    /// Internal tracking for navigation history.
+    in-out property <int> navigation-return-screen: 0;
 
     // ── Shared app state ──────────────────────────────────────────────────
     in property <string>  my-display-name: "";
@@ -132,6 +136,7 @@ export component AppWindow inherits Window {
     callback load-conversation(string, bool);
     callback clear-messages();
     callback delete-identity();
+    callback copy-text(string);
 
     // ── Android back button ───────────────────────────────────────────────
     forward-focus: back-handler;
@@ -142,11 +147,12 @@ export component AppWindow inherits Window {
                 if current-screen == 10 { current-screen = active-conversation.return-screen; return accept; }
                 if current-screen == 1 { current-screen = 0; return accept; }
                 if current-screen == 2 { current-screen = 0; return accept; }
-                if current-screen == 3 { current-screen = 0; return accept; }
+                if current-screen == 3 { current-screen = navigation-return-screen; return accept; }
                 if current-screen == 5 { current-screen = 0; return accept; }
                 if current-screen == 6 { current-screen = 0; return accept; }
                 if current-screen == 7 { current-screen = 6; return accept; }
                 if current-screen == 8 { current-screen = 7; return accept; }
+                if current-screen == 11 { current-screen = 5; return accept; }
             }
             return reject;
         }
@@ -157,14 +163,18 @@ export component AppWindow inherits Window {
     // ════════════════════════════════════════════════════════════════════
     Rectangle {
         clip: true;
+        width: root.width;
+        height: root.height;
 
         // Desktop: two-panel layout. Mobile: full-screen single panel.
         HorizontalLayout {
             spacing: 0;
+            width: parent.width;
+            height: parent.height;
 
             // ── LEFT PANEL (Sidebar on desktop / Home on mobile) ──────────
             if is-desktop || current-screen == 0 || current-screen == 6: Rectangle {
-                width: is-desktop ? 340px : root.width; 
+                width: is-desktop ? 340px : parent.width; 
                 background: AppTheme.surface-primary;
 
                 if is-desktop || current-screen == 0: ChatListScreen {
@@ -176,34 +186,16 @@ export component AppWindow inherits Window {
                     relay-peers:       root.relay-peers;
                     is-offline:        root.is-offline;
                     open-chat(id, name, initials, is-group, is-online, is-relay, is-verified) => {
-                        if is-group {
-                            root.active-conversation.kind = "group";
-                            root.active-conversation.id = id;
-                            root.active-conversation.title = name;
-                            root.active-conversation.initials = "👥";
-                            root.active-conversation.ticket = "";
-                            root.active-conversation.is-online = true;
-                            root.active-conversation.is-verified = true;
-                            root.active-conversation.connection-stage = "";
-                            root.active-conversation.member-count = "0";
-                            root.active-conversation.return-screen = 2;
-                            current-screen = 2;
-                        } else {
-                            root.active-conversation.kind = "direct";
-                            root.active-conversation.id = id;
-                            root.active-conversation.title = name;
-                            root.active-conversation.initials = initials;
-                            root.active-conversation.ticket = "";
-                            root.active-conversation.is-online = is-online;
-                            root.active-conversation.is-verified = is-verified;
-                            root.active-conversation.connection-stage = "";
-                            root.active-conversation.member-count = "0";
-                            root.active-conversation.return-screen = 1;
-                            current-screen = 1;
-                        }
                         root.load-conversation(id, is-group);
+                        active-conversation = {
+                            kind: is-group ? "group" : "direct",
+                            id: id, title: name, initials: initials,
+                            ticket: "", is-online: is-online, is-verified: is-verified,
+                            connection-stage: "", member-count: "", return-screen: 0,
+                        };
+                        current-screen = is-group ? 2 : 1;
                     }
-                    add-contact =>    { current-screen = 3; }
+                    add-contact =>    { navigation-return-screen = 0; current-screen = 3; }
                     open-contacts =>  { current-screen = 6; }
                     open-settings =>  { current-screen = 5; }
                 }
@@ -211,6 +203,7 @@ export component AppWindow inherits Window {
                 if !is-desktop && current-screen == 6: ContactsScreen {
                     is-desktop:    false;
                     safe-area-top: root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
                     contacts:       root.contact-directory;
                     go-back =>     { current-screen = 0; }
                     open-contact(id, name, initials, is-group, is-online, is-relay, is-verified) => {
@@ -240,7 +233,7 @@ export component AppWindow inherits Window {
                         current-screen = 9;
                         root.load-conversation(id, is-group);
                     }
-                    add-contact => { current-screen = 3; }
+                    add-contact => { navigation-return-screen = 6; current-screen = 3; }
                     new-group =>   { current-screen = 7; }
                 }
 
@@ -272,6 +265,7 @@ export component AppWindow inherits Window {
                 if is-desktop && current-screen == 6: ContactsScreen {
                     is-desktop:    true;
                     safe-area-top: 0px;
+                    safe-area-bottom: 0px;
                     contacts:       root.contact-directory;
                     go-back =>     { current-screen = 0; }
                     open-contact(id, name, initials, is-group, is-online, is-relay, is-verified) => {
@@ -301,7 +295,7 @@ export component AppWindow inherits Window {
                         current-screen = 9;
                         root.load-conversation(id, is-group);
                     }
-                    add-contact => { current-screen = 3; }
+                    add-contact => { navigation-return-screen = 6; current-screen = 3; }
                     new-group =>   { current-screen = 7; }
                 }
 
@@ -345,28 +339,30 @@ export component AppWindow inherits Window {
                     connection-stage:        root.active-conversation.connection-stage;
                     go-back =>               { current-screen = 0; }
                     send-message(msg) =>     { root.send-group-message(msg); }
-                    open-contact-info =>     { }
+                    open-contact-info =>     {
+                        active-conversation.return-screen = 2;
+                        current-screen = 10;
+                    }
                     delete-conversation =>   {
                         root.delete-conversation(root.active-conversation.id, true);
                     }
-                    retry-queued =>          { }
+                    retry-queued =>          { root.retry-queued(); }
                 }
 
                 // Screen 3 — Add Contact
                 if current-screen == 3: AddContactScreen {
                     is-desktop:    root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
-                    go-back =>     { current-screen = 0; }
-                    add-contact(id) => {
-                        root.add-contact(id);
-                        current-screen = 0;
-                    }
+                    safe-area-bottom: root.safe-area-bottom;
+                    go-back =>     { current-screen = navigation-return-screen; }
+                    add-contact(id) => { root.add-contact(id); }
                 }
 
                 // Screen 9 — Contact Details
                 if current-screen == 9: ContactDetailsScreen {
                     is-desktop:    root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
                     peer-name:     root.active-conversation.title;
                     peer-initials: root.active-conversation.initials;
                     peer-node-id:  root.active-conversation.id;
@@ -383,6 +379,7 @@ export component AppWindow inherits Window {
                     mark-verified => { root.mark-verified(); }
                     clear-conversation(peer_id, is_group) =>  { root.clear-conversation(peer_id, is_group); }
                     remove-contact => { root.remove-contact(); }
+                    copy-text(text) => { root.copy-text(text); }
                 }
 
                 // Screen 10 — Conversation Actions
@@ -426,8 +423,10 @@ export component AppWindow inherits Window {
                     direct-peers:  root.direct-peers;
                     relay-peers:   root.relay-peers;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
                     go-back =>     { current-screen = 0; }
                     copy-node-id => { root.copy-node-id(); }
+                    edit-display-name => { current-screen = 11; }
                     clear-messages => { root.clear-messages(); }
                     delete-identity => { root.delete-identity(); }
                 }
@@ -436,6 +435,7 @@ export component AppWindow inherits Window {
                 if current-screen == 7: SelectMembersScreen {
                     is-desktop:    root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
                     contacts:      root.group-member-candidates;
                     selected-count: root.selected-group-member-count;
                     go-back =>     { current-screen = 6; }
@@ -447,11 +447,25 @@ export component AppWindow inherits Window {
                 if current-screen == 8: CreateGroupScreen {
                     is-desktop:    root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
                     member-count:  root.selected-group-member-count;
                     go-back =>     { current-screen = 7; }
                     launch-group(name) => {
                         root.launch-group(name);
                         current-screen = 0;
+                    }
+                }
+
+                // Screen 11 — Edit Profile Name
+                if current-screen == 11: EditNameScreen {
+                    is-desktop:    root.is-desktop;
+                    display-name:  root.my-display-name;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
+                    go-back =>     { current-screen = 5; }
+                    confirm-name(name) => {
+                        root.confirm-name(name);
+                        current-screen = 5; // Return to settings
                     }
                 }
             }
@@ -480,6 +494,7 @@ export component AppWindow inherits Window {
             generating:    root.setup-step == 2;
             is-desktop:    root.is-desktop;
             safe-area-top: root.safe-area-top;
+            safe-area-bottom: root.safe-area-bottom;
             go-back => {
                 root.setup-step = 0;
             }
@@ -497,6 +512,8 @@ export component AppWindow inherits Window {
             display-name: root.my-display-name;
             node-id:      root.my-node-id;
             endpoint-ticket: root.my-endpoint-ticket;
+            safe-area-top: root.safe-area-top;
+            safe-area-bottom: root.safe-area-bottom;
             copy-node-id => { root.copy-node-id(); }
             go-to-chats => {
                 root.setup-complete();
