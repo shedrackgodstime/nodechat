@@ -19,8 +19,8 @@ export component ConversationActionsScreen inherits Rectangle {
     callback go-back();
     callback open-chat();
     callback retry-queued();
-    callback clear-conversation(string, bool);
-    callback delete-conversation(string, bool);
+    callback request-clear-history();
+    callback request-delete-conversation();
 
     BaseScreen {
         title: is-group ? "Group Info" : "Peer Info";
@@ -117,7 +117,7 @@ export component ConversationActionsScreen inherits Rectangle {
                     background: AppTheme.surface-secondary;
                     border-width: 1px; border-color: AppTheme.divider;
                     TouchArea {
-                        clicked => { root.clear-conversation(primary-id, is-group); }
+                        clicked => { root.request-clear-history(); }
                         Text { text: "Clear Local History"; font-size: 16px; font-weight: 800; color: AppTheme.text-primary; horizontal-alignment: center; vertical-alignment: center; }
                     }
                 }
@@ -127,7 +127,7 @@ export component ConversationActionsScreen inherits Rectangle {
                     background: rgba(255, 69, 58, 0.1);
                     border-width: 1px; border-color: AppTheme.accent-danger;
                     TouchArea {
-                        clicked => { root.delete-conversation(primary-id, is-group); }
+                        clicked => { root.request-delete-conversation(); }
                         Text { text: "Delete Stream Forever"; font-size: 16px; font-weight: 800; color: AppTheme.accent-danger; horizontal-alignment: center; vertical-alignment: center; }
                     }
                 }

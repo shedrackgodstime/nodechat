@@ -1,0 +1,115 @@
+import { AppTheme } from "../theme.slint";
+import { BaseScreen } from "../components/base_screen.slint";
+
+export component VerifyIdentityScreen inherits Rectangle {
+    in property <string> peer-name: "";
+    in property <string> peer-initials: "";
+    in property <string> peer-node-id: "";
+    in property <string> my-node-id: "";
+    in property <bool> is-desktop: false;
+    in property <length> safe-area-top: 0px;
+    in property <length> safe-area-bottom: 0px;
+
+    callback mark-verified();
+    callback go-back();
+
+    // UI Helper: Split 64-char ID into 12 blocks of 5-6 chars to make it readable
+    // Signal style "Safety Numbers" usually involves some hashing, but we can 
+    // at least present the ID in a "checkable" format for now.
+    
+    BaseScreen {
+        title: "Verify Identity";
+        is-desktop: root.is-desktop;
+        safe-area-top: root.safe-area-top;
+        safe-area-bottom: root.safe-area-bottom;
+        go-back => { root.go-back(); }
+
+        VerticalLayout {
+            spacing: AppTheme.sp-xl;
+            padding-bottom: AppTheme.sp-lg;
+
+            // --- Context Heading ---
+            VerticalLayout {
+                spacing: AppTheme.sp-sm;
+                alignment: center;
+                Text { text: "Safety Numbers"; font-size: 28px; font-weight: 900; color: #FFFFFF; horizontal-alignment: center; letter-spacing: -0.5px; }
+                Text { 
+                    text: "To confirm " + peer-name + "'s identity, compare these numbers with their device. This prevents unauthorized interception."; 
+                    font-size: 14px; color: AppTheme.text-tertiary; horizontal-alignment: center; wrap: word-wrap; 
+                }
+            }
+
+            // --- QR Placeholder (Premium Graphic) ---
+            Rectangle {
+                height: 180px; width: 180px;
+                background: #FFFFFF;
+                border-radius: AppTheme.radius-lg;
+                HorizontalLayout {
+                    alignment: center;
+                    VerticalLayout {
+                        alignment: center;
+                        Image { 
+                            // Using app icon as a placeholder for the QR
+                            source: @image-url("../../assets/icons/app_logo_with_name_transparent_bg.png"); 
+                            height: 120px; image-fit: contain;
+                        }
+                    }
+                }
+                Text { text: "SCAN TO VERIFY"; font-size: 10px; font-weight: 900; color: AppTheme.accent; horizontal-alignment: center; y: 155px; letter-spacing: 1px; }
+            }
+
+            // --- The Safety Numbers Grid ---
+            Rectangle {
+                background: AppTheme.surface-secondary;
+                border-radius: AppTheme.radius-lg;
+                border-width: 1px; border-color: AppTheme.divider;
+                VerticalLayout {
+                    padding: AppTheme.sp-lg;
+                    spacing: AppTheme.sp-md;
+
+                    Text { text: "PEER SECURITY NUMBER"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+
+                    VerticalLayout {
+                        spacing: 8px;
+                        Text { 
+                            text: peer-node-id; 
+                            font-family: "monospace"; font-size: 18px; font-weight: 700; color: AppTheme.text-primary; 
+                            wrap: char-wrap; horizontal-alignment: center;
+                        }
+                    }
+                    
+                    Rectangle { height: 1px; background: AppTheme.divider; opacity: 0.5; }
+                    
+                    Text { text: "YOUR SECURITY NUMBER"; font-size: 10px; font-weight: 800; color: AppTheme.text-tertiary; opacity: 0.7; }
+                    Text { 
+                        text: my-node-id; 
+                        font-family: "monospace"; font-size: 12px; color: AppTheme.text-tertiary; wrap: char-wrap; 
+                    }
+                }
+            }
+
+            // --- Action Toggle ---
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    height: 60px; border-radius: 30px;
+                    width: root.is-desktop ? 400px : parent.width;
+                    background: AppTheme.accent-success;
+                    
+                    touch := TouchArea {
+                        clicked => { root.mark-verified(); }
+                    }
+
+                    HorizontalLayout {
+                        spacing: AppTheme.sp-sm;
+                        alignment: center;
+                        VerticalLayout { alignment: center; Text { text: "Confirm Identity Matched"; font-size: 16px; font-weight: 800; color: #FFFFFF; } }
+                    }
+                    
+                    // Simple hover effect
+                    if (touch.has-hover): Rectangle { background: rgba(255,255,255,0.1); border-radius: 30px; }
+                }
+            }
+        }
+    }
+}

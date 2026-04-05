@@ -193,9 +193,10 @@ pub enum Command {
     },
 
     /// Ensure identity creation flow is triggered.
+    /// Create a new local identity with the given display name and pin.
     CreateIdentity {
-        /// The chosen display name
         name: String,
+        pin: String,
     },
 
     /// Finalise the setup overlay and go to chat list
@@ -228,13 +229,18 @@ pub enum Command {
         ticket_or_id: String,
     },
     /// Clear all messages from the local database.
-    ClearMessages,
+    ClearMessages {
+        /// The vault PIN for verification.
+        pin: String,
+    },
     /// Clear only the messages in a single conversation.
     ClearConversationHistory {
         /// Hex-encoded NodeId or TopicId of the conversation to clear.
         target: String,
         /// `true` if this is a group conversation.
         is_group: bool,
+        /// The vault PIN for verification.
+        pin: String,
     },
     /// Delete a single conversation and its local history.
     DeleteConversation {
@@ -242,6 +248,8 @@ pub enum Command {
         target: String,
         /// `true` if this is a group conversation.
         is_group: bool,
+        /// The vault PIN for verification.
+        pin: String,
     },
     /// Retry queued direct messages for a peer immediately.
     RetryQueuedMessages {
@@ -249,9 +257,25 @@ pub enum Command {
         target: String,
     },
     /// Delete the local identity and all associated data.
-    DeleteIdentity,
+    DeleteIdentity {
+        /// The vault PIN for verification.
+        pin: String,
+    },
+    /// Wipes everything without PIN verification. EMERGENCY ONLY.
+    ForceDeleteIdentity,
     /// Unlock the app shell after a returning-user gate is dismissed.
-    UnlockApp,
+    UnlockApp {
+        /// The characters/digits entered by the user.
+        pin: String,
+    },
+
+    /// Change the stored access PIN after verifying the current one.
+    ChangePassword {
+        /// The currently-stored PIN to verify identity.
+        current_pin: String,
+        /// The new PIN to hash and persist.
+        new_pin: String,
+    },
 
     /// Notify the backend that the app moved to foreground/background.
     SetAppForeground {
@@ -268,6 +292,11 @@ pub enum Command {
         target: String,
         /// `true` if this is a group conversation.
         is_group: bool,
+    },
+    /// Update the local display name in the identity vault.
+    UpdateDisplayName {
+        /// New human-readable name.
+        name: String,
     },
 }
 
@@ -379,6 +408,15 @@ pub enum AppEvent {
     /// All local messages have been cleared.
     MessagesCleared,
 
+    /// Clear messages failed (e.g. wrong PIN).
+    ClearMessagesFailed { error: String },
+
+    /// The local identity and all data have been wiped.
+    IdentityDeleted,
+
+    /// Reset failed (e.g. wrong PIN).
+    DeleteIdentityFailed { error: String },
+
     /// A single conversation's messages have been cleared.
     ConversationCleared {
         /// Hex-encoded NodeId or TopicId that was cleared.
@@ -407,8 +445,31 @@ pub enum AppEvent {
         verified: bool,
     },
 
-    /// The app lock overlay has been dismissed.
+    /// The backend explicitly finalized an application unlock event.
     UnlockComplete,
+
+    /// The application was locked (e.g. on background or startup).
+    AppLocked,
+
+    /// The application unlock event failed.
+    UnlockFailed {
+        /// Error message describing why unlock failed.
+        error: String,
+    },
+
+    /// A peer was successfully key-verified.
+    PeerVerified {
+        /// Hex-encoded NodeId of the verified peer.
+        peer: String,
+    },
+
+    /// Password was updated successfully.
+    PasswordChanged,
+
+    /// Password change failed (wrong current PIN or other error).
+    PasswordChangeFailed {
+        error: String,
+    },
 
     /// The home chat list has changed and should be re-rendered.
     ChatsUpdated {

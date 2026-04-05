@@ -1,7 +1,6 @@
 //! Iroh unicast — direct 1:1 message delivery.
 
 use anyhow::Result;
-use iroh_tickets::Ticket;
 
 use super::{NetworkManager, DIRECT_ALPN};
 
@@ -22,7 +21,7 @@ pub(crate) async fn send(
         .ok_or_else(|| anyhow::anyhow!("endpoint not initialised"))?;
 
     let target: iroh::EndpointAddr = if let Some(hint) = dial_hint {
-        if let Ok(ticket) = iroh_tickets::endpoint::EndpointTicket::deserialize(hint) {
+        if let Ok(ticket) = hint.parse::<iroh_tickets::endpoint::EndpointTicket>() {
             ticket.endpoint_addr().clone()
         } else {
             let target: iroh::EndpointId = hint.parse()?;

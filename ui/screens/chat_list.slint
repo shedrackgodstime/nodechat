@@ -11,6 +11,7 @@ export component ChatListScreen inherits Rectangle {
     in property <int>  queued-messages: 2;
     in property <bool> is-offline: false;
     in property <bool> is-desktop: false; 
+    in property <string> my-endpoint-ticket: "";
 
     in property <length> safe-area-top: 0px;
     in property <length> safe-area-bottom: 0px;
@@ -108,9 +109,34 @@ export component ChatListScreen inherits Rectangle {
                         spacing: AppTheme.sp-md;
                         Text { text: "💬"; font-size: 48px; horizontal-alignment: center; }
                         Text {
-                            text: "No chats yet. Connect with a Node ID.";
+                            text: "No chats yet. Share your ticket to start messaging:";
                             font-size: 14px; color: AppTheme.text-tertiary;
                             horizontal-alignment: center;
+                        }
+                        
+                        // --- Share Your Ticket Box ---
+                        Rectangle {
+                            height: 52px; width: 280px;
+                            background: AppTheme.surface-secondary;
+                            border-radius: AppTheme.radius-md;
+                            border-width: 1px; border-color: AppTheme.divider;
+                            
+                            HorizontalLayout {
+                                padding-left: 12px; padding-right: 4px; spacing: 8px;
+                                Text {
+                                    text: my-endpoint-ticket == "" ? "Generating ticket..." : my-endpoint-ticket;
+                                    font-size: 12px; font-family: "monospace"; color: AppTheme.text-primary;
+                                    vertical-alignment: center; horizontal-stretch: 1; overflow: elide;
+                                }
+                                TouchArea {
+                                    width: 80px; height: 36px;
+                                    clicked => { root.open-settings(); /* User can copy from settings/identity */ }
+                                    Rectangle {
+                                        background: AppTheme.surface-tertiary; border-radius: 4px;
+                                        Text { text: "DETAILS"; font-size: 11px; font-weight: 800; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

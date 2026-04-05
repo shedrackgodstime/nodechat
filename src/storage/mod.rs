@@ -55,7 +55,8 @@ fn apply_schema(conn: &Connection) -> Result<()> {
             id                    INTEGER PRIMARY KEY CHECK (id = 1),
             display_name          TEXT NOT NULL,
             node_id_bytes         BLOB NOT NULL,
-            x25519_secret         BLOB NOT NULL
+            x25519_secret         BLOB NOT NULL,
+            pin_hash              TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS peers (
@@ -90,6 +91,7 @@ fn apply_schema(conn: &Connection) -> Result<()> {
     )
     .context("failed to apply database schema")
     .and_then(|_| ensure_peer_schema(conn))
+    .and_then(|_| ensure_local_identity_schema(conn))
 }
 
 fn ensure_peer_schema(conn: &Connection) -> Result<()> {
@@ -112,6 +114,31 @@ fn ensure_peer_schema(conn: &Connection) -> Result<()> {
             "ALTER TABLE peers ADD COLUMN endpoint_ticket TEXT NOT NULL DEFAULT '';",
         )
         .context("failed to add endpoint_ticket column to peers")?;
+    }
+
+    Ok(())
+}
+
+fn ensure_local_identity_schema(conn: &Connection) -> Result<()> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(local_identity)")
+        .context("failed to inspect local_identity schema")?;
+    let mut rows = stmt.query([])?;
+    let mut has_pin_hash = false;
+
+    while let Some(row) = rows.next().context("failed to read local_identity schema row")? {
+        let name: String = row.get(1).context("schema column name")?;
+        if name == "pin_hash" {
+            has_pin_hash = true;
+            break;
+        }
+    }
+
+    if !has_pin_hash {
+        conn.execute_batch(
+            "ALTER TABLE local_identity ADD COLUMN pin_hash TEXT NOT NULL DEFAULT '';",
+        )
+        .context("failed to add pin_hash column to local_identity")?;
     }
 
     Ok(())

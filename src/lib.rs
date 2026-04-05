@@ -108,13 +108,29 @@ pub fn run_app(db_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
             .collect();
         app.set_chats(slint::VecModel::from_slice(&chat_rows));
 
-        if let Ok(Some(identity)) = storage::queries::get_local_identity(&startup_db) {
-            app.set_has_identity(true);
-            app.set_is_locked(true);
-            app.set_setup_step(0);
-            app.set_current_screen(0);
-            app.set_my_display_name(identity.display_name.into());
-            app.set_my_node_id(hex::encode(identity.node_id_bytes).into());
+        match storage::queries::get_local_identity(&startup_db) {
+            Ok(Some(identity)) => {
+                let initials = storage::queries::derive_initials(&identity.display_name);
+                app.set_has_identity(true);
+                app.set_is_locked(true);
+                app.set_setup_step(0);
+                app.set_current_screen(0);
+                app.set_my_display_name(identity.display_name.into());
+                app.set_my_initials(initials.into());
+                app.set_my_node_id(hex::encode(identity.node_id_bytes).into());
+                tracing::info!(node_id = %app.get_my_node_id(), "identity found at startup, showing lock screen");
+            }
+            Ok(None) => {
+                app.set_has_identity(false);
+                app.set_setup_step(0);
+                tracing::info!("no identity found at startup, showing onboarding");
+            }
+            Err(e) => {
+                tracing::error!("failed to check local identity at startup: {:?}", e);
+                // Fallback to onboarding but log the disaster
+                app.set_has_identity(false);
+                app.set_setup_step(0);
+            }
         }
     }
 
@@ -124,10 +140,14 @@ pub fn run_app(db_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
         let app_weak = app.as_weak();
         app.window().on_close_requested(move || {
             if let Some(app) = app_weak.upgrade() {
-                if app.get_has_identity() && !app.get_is_locked() && app.get_current_screen() != 0 {
-                    app.set_current_screen(0);
-                    return slint::CloseRequestResponse::KeepWindowShown;
+                // If on Home (0) or Welcome/Setup screens, allow minimizing.
+                if app.get_current_screen() == 0 || (!app.get_has_identity() && app.get_setup_step() == 0) {
+                    return slint::CloseRequestResponse::HideWindow;
                 }
+                
+                // Otherwise, perform the back navigation logic in Slint
+                app.invoke_trigger_back();
+                return slint::CloseRequestResponse::KeepWindowShown;
             }
             slint::CloseRequestResponse::HideWindow
         });

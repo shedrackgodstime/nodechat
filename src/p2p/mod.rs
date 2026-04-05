@@ -105,7 +105,11 @@ impl NetworkManager {
             builder = builder.secret_key(s);
         }
         let endpoint = builder.bind().await?;
+        
+        // Wait for the endpoint to be fully registered with relays and discovery
+        // services (iroh 0.97.0). This is critical for peer-to-peer discovery.
         endpoint.online().await;
+
         let router = Router::builder(endpoint.clone())
             .accept(DIRECT_ALPN, DirectProtocolHandler {
                 event_tx: self.event_tx.clone(),
@@ -275,15 +279,26 @@ impl ProtocolHandler for DirectProtocolHandler {
         connection: iroh::endpoint::Connection,
     ) -> Result<(), AcceptError> {
         let remote_id = connection.remote_id().to_string();
-        tracing::info!(peer = %remote_id, "direct protocol accepted");
-        drive_direct_connection(
-            self.event_tx.clone(),
-            self.connections.clone(),
-            remote_id,
-            connection,
-            true,
-        )
-        .await
+        tracing::info!(peer = %remote_id, "direct protocol accepted — spawning driver");
+        
+        let event_tx = self.event_tx.clone();
+        let connections = self.connections.clone();
+        
+        tokio::spawn(async move {
+            if let Err(e) = drive_direct_connection(
+                event_tx,
+                connections,
+                remote_id,
+                connection,
+                true,
+            )
+            .await 
+            {
+                tracing::debug!("direct driver task ended: {:?}", e);
+            }
+        });
+
+        Ok(())
     }
 }
 
