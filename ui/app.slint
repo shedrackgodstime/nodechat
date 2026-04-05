@@ -36,6 +36,7 @@ import { SelectMembersScreen, SelectionData } from "./screens/select_members.sli
 import { CreateGroupScreen }  from "./screens/create_group.slint";
 import { EditNameScreen }    from "./screens/edit_name.slint";
 import { DiagnosticsScreen, LogEntry } from "./screens/diagnostics.slint";
+import { ConfirmModal } from "./components/confirm_modal.slint";
 
 export struct ConversationContext {
     kind: string,
@@ -567,6 +568,8 @@ export component AppWindow inherits Window {
         // Step 0 — Welcome
         if setup-step == 0: WelcomeScreen {
             is-locked: false;
+            is-desktop: root.is-desktop;
+            safe-area-bottom: root.safe-area-bottom;
             get-started => {
                 root.setup-step = 1;
             }
@@ -595,6 +598,7 @@ export component AppWindow inherits Window {
             display-name: root.my-display-name;
             node-id:      root.my-node-id;
             endpoint-ticket: root.my-endpoint-ticket;
+            is-desktop:   root.is-desktop;
             safe-area-top: root.safe-area-top;
             safe-area-bottom: root.safe-area-bottom;
             copy-ticket(ticket) => { root.copy-node-id(); }
@@ -615,6 +619,8 @@ export component AppWindow inherits Window {
 
         WelcomeScreen {
             is-locked: true;
+            is-desktop: root.is-desktop;
+            safe-area-bottom: root.safe-area-bottom;
             get-started => {} // unused in locked mode
             unlock(pin) => {
                 root.is-locked = false;
@@ -731,6 +737,37 @@ export component AppWindow inherits Window {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // LAYER 5 — CONFIRMATION MODAL
+    // ════════════════════════════════════════════════════════════════════
+    if show-confirm-modal: ConfirmModal {
+        title: root.confirm-modal-title;
+        subtitle: root.confirm-modal-subtitle;
+        confirm-text: root.confirm-modal-action == "delete-identity" ? "Destroy Everything" : root.confirm-modal-action;
+        action-slug: root.confirm-modal-action;
+        error-msg: root.confirm-modal-error;
+        pin: root.confirm-modal-pin;
+        
+        cancel => {
+            root.show-confirm-modal = false;
+            root.confirm-modal-error = "";
+            root.confirm-modal-pin = "";
+        }
+        
+        confirm(pin) => {
+            root.confirm-modal-pin = pin;
+            if (root.confirm-modal-action == "clear-conversation") {
+                root.clear-conversation(root.confirm-modal-target, root.is-confirm-modal-group, pin);
+            } else if (root.confirm-modal-action == "delete-conversation") {
+                root.delete-conversation(root.confirm-modal-target, root.is-confirm-modal-group, pin);
+            } else if (root.confirm-modal-action == "clear-messages") {
+                root.clear-messages(pin);
+            } else if (root.confirm-modal-action == "delete-identity") {
+                root.delete-identity(pin);
             }
         }
     }
