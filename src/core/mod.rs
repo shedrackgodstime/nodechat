@@ -31,7 +31,7 @@ use commands::{
 };
 
 /// How often the offline queue flush task runs (RULES.md R-02).
-const QUEUE_FLUSH_INTERVAL_SECS: u64 = 10;
+const QUEUE_FLUSH_INTERVAL_SECS: u64 = 5;
 /// Channel capacity for network events from the `NetworkManager`.
 const NETWORK_EVENT_CHANNEL_CAPACITY: usize = 64;
 /// Prefix used for direct-contact handshake frames.
@@ -45,9 +45,9 @@ const CONTACT_HANDSHAKE_MAX_TICKET_BYTES: usize = 768;
 /// Maximum display-name bytes allowed in a direct-contact handshake frame.
 const CONTACT_HANDSHAKE_MAX_NAME_BYTES: usize = 128;
 /// How often to probe established direct peers for health.
-const PEER_HEALTH_PING_INTERVAL_SECS: u64 = 20;
+const PEER_HEALTH_PING_INTERVAL_SECS: u64 = 5;
 /// How long without any direct activity before we attempt a reconnect.
-const PEER_HEALTH_RECONNECT_AFTER_SECS: u64 = 40;
+const PEER_HEALTH_RECONNECT_AFTER_SECS: u64 = 15;
 /// Prefix used for encrypted direct-message frames.
 const DIRECT_MESSAGE_MAGIC: &[u8; 4] = b"NC1D";
 /// Direct frame version.
@@ -666,17 +666,20 @@ impl NodeChatWorker {
                 if let Err(e) = self.flush_offline_queue_for_peer(&peer_id).await {
                     tracing::error!(peer = %peer_id, "failed to flush queued messages after connect: {:?}", e);
                 }
+                self.emit_chat_list();
                 Ok(())
             }
             NetworkEvent::PeerDisconnected { node_id } => {
-                if self.app_foreground {
-                    self.emit(AppEvent::PeerOnlineStatus {
-                        peer: node_id.clone(),
-                        online: false,
-                        via_relay: false,
-                        session_ready: false,
-                    });
-                }
+                // Remove the stale connection immediately so has_connection() is accurate.
+                self.network.remove_connection(&node_id);
+                self.peer_last_seen.remove(&node_id);
+                self.emit(AppEvent::PeerOnlineStatus {
+                    peer: node_id.clone(),
+                    online: false,
+                    via_relay: false,
+                    session_ready: false,
+                });
+                self.emit_chat_list();
                 Ok(())
             }
         }
@@ -1637,8 +1640,8 @@ impl NodeChatWorker {
             .or_insert(1);
 
         let step = failures.saturating_sub(1).min(5);
-        let seconds = 20u64.saturating_mul(1u64 << step);
-        let delay = Duration::from_secs(seconds.min(600));
+        let seconds = 5u64.saturating_mul(1u64 << step);
+        let delay = Duration::from_secs(seconds.min(300));
         self.peer_next_probe_at
             .insert(peer.to_owned(), Instant::now() + delay);
     }
@@ -1665,10 +1668,8 @@ impl NodeChatWorker {
                 .map(|crypto| crypto.has_session(&peer.node_id))
                 .unwrap_or(false);
             let has_connection = self.network.has_connection(&peer.node_id);
-
-            if !has_session && !has_connection {
-                continue;
-            }
+            // Even if we don't have a connection, we want to probe them
+            // occasionally to see if they've come online.
 
             let last_seen = self
                 .peer_last_seen

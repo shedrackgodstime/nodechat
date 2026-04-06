@@ -101,7 +101,7 @@ impl NetworkManager {
     /// Returns an error if the endpoint fails to bind.
     pub async fn initialize(&mut self, secret_key: Option<iroh::SecretKey>) -> Result<()> {
         let transport_config = iroh::endpoint::QuicTransportConfig::builder()
-            .max_idle_timeout(Some(std::time::Duration::from_secs(30).try_into().unwrap()))
+            .max_idle_timeout(Some(std::time::Duration::from_secs(15).try_into().unwrap()))
             .keep_alive_interval(std::time::Duration::from_secs(10))
             .build();
 
