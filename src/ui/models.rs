@@ -10,7 +10,7 @@ use crate::{
     AppWindow, ChatPreview, ContactData, MessageData, SelectionData, LogEntry,
 };
 
-fn push_log(ui: &AppWindow, level: &str, message: &str) {
+fn push_log(ui: &AppWindow, level: &str, target: &str, message: &str) {
     let mut logs: Vec<LogEntry> = ui.get_debug_logs().iter().collect();
     
     // Fallback timestamp if chrono isn't available, but we'll try to use a simple one
@@ -19,11 +19,12 @@ fn push_log(ui: &AppWindow, level: &str, message: &str) {
     logs.insert(0, LogEntry {
         timestamp: timestamp.into(),
         level: level.into(),
+        target: target.into(),
         message: message.into(),
     });
 
-    if logs.len() > 50 {
-        logs.truncate(50);
+    if logs.len() > 300 {
+        logs.truncate(300);
     }
 
     ui.set_debug_logs(VecModel::from_slice(&logs));
@@ -46,6 +47,7 @@ fn reset_active_conversation(ui: &AppWindow) {
     convo.initials = String::new().into();
     convo.ticket = String::new().into();
     convo.is_online = false;
+    convo.is_session_ready = false;
     convo.is_verified = false;
     convo.connection_stage = String::new().into();
     convo.member_count = "0".into();
@@ -59,7 +61,7 @@ fn reset_active_conversation(ui: &AppWindow) {
 pub fn apply_event(ui: &AppWindow, event: AppEvent) {
     match event {
         AppEvent::IncomingMessage { sender, id: _, plaintext: _, timestamp: _ } => {
-            push_log(ui, "INFO", &format!("Incoming message from {sender}"));
+            push_log(ui, "INFO", "network", &format!("incoming message from {sender}"));
         }
 
         AppEvent::IncomingGroupMessage { topic, sender, id: _, plaintext: _, timestamp: _ } => {
@@ -72,8 +74,8 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
             tracing::debug!(peer = %sender, file = %file_name, "incoming file — UI update pending");
         }
 
-        AppEvent::MessageStatusUpdate { id, target, is_group: _, status } => {
-            push_log(ui, "INFO", &format!("Message {id} in {target} changed to {status:?}"));
+        AppEvent::MessageStatusUpdate { id, target: _, is_group: _, status } => {
+            push_log(ui, "INFO", "network", &format!("message status update: {id} -> {status:?}"));
         }
 
         AppEvent::GroupInviteReceived { topic, group_name } => {
@@ -81,18 +83,19 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
             tracing::debug!(topic = %topic, group = %group_name, "group invite — UI update pending");
         }
 
-        AppEvent::PeerOnlineStatus { peer, online, via_relay } => {
+        AppEvent::PeerOnlineStatus { peer, online, via_relay, session_ready } => {
             // WIRE: update the status dot and connection mode label
             tracing::debug!(peer = %peer, online, via_relay, "peer status — UI update pending");
             let mut convo = ui.get_active_conversation();
             if convo.kind == "direct" && convo.id == peer {
                 convo.is_online = online;
+                convo.is_session_ready = session_ready;
                 ui.set_active_conversation(convo);
             }
         }
 
         AppEvent::PeerHandshakeStage { peer, stage } => {
-            push_log(ui, if stage.contains("failed") { "WARN" } else { "INFO" }, &format!("Handshake with {peer}: {stage}"));
+            push_log(ui, if stage.contains("failed") { "WARN" } else { "INFO" }, "network", &format!("Handshake with {peer}: {stage}"));
             tracing::debug!(peer = %peer, stage = %stage, "peer handshake stage update");
             let mut convo = ui.get_active_conversation();
             if convo.kind == "direct" && convo.id == peer {
@@ -120,7 +123,7 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
             ui.set_my_display_name(display_name.into());
             ui.set_my_node_id(node_id.into());
             ui.set_setup_step(3);
-            push_log(ui, "INFO", "New P2P identity generated.");
+            push_log(ui, "INFO", "p2p", "New P2P identity generated.");
         }
 
         AppEvent::EndpointTicketUpdated { ticket } => {
@@ -130,7 +133,7 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
                 let relay = endpoint_ticket.endpoint_addr().relay_urls().map(|u| u.to_string()).collect::<Vec<_>>().join(", ");
                 ui.set_relay_url(relay.into());
             }
-            push_log(ui, "INFO", "My endpoint ticket updated.");
+            push_log(ui, "INFO", "p2p", &format!("endpoint ticket updated: {ticket}"));
         }
 
         AppEvent::MessagesCleared => {
@@ -219,7 +222,7 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         }
 
         AppEvent::PeerVerified { peer } => {
-            push_log(ui, "INFO", &format!("Peer verified: {peer}"));
+            push_log(ui, "INFO", "network", &format!("Peer verified: {peer}"));
             let mut active = ui.get_active_conversation();
             if active.id == peer.as_str() {
                 active.is_verified = true;
@@ -240,6 +243,7 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
                     unread: chat.unread,
                     is_group: chat.is_group,
                     is_online: chat.is_online,
+                    is_session_ready: chat.is_session_ready,
                     is_relay: chat.is_relay,
                     is_queued: chat.is_queued,
                     is_verified: chat.is_verified,
@@ -257,6 +261,7 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
                     initials: contact.initials.into(),
                     node_id: contact.node_id.into(),
                     is_online: contact.is_online,
+                    is_session_ready: contact.is_session_ready,
                     is_relay: contact.is_relay,
                     is_verified: contact.is_verified,
                 })
@@ -322,11 +327,12 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         AppEvent::NetworkStatus { direct_peers, relay_peers, is_offline: _ } => {
             ui.set_direct_peers(direct_peers);
             ui.set_relay_peers(relay_peers);
-            push_log(ui, "INFO", &format!("Network status: {} direct / {} relay", direct_peers, relay_peers));
+            push_log(ui, "INFO", "network", &format!("status: {direct_peers} direct, {relay_peers} relay"));
         }
 
         AppEvent::Error { message } => {
             tracing::warn!("backend error surfaced to UI: {}", message);
+            push_log(ui, "ERROR", "backend", &message);
             let current = ui.get_runtime_error_log().to_string();
             let next = if current.trim().is_empty() {
                 message.clone()
@@ -339,6 +345,10 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
                 next
             };
             ui.set_runtime_error_log(trimmed.into());
+        }
+
+        AppEvent::Log { level, target, message } => {
+            push_log(ui, &level, &target, &message);
         }
     }
 }

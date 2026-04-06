@@ -50,7 +50,9 @@ fn android_main(app: slint::android::AndroidApp) {
 ///
 /// * `db_dir` — optional base directory for the database file. If None, uses local directory.
 pub fn run_app(db_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
-    init_tracing();
+    let (tx_commands, rx_commands) = tokio::sync::mpsc::channel(100);
+    let (tx_events, _rx_events)    = tokio::sync::broadcast::channel(512);
+    init_tracing(tx_events.clone());
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -59,8 +61,6 @@ pub fn run_app(db_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
 
     let _guard = runtime.enter();
 
-    let (tx_commands, rx_commands) = tokio::sync::mpsc::channel(100);
-    let (tx_events, _rx_events)    = tokio::sync::broadcast::channel(64);
     install_panic_hook(tx_events.clone());
 
     #[cfg(target_os = "android")]
@@ -82,6 +82,10 @@ pub fn run_app(db_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
     });
 
     let app = AppWindow::new().context("failed to create Slint window")?;
+    #[cfg(target_os = "android")]
+    app.set_is_desktop(false);
+    #[cfg(not(target_os = "android"))]
+    app.set_is_desktop(true);
 
     // Pre-flight check: if the user already has an identity, bypass the overlay (RULES.md UX-01).
     // Keep this connection short-lived so the backend worker owns the live DB cleanly.
@@ -101,6 +105,7 @@ pub fn run_app(db_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
                 unread: chat.unread,
                 is_group: chat.is_group,
                 is_online: chat.is_online,
+                is_session_ready: false,
                 is_relay: chat.is_relay,
                 is_queued: chat.is_queued,
                 is_verified: chat.is_verified,
@@ -144,9 +149,19 @@ pub fn run_app(db_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
                 if app.get_current_screen() == 0 || (!app.get_has_identity() && app.get_setup_step() == 0) {
                     return slint::CloseRequestResponse::HideWindow;
                 }
-                
-                // Otherwise, perform the back navigation logic in Slint
-                app.invoke_trigger_back();
+
+                // Mirror the Slint back-navigation rules here because Android close
+                // requests can arrive before the UI handles a key event.
+                let next_screen = match app.get_current_screen() {
+                    9 | 10 => app.get_active_conversation().return_screen,
+                    1 | 2 | 5 | 6 => 0,
+                    3 => app.get_navigation_return_screen(),
+                    7 => 6,
+                    8 => 7,
+                    11 => 5,
+                    _ => 0,
+                };
+                app.set_current_screen(next_screen);
                 return slint::CloseRequestResponse::KeepWindowShown;
             }
             slint::CloseRequestResponse::HideWindow
@@ -165,14 +180,99 @@ pub fn run_app(db_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn init_tracing() {
-    let _ = tracing_subscriber::fmt()
+fn init_tracing(tx_events: tokio::sync::broadcast::Sender<core::commands::AppEvent>) {
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::EnvFilter;
+
+    // 🎯 Terminal/Console Filter (cleaner cargo run)
+    // - Libraries (iroh, quinn, winit, rustls) default to INFO
+    // - NodeChat code defaults to DEBUG for development visibility
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,nodechat=debug,NodeChat=debug"));
+
+    let ui_layer = UIEventLayer { tx: tx_events };
+
+    let fmt_layer = tracing_subscriber::fmt::layer()
         .with_target(false)
         .with_level(true)
-        .with_thread_ids(false)
-        .with_thread_names(false)
-        .with_ansi(true)
+        .with_ansi(true);
+
+    let _ = tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt_layer)
+        .with(ui_layer)
         .try_init();
+}
+
+struct UIEventLayer {
+    tx: tokio::sync::broadcast::Sender<core::commands::AppEvent>,
+}
+
+impl<S> tracing_subscriber::Layer<S> for UIEventLayer
+where
+    S: tracing::Subscriber,
+{
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        let metadata = event.metadata();
+        let level = metadata.level();
+        let target = metadata.target();
+
+        // 🧠 Filtering Logic for UI Console (RULES.md P-01/U-04 compliance)
+        // We only want logs that are relevant to the user/developer of this app.
+        // Deep library traces from iroh/quinn/rustls will flood the Slint thread and cause lag.
+        
+        let is_nodechat = target.contains("nodechat") || target.contains("NodeChat");
+        
+        let should_log = match *level {
+            tracing::Level::ERROR | tracing::Level::WARN => true,
+            tracing::Level::INFO => {
+                // For INFO, we want our logs + important library events, but NOT the noisy ones.
+                is_nodechat || (!target.starts_with("iroh") && !target.starts_with("quinn") && !target.starts_with("rustls"))
+            }
+            tracing::Level::DEBUG | tracing::Level::TRACE => {
+                // For DEBUG/TRACE, ONLY show logs from our own project.
+                is_nodechat
+            }
+        };
+
+        if !should_log {
+            return;
+        }
+
+        let mut visitor = LogVisitor::default();
+        event.record(&mut visitor);
+        let message = visitor.message;
+        let level_str = level.to_string();
+        let target_str = target.to_string();
+
+        let _ = self.tx.send(core::commands::AppEvent::Log {
+            level: level_str,
+            target: target_str,
+            message,
+        });
+    }
+}
+
+#[derive(Default)]
+struct LogVisitor {
+    message: String,
+}
+
+impl tracing::field::Visit for LogVisitor {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "message" {
+            self.message = format!("{:?}", value);
+            // Strip quotes from debug-printed strings
+            if self.message.starts_with('\"') && self.message.ends_with('\"') && self.message.len() >= 2 {
+                self.message = self.message[1..self.message.len()-1].to_string();
+            }
+        }
+    }
 }
 
 fn install_panic_hook(tx_events: tokio::sync::broadcast::Sender<core::commands::AppEvent>) {

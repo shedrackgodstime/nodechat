@@ -6,7 +6,7 @@
 
 pub mod models;
 
-use slint::{ComponentHandle, VecModel};
+use slint::{ComponentHandle, Model, VecModel};
 use tokio::sync::{broadcast, mpsc};
 
 use crate::core::commands::{AppEvent, Command};
@@ -46,6 +46,8 @@ pub fn wire_callbacks(
     wire_destructive_actions(app, tx.clone());
     wire_change_password(app, tx.clone());
     wire_clear_debug_logs(app);
+    wire_copy_debug_logs(app);
+    wire_copy_text(app);
 
     spawn_event_listener(app.as_weak(), rx_events);
 }
@@ -187,6 +189,37 @@ fn wire_clear_debug_logs(app: &AppWindow) {
     app.on_clear_debug_logs(move || {
         if let Some(app) = handle.upgrade() {
             app.set_debug_logs(VecModel::from_slice(&[]));
+        }
+    });
+}
+
+fn wire_copy_debug_logs(app: &AppWindow) {
+    let handle = app.as_weak();
+    app.on_copy_debug_logs(move || {
+        if let Some(app) = handle.upgrade() {
+            let mut formatted = String::new();
+            let logs = app.get_debug_logs();
+            for i in 0..logs.row_count() {
+                if let Some(entry) = logs.row_data(i) {
+                    formatted.push_str(&format!(
+                        "[{}] {} [{}] {}\n",
+                        entry.timestamp, entry.level, entry.target, entry.message
+                    ));
+                }
+            }
+            app.set_clipboard_buffer(formatted.into());
+            app.invoke_do_copy();
+            tracing::info!("debug logs copied to clipboard ({} entries)", logs.row_count());
+        }
+    });
+}
+
+fn wire_copy_text(app: &AppWindow) {
+    let handle = app.as_weak();
+    app.on_copy_text(move |text| {
+        if let Some(app) = handle.upgrade() {
+            app.set_clipboard_buffer(text);
+            app.invoke_do_copy();
         }
     });
 }

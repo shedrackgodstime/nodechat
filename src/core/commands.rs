@@ -37,6 +37,8 @@ pub struct ChatPreviewData {
     pub is_queued: bool,
     /// `true` if the peer has been key-verified.
     pub is_verified: bool,
+    /// `true` if the handshake is complete and a session key exists.
+    pub is_session_ready: bool,
 }
 
 /// A direct-chat message row rendered in the active conversation view.
@@ -77,6 +79,7 @@ pub struct ContactDirectoryData {
     pub is_online: bool,
     pub is_relay: bool,
     pub is_verified: bool,
+    pub is_session_ready: bool,
 }
 
 /// A selectable peer row rendered in the group member picker.
@@ -370,6 +373,8 @@ pub enum AppEvent {
         online: bool,
         /// `true` if the connection is routed through a DERP relay (reduced privacy).
         via_relay: bool,
+        /// `true` if the E2EE handshake is complete and a session key exists.
+        session_ready: bool,
     },
 
     /// Direct-chat handshake progress for the currently active peer.
@@ -510,6 +515,13 @@ pub enum AppEvent {
     /// A non-fatal backend error to surface to the user in plain English (RULES.md E-03).
     Error {
         /// Human-readable, user-facing description of what went wrong.
+        message: String,
+    },
+
+    /// A runtime log entry for the debug console.
+    Log {
+        level: String,
+        target: String,
         message: String,
     },
 }

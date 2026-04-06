@@ -9,6 +9,7 @@ export struct ChatPreview {
     unread: int,
     is-group: bool,
     is-online: bool,
+    is-session-ready: bool,
     is-relay: bool,
     is-queued: bool,
     is-verified: bool,
@@ -22,6 +23,7 @@ export component ContactRow inherits Rectangle {
     in property <int> unread: 0;
     in property <bool> is-group: false;
     in property <bool> is-online: false;
+    in property <bool> is-session-ready: false;
     in property <bool> is-relay: false;
     in property <bool> is-queued: false;
     in property <bool> is-verified: false;
@@ -66,7 +68,7 @@ export component ContactRow inherits Rectangle {
                         y: parent.height - 14px;
                         width: 14px; height: 14px;
                         border-radius: 7px;
-                        background: AppTheme.accent-success;
+                        background: is-session-ready ? AppTheme.accent-success : AppTheme.accent-warning;
                         border-width: 2px;
                         border-color: root.background;
                     }

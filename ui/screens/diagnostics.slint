@@ -5,6 +5,7 @@ import { ScrollView } from "std-widgets.slint";
 export struct LogEntry {
     level: string,
     timestamp: string,
+    target: string,
     message: string,
 }
 
@@ -20,6 +21,7 @@ export component DiagnosticsScreen inherits Rectangle {
 
     callback go-back();
     callback clear-logs();
+    callback copy-logs();
 
     BaseScreen {
         title: "Debug Console";
@@ -64,10 +66,17 @@ export component DiagnosticsScreen inherits Rectangle {
             // --- Log Viewer ---
             HorizontalLayout {
                 alignment: space-between;
-                Text { text: "EVENT LOG (Last 50)"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
-                TouchArea {
-                    clicked => { root.clear-logs(); }
-                    Text { text: "CLEAR"; font-size: 11px; font-weight: 900; color: AppTheme.accent-danger; }
+                Text { text: "RUNTIME LOG (Last 300)"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+                HorizontalLayout {
+                    spacing: 16px;
+                    TouchArea {
+                        clicked => { root.copy-logs(); }
+                        Text { text: "COPY"; font-size: 11px; font-weight: 900; color: AppTheme.accent; }
+                    }
+                    TouchArea {
+                        clicked => { root.clear-logs(); }
+                        Text { text: "CLEAR"; font-size: 11px; font-weight: 900; color: AppTheme.accent-danger; }
+                    }
                 }
             }
 
@@ -89,7 +98,15 @@ export component DiagnosticsScreen inherits Rectangle {
                             Text {
                                 text: entry.level;
                                 font-size: 9px; font-weight: 900;
-                                color: entry.level == "ERROR" ? #FF453A : (entry.level == "WARN" ? #FF9F0A : #30D158);
+                                color: entry.level == "ERROR" ? #FF453A : 
+                                       (entry.level == "WARN" ? #FF9F0A : 
+                                       (entry.level == "DEBUG" ? #BF5AF2 : 
+                                       (entry.level == "TRACE" ? #5E5CE6 : #30D158)));
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: "[" + entry.target + "]";
+                                font-size: 9px; font-weight: 900; color: #666;
                                 vertical-alignment: center;
                             }
                             Text {
