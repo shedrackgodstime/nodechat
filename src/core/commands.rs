@@ -406,6 +406,11 @@ pub enum AppEvent {
         node_id: String,
     },
 
+    /// The local identity (name) was updated.
+    IdentityUpdated {
+        display_name: String,
+    },
+
     /// Shareable endpoint ticket for the local identity / discovery flow.
     EndpointTicketUpdated {
         /// Ticket string created from the local endpoint address.

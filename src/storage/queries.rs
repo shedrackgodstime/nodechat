@@ -661,7 +661,7 @@ pub fn list_chat_previews(conn: &Connection) -> Result<Vec<ChatPreviewRecord>> {
 }
 
 /// Derive a two-letter avatar label from a display name.
-pub(crate) fn derive_initials(name: &str) -> String {
+pub fn derive_initials(name: &str) -> String {
     let mut initials = String::new();
     for part in name.split_whitespace() {
         if let Some(ch) = part.chars().next() {

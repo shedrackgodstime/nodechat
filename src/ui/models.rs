@@ -120,10 +120,19 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         }
 
         AppEvent::IdentityGenerated { display_name, node_id } => {
+            let initials = crate::storage::queries::derive_initials(&display_name);
             ui.set_my_display_name(display_name.into());
+            ui.set_my_initials(initials.into());
             ui.set_my_node_id(node_id.into());
             ui.set_setup_step(3);
             push_log(ui, "INFO", "p2p", "New P2P identity generated.");
+        }
+
+        AppEvent::IdentityUpdated { display_name } => {
+            let initials = crate::storage::queries::derive_initials(&display_name);
+            ui.set_my_display_name(display_name.clone().into());
+            ui.set_my_initials(initials.into());
+            push_log(ui, "INFO", "p2p", &format!("Display name updated to: {}", display_name));
         }
 
         AppEvent::EndpointTicketUpdated { ticket } => {
