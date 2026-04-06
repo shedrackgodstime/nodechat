@@ -299,6 +299,11 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
                     status: msg.status.into(),
                     is_ephemeral: msg.is_ephemeral,
                     ttl_seconds: msg.ttl_seconds,
+                    is_group_invite: msg.is_group_invite,
+                    invite_group_name: msg.invite_group_name.into(),
+                    invite_topic_id: msg.invite_topic_id.into(),
+                    invite_key: msg.invite_key.into(),
+                    invite_is_joined: msg.invite_is_joined,
                 })
                 .collect();
             ui.set_active_conversation_messages(VecModel::from_slice(&rows));
@@ -319,6 +324,11 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
                     status: msg.status.into(),
                     is_ephemeral: false,
                     ttl_seconds: 0,
+                    is_group_invite: false,
+                    invite_group_name: "".into(),
+                    invite_topic_id: "".into(),
+                    invite_key: "".into(),
+                    invite_is_joined: false,
                 })
                 .collect();
             ui.set_active_conversation_messages(VecModel::from_slice(&rows));

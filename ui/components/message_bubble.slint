@@ -1,4 +1,5 @@
 import { AppTheme } from "../theme.slint";
+import { GroupInviteBubble } from "group_invite_bubble.slint";
 
 export struct MessageData {
     id: string,
@@ -8,19 +9,42 @@ export struct MessageData {
     status: string,
     is-ephemeral: bool,
     ttl-seconds: int,
+    is-group-invite: bool,
+    invite-group-name: string,
+    invite-topic-id: string,
+    invite-key: string,
+    invite-is-joined: bool,
 }
 
-export component MessageBubble inherits Rectangle {
+export component MessageBubble inherits VerticalLayout {
     in property <string> text: "";
     in property <string> timestamp: "";
     in property <bool> is-mine: false;
     in property <string> status: "sent"; // sent, delivered, read, failed, queued
     in property <bool> is-ephemeral: false;
     in property <int> ttl-seconds: 0;
+    
+    // Group Invite Support
+    in property <bool> is-group-invite: false;
+    in property <string> invite-group-name: "";
+    in property <string> invite-topic-id: "";
+    in property <string> invite-key: "";
+    in property <bool> invite-is-joined: false;
 
-    background: transparent;
+    callback open-group(string, string, string, bool);
 
-    HorizontalLayout {
+    if is-group-invite: GroupInviteBubble {
+        width: 100%;
+        group-name: root.invite-group-name;
+        topic-id: root.invite-topic-id;
+        invite-key: root.invite-key;
+        timestamp: root.timestamp;
+        is-mine: root.is-mine;
+        is-joined: root.invite-is-joined;
+        open-group(topic, name, key, joined) => { root.open-group(topic, name, key, joined); }
+    }
+
+    if !is-group-invite: HorizontalLayout {
         alignment: is-mine ? end : start;
         width: 100%;
 

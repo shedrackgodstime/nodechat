@@ -43,7 +43,10 @@ pub(crate) async fn send(
         if let Some(conn) = maybe_conn {
             conn
         } else {
-            let conn: iroh::endpoint::Connection = endpoint.connect(target, DIRECT_ALPN).await?;
+            let connect_fut = endpoint.connect(target, DIRECT_ALPN);
+            let conn: iroh::endpoint::Connection = tokio::time::timeout(std::time::Duration::from_secs(5), connect_fut)
+                .await
+                .map_err(|_| anyhow::anyhow!("connection timeout"))??;
             manager
                 .connections
                 .lock()
