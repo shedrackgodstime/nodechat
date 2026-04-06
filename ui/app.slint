@@ -152,7 +152,7 @@ export component AppWindow inherits Window {
     callback send-group-message(string);
     callback add-contact(string);
     callback accept-group-invite(string, string, string);
-    callback mark-verified();
+    callback toggle-verified(string, bool);
     callback copy-node-id();
     callback copy-runtime-error(string);
     callback delete-conversation(string, bool, string);
@@ -544,7 +544,7 @@ export component AppWindow inherits Window {
                         current-screen = root.active-conversation.kind == "group" ? 2 : 1;
                     }
                     request-verification => {
-                        current-screen = 13;
+                        root.toggle-verified(root.active-conversation.id, !root.active-conversation.is-verified);
                     }
                     request-clear-history => {
                         root.confirm-modal-title = "Clear Chat History";

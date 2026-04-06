@@ -34,14 +34,17 @@ export component ConversationActionsScreen inherits Rectangle {
             spacing: AppTheme.sp-lg;
             alignment: center;
 
-            Rectangle {
-                width: 100px; height: 100px;
-                border-radius: 50px;
-                background: is-group ? @linear-gradient(135deg, #FF9500 0%, #FFCC00 100%) : @linear-gradient(135deg, AppTheme.accent 0%, #0056b3 100%);
-                Text {
-                    text: initials != "" ? initials : (is-group ? "👥" : "?");
-                    font-size: 32px; font-weight: 800; color: #FFFFFF;
-                    horizontal-alignment: center; vertical-alignment: center;
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 100px; height: 100px;
+                    border-radius: 50px;
+                    background: is-group ? @linear-gradient(135deg, #FF9500 0%, #FFCC00 100%) : @linear-gradient(135deg, AppTheme.accent 0%, #0056b3 100%);
+                    Text {
+                        text: initials != "" ? initials : (is-group ? "👥" : "?");
+                        font-size: 32px; font-weight: 800; color: #FFFFFF;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
                 }
             }
 
