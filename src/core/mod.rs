@@ -677,10 +677,17 @@ impl NodeChatWorker {
         queries::update_local_identity_name(&self.db, &name).context("failed to update name in DB")?;
         self.local_display_name = name.clone();
         
-        // Notify UI so it can update immediately
-        // We'll reuse IdentityGenerated or just let it refresh on next state push
-        // Actually, we should probably have a more specific event, but for now we'll push local info.
-        self.cmd_refresh_local_info().await?;
+        // 1. Notify UI so headers and settings screens can update
+        self.emit(AppEvent::IdentityUpdated {
+            display_name: name.clone(),
+        });
+
+        // 2. Refresh chat list (if we show our own name anywhere)
+        self.emit_chat_list();
+
+        // 3. (Optional future enhancement): Notify active peers of the name change.
+        // For now, names will update on the next handshake/message.
+        
         Ok(())
     }
 
