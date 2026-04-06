@@ -68,21 +68,24 @@ export component GroupInviteBubble inherits Rectangle {
                         vertical-alignment: center;
                     }
 
-                    TouchArea {
-                        clicked => { root.open-group(topic-id, group-name, invite-key, is-joined); }
-                        Rectangle {
-                            min-width: 94px;
-                            height: 30px;
-                            border-radius: 15px;
-                            background: is-joined ? AppTheme.accent-success : AppTheme.accent;
-                            Text {
-                                text: is-joined ? "View group" : "Join group";
-                                font-size: 11px;
-                                font-weight: 800;
-                                color: #FFFFFF;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
+                    Rectangle {
+                        min-width: 94px;
+                        height: 30px;
+                        border-radius: 15px;
+                        background: is-joined ? AppTheme.accent-success : AppTheme.accent;
+                        
+                        TouchArea {
+                            width: 100%; height: 100%;
+                            clicked => { root.open-group(topic-id, group-name, invite-key, is-joined); }
+                        }
+
+                        Text {
+                            text: is-joined ? "View group" : "Join group";
+                            font-size: 11px;
+                            font-weight: 800;
+                            color: #FFFFFF;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
                         }
                     }
                 }

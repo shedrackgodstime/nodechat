@@ -439,6 +439,27 @@ export component AppWindow inherits Window {
                         root.active-conversation.return-screen = 1;
                         current-screen = 9;
                     }
+                    open-group(topic, name, key, is-joined) => {
+                        if !is-joined {
+                            root.accept-group-invite(topic, name, key);
+                        }
+                        root.load-conversation(topic, true);
+                        root.active-conversation = {
+                            kind: "group",
+                            id: topic,
+                            title: name,
+                            initials: "",
+                            ticket: "",
+                            is-online: true,
+                            is-session-ready: true,
+                            is-relay: false,
+                            is-verified: false,
+                            connection-stage: "",
+                            member-count: "",
+                            return-screen: 1, // back takes us to the previous chat
+                        };
+                        root.current-screen = 2;
+                    }
                     retry-queued => {
                         root.retry-queued();
                     }

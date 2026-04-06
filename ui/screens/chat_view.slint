@@ -22,6 +22,7 @@ export component ChatViewScreen inherits Rectangle {
     callback go-back();
     callback send-message(string);
     callback open-contact-info();
+    callback open-group(string, string, string, bool);
     callback request-delete-conversation();
     callback retry-queued();
 
@@ -155,6 +156,12 @@ export component ChatViewScreen inherits Rectangle {
                                 status:       msg.status;
                                 is-ephemeral: msg.is-ephemeral;
                                 ttl-seconds:  msg.ttl-seconds;
+                                is-group-invite: msg.is-group-invite;
+                                invite-group-name: msg.invite-group-name;
+                                invite-topic-id: msg.invite-topic-id;
+                                invite-key: msg.invite-key;
+                                invite-is-joined: msg.invite-is-joined;
+                                open-group(topic, name, key, joined) => { root.open-group(topic, name, key, joined); }
                             }
                         }
                     }

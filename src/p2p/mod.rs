@@ -116,13 +116,16 @@ impl NetworkManager {
         // services (iroh 0.97.0). This is critical for peer-to-peer discovery.
         endpoint.online().await;
 
+        // Initialize gossip first so we can mount it on the router
+        let gossip: iroh_gossip::net::Gossip = iroh_gossip::net::Gossip::builder().spawn(endpoint.clone());
+
         let router = Router::builder(endpoint.clone())
             .accept(DIRECT_ALPN, DirectProtocolHandler {
                 event_tx: self.event_tx.clone(),
                 connections: self.connections.clone(),
             })
+            .accept(iroh_gossip::ALPN, gossip.clone())
             .spawn();
-        let gossip = iroh_gossip::net::Gossip::builder().spawn(endpoint.clone());
 
         let node_id = endpoint.id();
         self.endpoint = Some(endpoint.clone());
