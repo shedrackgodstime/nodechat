@@ -37,7 +37,7 @@ pub fn wire_callbacks(
     wire_send_group_message(app, tx.clone());
     wire_add_contact(app, tx.clone());
     wire_accept_group_invite(app, tx.clone());
-    wire_mark_verified(app, tx.clone());
+    wire_toggle_verified(app, tx.clone());
     wire_toggle_group_member(app, tx.clone());
     wire_copy_node_id(app, tx.clone());
     wire_retry_queued_messages(app, tx.clone());
@@ -224,21 +224,14 @@ fn wire_copy_text(app: &AppWindow) {
     });
 }
 
-/// Fired when the user taps Mark as Verified on the key verification screen.
-/// Rust: sends Command::MarkVerified to the backend worker.
-fn wire_mark_verified(app: &AppWindow, tx: mpsc::Sender<Command>) {
-    let handle = app.as_weak();
-    app.on_mark_verified(move || {
-        if let Some(app) = handle.upgrade() {
-            if active_conversation_kind(&app) != "direct" {
-                return;
-            }
-            let node_id = active_conversation_id(&app);
-            if node_id.is_empty() {
-                return;
-            }
-            let _ = tx.try_send(Command::MarkVerified { node_id });
-        }
+/// Fired when the user toggles trust in contact details.
+/// Rust: sends Command::ToggleVerified to the backend worker.
+fn wire_toggle_verified(app: &AppWindow, tx: mpsc::Sender<Command>) {
+    app.on_toggle_verified(move |node_id, verified| {
+        let _ = tx.try_send(Command::ToggleVerified { 
+            node_id: node_id.to_string(), 
+            verified 
+        });
     });
 }
 

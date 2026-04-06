@@ -221,14 +221,14 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
             ui.set_confirm_modal_error(error.into());
         }
 
-        AppEvent::PeerVerified { peer } => {
-            push_log(ui, "INFO", "network", &format!("Peer verified: {peer}"));
+        AppEvent::PeerVerificationUpdated { peer, verified } => {
+            push_log(ui, "INFO", "network", &format!("Peer verification updated: {peer} -> {verified}"));
             let mut active = ui.get_active_conversation();
             if active.id == peer.as_str() {
-                active.is_verified = true;
+                active.is_verified = verified;
                 ui.set_active_conversation(active);
             }
-            tracing::info!(peer = %peer, "UI updated peer verification status");
+            tracing::info!(peer = %peer, verified, "UI updated peer verification status");
         }
 
         AppEvent::ChatsUpdated { chats } => {

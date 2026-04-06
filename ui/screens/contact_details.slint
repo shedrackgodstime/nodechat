@@ -34,14 +34,17 @@ export component ContactDetailsScreen inherits Rectangle {
             alignment: center;
             padding-bottom: AppTheme.sp-md;
 
-            Rectangle {
-                width: 100px; height: 100px;
-                border-radius: 50px;
-                background: @linear-gradient(135deg, AppTheme.accent 0%, #0056b3 100%);
-                Text {
-                    text: peer-initials != "" ? peer-initials : "?";
-                    font-size: 32px; font-weight: 800; color: #FFFFFF;
-                    horizontal-alignment: center; vertical-alignment: center;
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 100px; height: 100px;
+                    border-radius: 50px;
+                    background: @linear-gradient(135deg, AppTheme.accent 0%, #0056b3 100%);
+                    Text {
+                        text: peer-initials != "" ? peer-initials : "?";
+                        font-size: 32px; font-weight: 800; color: #FFFFFF;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
                 }
             }
 
@@ -61,13 +64,36 @@ export component ContactDetailsScreen inherits Rectangle {
                 spacing: AppTheme.sp-md;
                 HorizontalLayout {
                     alignment: space-between;
-                    Text { text: "Identity"; font-size: 14px; color: AppTheme.text-secondary; }
-                    Text { text: is-verified ? "Verified ✅" : "Unverified 🔒"; font-size: 14px; font-weight: 700; color: is-verified ? AppTheme.accent-success : AppTheme.accent-warning; }
+                    VerticalLayout {
+                        alignment: center;
+                        Text { text: "Verified Identity"; font-size: 14px; color: AppTheme.text-primary; font-weight: 700;}
+                        Text { text: is-verified ? "Handshake Trusted" : "Tap to trust this peer"; font-size: 12px; color: AppTheme.text-tertiary; }
+                    }
+                    
+                    TouchArea {
+                        width: 50px;
+                        clicked => { root.request-verification(); }
+                        Rectangle {
+                            width: 50px; height: 28px;
+                            background: is-verified ? AppTheme.accent-success : AppTheme.surface-tertiary;
+                            border-radius: 14px;
+                            animate background { duration: AppTheme.dur-short; }
+                            
+                            Rectangle {
+                                x: is-verified ? 24px : 2px;
+                                y: 2px;
+                                width: 24px; height: 24px;
+                                background: #FFFFFF;
+                                border-radius: 12px;
+                                animate x { duration: AppTheme.dur-short; }
+                            }
+                        }
+                    }
                 }
                 Rectangle { height: 1px; background: AppTheme.divider; }
                 HorizontalLayout {
                     alignment: space-between;
-                    Text { text: "Network"; font-size: 14px; color: AppTheme.text-secondary; }
+                    Text { text: "Network Connection"; font-size: 14px; color: AppTheme.text-secondary; }
                     Text { text: connection-mode; font-size: 14px; font-weight: 700; color: AppTheme.accent; }
                 }
             }
@@ -143,19 +169,9 @@ export component ContactDetailsScreen inherits Rectangle {
         }
 
         // --- Action Area ---
-        // Stack on mobile, side-by-side on desktop for "Clear/Remove"
         VerticalLayout {
             spacing: AppTheme.sp-md;
             padding-top: AppTheme.sp-md;
-
-            if !is-verified: Rectangle {
-                height: 52px; border-radius: 26px;
-                background: AppTheme.accent-success;
-                TouchArea {
-                    clicked => { root.request-verification(); }
-                    Text { text: "Verify Security Numbers"; font-size: 15px; font-weight: 800; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
-                }
-            }
 
             Rectangle {
                 height: 52px; border-radius: 26px;

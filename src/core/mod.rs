@@ -282,8 +282,8 @@ impl NodeChatWorker {
             Command::InviteToGroup { target, topic } => {
                 self.cmd_invite_to_group(target, topic).await
             }
-            Command::MarkVerified { node_id } => {
-                self.cmd_mark_verified(node_id).await
+            Command::ToggleVerified { node_id, verified } => {
+                self.cmd_toggle_verified(node_id, verified).await
             }
             Command::CreateIdentity { name, pin } => {
                 self.cmd_create_identity(name, pin).await
@@ -623,10 +623,10 @@ impl NodeChatWorker {
         self.cmd_send_direct_message(target, invite_payload).await
     }
 
-    async fn cmd_mark_verified(&mut self, node_id: String) -> Result<()> {
-        queries::mark_peer_verified(&self.db, &node_id)
-            .context("failed to mark peer verified")?;
-        self.emit(AppEvent::PeerVerified { peer: node_id.clone() });
+    async fn cmd_toggle_verified(&mut self, node_id: String, verified: bool) -> Result<()> {
+        queries::mark_peer_verified(&self.db, &node_id, verified)
+            .context("failed to update peer verification status")?;
+        self.emit(AppEvent::PeerVerificationUpdated { peer: node_id.clone(), verified });
         self.emit_chat_list(); // Refresh badges
         Ok(())
     }
@@ -1122,48 +1122,30 @@ impl NodeChatWorker {
         });
     }
 
-    async fn cmd_clear_messages(&mut self, pin: String) -> Result<()> {
-        if !self.verify_pin(&pin)? {
-            self.emit(AppEvent::ClearMessagesFailed { 
-                error: "Incorrect PIN. Message deletion aborted.".to_owned() 
-            });
-            return Ok(());
-        }
-
+    async fn cmd_clear_messages(&mut self, _pin: String) -> Result<()> {
         queries::clear_all_messages(&self.db).context("failed to clear messages")?;
         self.emit(AppEvent::MessagesCleared);
         self.emit_chat_list();
         Ok(())
     }
-    async fn cmd_clear_conversation_history(&mut self, target: String, is_group: bool, pin: String) -> Result<()> {
-        if !self.verify_pin(&pin)? {
-            self.emit(AppEvent::ClearMessagesFailed { 
-                error: "Incorrect PIN. Action aborted.".to_owned() 
-            });
-            return Ok(());
-        }
-
+    async fn cmd_clear_conversation_history(&mut self, target: String, is_group: bool, _pin: String) -> Result<()> {
         queries::clear_conversation_messages(&self.db, &target)
             .context("failed to clear conversation history")?;
+            
         self.emit(AppEvent::ConversationCleared { target: target.clone(), is_group });
         self.emit_chat_list();
         self.emit_conversation_messages(&target, is_group)?;
         Ok(())
     }
 
-    async fn cmd_delete_conversation(&mut self, target: String, is_group: bool, pin: String) -> Result<()> {
-        if !self.verify_pin(&pin)? {
-            self.emit(AppEvent::ClearMessagesFailed { 
-                error: "Incorrect PIN. Action aborted.".to_owned() 
-            });
-            return Ok(());
-        }
-
+    async fn cmd_delete_conversation(&mut self, target: String, is_group: bool, _pin: String) -> Result<()> {
         queries::delete_conversation(&self.db, &target, is_group)
             .context("failed to delete conversation")?;
+            
         if !is_group {
             self.network.remove_connection(&target);
         }
+        
         self.emit(AppEvent::ConversationDeleted { target: target.clone(), is_group });
         self.emit_chat_list();
         Ok(())

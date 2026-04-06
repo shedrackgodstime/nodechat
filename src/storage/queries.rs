@@ -209,13 +209,14 @@ pub fn list_peers(conn: &Connection) -> Result<Vec<PeerRecord>> {
 ///
 /// # Errors
 /// Returns an error if no peer with this `node_id` exists or the write fails.
-pub fn mark_peer_verified(conn: &Connection, node_id: &str) -> Result<()> {
+pub fn mark_peer_verified(conn: &Connection, node_id: &str, verified: bool) -> Result<()> {
+    let val = if verified { 1 } else { 0 };
     let rows = conn
         .execute(
-            "UPDATE peers SET verified = 1 WHERE node_id = ?1",
-            params![node_id],
+            "UPDATE peers SET verified = ?1 WHERE node_id = ?2",
+            params![val, node_id],
         )
-        .context("failed to mark peer verified")?;
+        .context("failed to update peer verification status")?;
     if rows == 0 {
         bail!("mark_peer_verified: no peer found with node_id {:?}", node_id);
     }

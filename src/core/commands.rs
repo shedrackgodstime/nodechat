@@ -221,10 +221,12 @@ pub enum Command {
         topic: String,
     },
 
-    /// Mark a contact as key-verified after the user completes the safety number check.
-    MarkVerified {
-        /// Hex-encoded NodeId of the peer to mark as verified.
+    /// Toggle a contact's trusted status.
+    ToggleVerified {
+        /// Hex-encoded NodeId of the peer.
         node_id: String,
+        /// New verification state.
+        verified: bool,
     },
     /// Add a new contact by Iroh EndpointTicket or discovery-capable NodeId.
     AddContact {
@@ -462,10 +464,12 @@ pub enum AppEvent {
         error: String,
     },
 
-    /// A peer was successfully key-verified.
-    PeerVerified {
-        /// Hex-encoded NodeId of the verified peer.
+    /// A peer's verification status was changed by the user.
+    PeerVerificationUpdated {
+        /// Hex-encoded NodeId of the peer.
         peer: String,
+        /// New verification state.
+        verified: bool,
     },
 
     /// Password was updated successfully.
