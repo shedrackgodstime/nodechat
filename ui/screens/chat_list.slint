@@ -16,7 +16,7 @@ export component ChatListScreen inherits Rectangle {
     in property <length> safe-area-top: 0px;
     in property <length> safe-area-bottom: 0px;
 
-    callback open-chat(string, string, string, bool, bool, bool, bool);
+    callback open-chat(string, string, string, bool, bool, bool, bool, bool);
     callback add-contact();
     callback open-contacts();
     callback open-settings();
@@ -86,6 +86,7 @@ export component ChatListScreen inherits Rectangle {
                     unread:       chat.unread;
                     is-group:     chat.is-group;
                     is-online:    chat.is-online;
+                    is-session-ready: chat.is-session-ready;
                     is-relay:     chat.is-relay;
                     is-queued:    chat.is-queued;
                     is-verified:  chat.is-verified;
@@ -96,6 +97,7 @@ export component ChatListScreen inherits Rectangle {
                             chat.initials,
                             chat.is-group,
                             chat.is-online,
+                            chat.is-session-ready,
                             chat.is-relay,
                             chat.is-verified,
                         );

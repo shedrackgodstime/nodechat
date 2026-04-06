@@ -31,8 +31,13 @@ import { AddContactScreen }   from "./screens/add_contact.slint";
 import { SettingsScreen }     from "./screens/settings.slint";
 import { ContactsScreen, ContactData }     from "./screens/contacts.slint";
 import { ContactDetailsScreen } from "./screens/contact_details.slint";
-import { ConversationActionsScreen } from "./screens/conversation_actions.slint";
-import { SelectMembersScreen, SelectionData } from "./screens/select_members.slint";
+import {
+    ConversationActionsScreen,
+} from "./screens/conversation_actions.slint";
+import {
+    SelectMembersScreen,
+    SelectionData,
+} from "./screens/select_members.slint";
 import { CreateGroupScreen }  from "./screens/create_group.slint";
 import { EditNameScreen }    from "./screens/edit_name.slint";
 import { DiagnosticsScreen, LogEntry } from "./screens/diagnostics.slint";
@@ -45,6 +50,9 @@ export struct ConversationContext {
     initials: string,
     ticket: string,
     is-online: bool,
+    is-session-ready: bool,
+    is-relay: bool,
+    is-queued: bool,
     is-verified: bool,
     connection-stage: string,
     member-count: string,
@@ -60,7 +68,7 @@ export component AppWindow inherits Window {
     background: AppTheme.surface-primary;
 
     // ── Responsive breakpoint ──────────────────────────────────────────────
-    property <bool> is-desktop: root.width >= 750px;
+    in-out property <bool> is-desktop: false;
 
     // ── Safe area metrics ─────────────────────────────────────────────────
     property <length> safe-area-top:    is-desktop ? 0px : root.safe-area-insets.top;
@@ -86,15 +94,15 @@ export component AppWindow inherits Window {
     in-out property <int> navigation-return-screen: 0;
 
     // ── Shared app state ──────────────────────────────────────────────────
-    in property <string>  my-display-name: "";
-    in property <string>  my-initials: "";
-    in property <string>  my-node-id: "";
-    in property <string>  my-endpoint-ticket: "";
-    in property <int>     direct-peers: 0;
-    in property <int>     relay-peers: 0;
-    in property <bool>    is-offline: false;
+    in property <string> my-display-name: "";
+    in property <string> my-initials: "";
+    in property <string> my-node-id: "";
+    in property <string> my-endpoint-ticket: "";
+    in property <int> direct-peers: 0;
+    in property <int> relay-peers: 0;
+    in property <bool> is-offline: false;
     in property <[LogEntry]> debug-logs: [];
-    in property <string>  relay-url: "";
+    in property <string> relay-url: "";
     in-out property <string> runtime-error-log: "";
     in-out property <string> lock-pin: "";
     in-out property <string> lock-error: "";
@@ -107,8 +115,8 @@ export component AppWindow inherits Window {
     in-out property <string> confirm-modal-target: "";
     in-out property <string> confirm-modal-pin: "";
     in-out property <string> confirm-modal-error: "";
-    in-out property <bool>   is-confirm-modal-group: false;
-    in-out property <bool>   show-confirm-modal: false;
+    in-out property <bool> is-confirm-modal-group: false;
+    in-out property <bool> show-confirm-modal: false;
 
     in property <[ChatPreview]> chats: [];
     in property <[ContactData]> contact-directory: [];
@@ -162,21 +170,62 @@ export component AppWindow inherits Window {
     callback change-password(string, string);
     callback copy-text(string);
 
+    // Clipboard Hack (RULES.md compliant cross-platform sync)
+    in-out property <string> clipboard-buffer: "";
+    public function do-copy() {
+        clipboard-input.select-all();
+        clipboard-input.copy();
+    }
+    clipboard-input := TextInput {
+        text: root.clipboard-buffer;
+        visible: false;
+    }
+
     // ── Android back button ───────────────────────────────────────────────
     forward-focus: back-handler;
     back-handler := FocusScope {
         key-pressed(event) => {
-                if event.text == "\u{001b}" || event.text == Key.Escape {
-                if current-screen == 9 { current-screen = active-conversation.return-screen; return accept; }
-                if current-screen == 10 { current-screen = active-conversation.return-screen; return accept; }
-                if current-screen == 1 { current-screen = 0; return accept; }
-                if current-screen == 2 { current-screen = 0; return accept; }
-                if current-screen == 3 { current-screen = navigation-return-screen; return accept; }
-                if current-screen == 5 { current-screen = 0; return accept; }
-                if current-screen == 6 { current-screen = 0; return accept; }
-                if current-screen == 7 { current-screen = 6; return accept; }
-                if current-screen == 8 { current-screen = 7; return accept; }
-                if current-screen == 11 { current-screen = 5; return accept; }
+            if event.text == "\u{001b}" || event.text == Key.Escape {
+                if current-screen == 9 {
+                    current-screen = active-conversation.return-screen;
+                    return accept;
+                }
+                if current-screen == 10 {
+                    current-screen = active-conversation.return-screen;
+                    return accept;
+                }
+                if current-screen == 1 {
+                    current-screen = 0;
+                    return accept;
+                }
+                if current-screen == 2 {
+                    current-screen = 0;
+                    return accept;
+                }
+                if current-screen == 3 {
+                    current-screen = navigation-return-screen;
+                    return accept;
+                }
+                if current-screen == 5 {
+                    current-screen = 0;
+                    return accept;
+                }
+                if current-screen == 6 {
+                    current-screen = 0;
+                    return accept;
+                }
+                if current-screen == 7 {
+                    current-screen = 6;
+                    return accept;
+                }
+                if current-screen == 8 {
+                    current-screen = 7;
+                    return accept;
+                }
+                if current-screen == 11 {
+                    current-screen = 5;
+                    return accept;
+                }
             }
             return reject;
         }
@@ -187,50 +236,69 @@ export component AppWindow inherits Window {
     // ════════════════════════════════════════════════════════════════════
     Rectangle {
         clip: true;
-        width: root.width;
-        height: root.height;
+        horizontal-stretch: 1;
+        vertical-stretch: 1;
 
         // Desktop: two-panel layout. Mobile: full-screen single panel.
         HorizontalLayout {
             spacing: 0;
-            width: parent.width;
-            height: parent.height;
+            horizontal-stretch: 1;
+            vertical-stretch: 1;
 
             // ── LEFT PANEL (Sidebar on desktop / Home on mobile) ──────────
             if is-desktop || current-screen == 0 || current-screen == 6: Rectangle {
-                width: is-desktop ? 340px : parent.width; 
+                preferred-width: is-desktop ? 340px : 0px;
+                horizontal-stretch: is-desktop ? 0 : 1;
                 background: AppTheme.surface-primary;
 
                 if is-desktop || current-screen == 0: ChatListScreen {
-                    chats:            root.chats;
-                    is-desktop:        root.is-desktop;
-                    safe-area-top:     root.safe-area-top;
-                    safe-area-bottom:  root.safe-area-bottom;
-                    direct-peers:      root.direct-peers;
-                    relay-peers:       root.relay-peers;
-                    is-offline:        root.is-offline;
-                    open-chat(id, name, initials, is-group, is-online, is-relay, is-verified) => {
+                    chats: root.chats;
+                    is-desktop: root.is-desktop;
+                    safe-area-top: root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
+                    direct-peers: root.direct-peers;
+                    relay-peers: root.relay-peers;
+                    is-offline: root.is-offline;
+                    open-chat(id, name, initials, is-group, is-online, is-session-ready, is-relay, is-verified) => {
                         root.load-conversation(id, is-group);
                         active-conversation = {
                             kind: is-group ? "group" : "direct",
-                            id: id, title: name, initials: initials,
-                            ticket: "", is-online: is-online, is-verified: is-verified,
-                            connection-stage: "", member-count: "", return-screen: 0,
+                            id: id,
+                            title: name,
+                            initials: initials,
+                            ticket: "",
+                            is-online: is-online,
+                            is-session-ready: is-session-ready,
+                            is-relay: is-relay,
+                            is-queued: false,
+                            is-verified: is-verified,
+                            connection-stage: "",
+                            member-count: "",
+                            return-screen: 0,
                         };
                         current-screen = is-group ? 2 : 1;
                     }
-                    add-contact =>    { navigation-return-screen = 0; current-screen = 3; }
-                    open-contacts =>  { current-screen = 6; }
-                    open-settings =>  { current-screen = 5; }
+                    add-contact => {
+                        navigation-return-screen = 0;
+                        current-screen = 3;
+                    }
+                    open-contacts => {
+                        current-screen = 6;
+                    }
+                    open-settings => {
+                        current-screen = 5;
+                    }
                 }
 
                 if !is-desktop && current-screen == 6: ContactsScreen {
-                    is-desktop:    false;
+                    is-desktop: false;
                     safe-area-top: root.safe-area-top;
                     safe-area-bottom: root.safe-area-bottom;
-                    contacts:       root.contact-directory;
-                    go-back =>     { current-screen = 0; }
-                    open-contact(id, name, initials, is-group, is-online, is-relay, is-verified) => {
+                    contacts: root.contact-directory;
+                    go-back => {
+                        current-screen = 0;
+                    }
+                    open-contact(id, name, initials, is-group, is-online, is-session-ready, is-relay, is-verified) => {
                         if is-group {
                             root.active-conversation.kind = "group";
                             root.active-conversation.id = id;
@@ -238,6 +306,7 @@ export component AppWindow inherits Window {
                             root.active-conversation.initials = "👥";
                             root.active-conversation.ticket = "";
                             root.active-conversation.is-online = true;
+                            root.active-conversation.is-session-ready = true;
                             root.active-conversation.is-verified = true;
                             root.active-conversation.connection-stage = "";
                             root.active-conversation.member-count = "0";
@@ -249,6 +318,7 @@ export component AppWindow inherits Window {
                             root.active-conversation.initials = initials;
                             root.active-conversation.ticket = "";
                             root.active-conversation.is-online = is_online;
+                            root.active-conversation.is-session-ready = is_session_ready;
                             root.active-conversation.is-verified = is_verified;
                             root.active-conversation.connection-stage = "";
                             root.active-conversation.member-count = "0";
@@ -257,13 +327,20 @@ export component AppWindow inherits Window {
                         current-screen = 9;
                         root.load-conversation(id, is-group);
                     }
-                    add-contact => { navigation-return-screen = 6; current-screen = 3; }
-                    new-group =>   { current-screen = 7; }
+                    add-contact => {
+                        navigation-return-screen = 6;
+                        current-screen = 3;
+                    }
+                    new-group => {
+                        current-screen = 7;
+                    }
                 }
 
                 if is-desktop: Rectangle {
-                    x: parent.width - 1px; y: 0;
-                    width: 1px; height: parent.height;
+                    x: parent.width - 1px;
+                    y: 0;
+                    width: 1px;
+                    height: parent.height;
                     background: AppTheme.divider;
                 }
             }
@@ -277,22 +354,30 @@ export component AppWindow inherits Window {
                 if is-desktop && (current-screen == 0): VerticalLayout {
                     alignment: center;
                     spacing: AppTheme.sp-md;
-                    Text { text: "💬"; font-size: 64px; horizontal-alignment: center; }
+                    Text {
+                        text: "💬";
+                        font-size: 64px;
+                        horizontal-alignment: center;
+                    }
+
                     Text {
                         text: "Select a chat to start messaging.";
-                        font-size: 16px; color: AppTheme.text-secondary;
+                        font-size: 16px;
+                        color: AppTheme.text-secondary;
                         horizontal-alignment: center;
                     }
                 }
 
                 // Desktop contacts in right panel
                 if is-desktop && current-screen == 6: ContactsScreen {
-                    is-desktop:    true;
+                    is-desktop: true;
                     safe-area-top: 0px;
                     safe-area-bottom: 0px;
-                    contacts:       root.contact-directory;
-                    go-back =>     { current-screen = 0; }
-                    open-contact(id, name, initials, is-group, is-online, is-relay, is-verified) => {
+                    contacts: root.contact-directory;
+                    go-back => {
+                        current-screen = 0;
+                    }
+                    open-contact(id, name, initials, is-group, is-online, is-session-ready, is-relay, is-verified) => {
                         if is-group {
                             root.active-conversation.kind = "group";
                             root.active-conversation.id = id;
@@ -300,6 +385,7 @@ export component AppWindow inherits Window {
                             root.active-conversation.initials = "👥";
                             root.active-conversation.ticket = "";
                             root.active-conversation.is-online = true;
+                            root.active-conversation.is-session-ready = true;
                             root.active-conversation.is-verified = true;
                             root.active-conversation.connection-stage = "";
                             root.active-conversation.member-count = "0";
@@ -310,41 +396,53 @@ export component AppWindow inherits Window {
                             root.active-conversation.title = name;
                             root.active-conversation.initials = initials;
                             root.active-conversation.ticket = "";
-                            root.active-conversation.is-online = is-online;
-                            root.active-conversation.is-verified = is-verified;
-                            root.active-conversation.connection-stage = is-relay ? "relay" : "direct";
+                            root.active-conversation.is-online = is_online;
+                            root.active-conversation.is-session-ready = is_session_ready;
+                            root.active-conversation.is-verified = is_verified;
+                            root.active-conversation.connection-stage = is_relay ? "relay" : "direct";
                             root.active-conversation.member-count = "0";
                             root.active-conversation.return-screen = 6;
                         }
                         current-screen = 9;
                         root.load-conversation(id, is-group);
                     }
-                    add-contact => { navigation-return-screen = 6; current-screen = 3; }
-                    new-group =>   { current-screen = 7; }
+                    add-contact => {
+                        navigation-return-screen = 6;
+                        current-screen = 3;
+                    }
+                    new-group => {
+                        current-screen = 7;
+                    }
                 }
 
                 // Screen 1 — 1:1 Chat View
                 if current-screen == 1: ChatViewScreen {
-                    is-desktop:               root.is-desktop;
-                    peer-name:                root.active-conversation.title;
-                    peer-initials:            root.active-conversation.initials;
-                    peer-node-id:             root.active-conversation.id;
-                    connection-mode:          root.active-conversation.kind;
-                    is-verified:              root.active-conversation.is-verified;
-                    is-online:                root.active-conversation.is-online;
-                    connection-stage:         root.active-conversation.connection-stage;
-                    messages:                 root.active-conversation-messages;
-                    safe-area-top:            is-desktop ? 0px : root.safe-area-top;
-                    safe-area-bottom:         root.safe-area-bottom;
-                    virtual-keyboard-height:  root.kb-height;
-                    go-back =>                { current-screen = 0; }
-                    send-message(msg) =>      { root.send-message(msg); }
-                    open-contact-info =>      {
+                    is-desktop: root.is-desktop;
+                    peer-name: root.active-conversation.title;
+                    peer-initials: root.active-conversation.initials;
+                    peer-node-id: root.active-conversation.id;
+                    connection-mode: root.active-conversation.kind;
+                    is-verified: root.active-conversation.is-verified;
+                    is-online: root.active-conversation.is-online;
+                    connection-stage: root.active-conversation.connection-stage;
+                    messages: root.active-conversation-messages;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
+                    virtual-keyboard-height: root.kb-height;
+                    go-back => {
+                        current-screen = 0;
+                    }
+                    send-message(msg) => {
+                        root.send-message(msg);
+                    }
+                    open-contact-info => {
                         root.active-conversation.return-screen = 1;
                         current-screen = 9;
                     }
-                    retry-queued =>           { root.retry-queued(); }
-                    request-delete-conversation =>    {
+                    retry-queued => {
+                        root.retry-queued();
+                    }
+                    request-delete-conversation => {
                         root.confirm-modal-title = "Delete Conversation";
                         root.confirm-modal-subtitle = "Everything in this thread will be permanently deleted.";
                         root.confirm-modal-action = "delete-conversation";
@@ -356,25 +454,29 @@ export component AppWindow inherits Window {
 
                 // Screen 2 — Group Chat View
                 if current-screen == 2: ChatViewScreen {
-                    is-desktop:              root.is-desktop;
-                    peer-name:               root.active-conversation.title;
-                    peer-initials:           root.active-conversation.initials;
-                    peer-node-id:            root.active-conversation.id;
-                    connection-mode:         root.active-conversation.kind;
-                    is-verified:             root.active-conversation.is-verified;
-                    is-online:               root.active-conversation.is-online;
-                    messages:                root.active-conversation-messages;
-                    safe-area-top:           is-desktop ? 0px : root.safe-area-top;
-                    safe-area-bottom:        root.safe-area-bottom;
+                    is-desktop: root.is-desktop;
+                    peer-name: root.active-conversation.title;
+                    peer-initials: root.active-conversation.initials;
+                    peer-node-id: root.active-conversation.id;
+                    connection-mode: root.active-conversation.kind;
+                    is-verified: root.active-conversation.is-verified;
+                    is-online: root.active-conversation.is-online;
+                    messages: root.active-conversation-messages;
+                    safe-area-top: is-desktop ? 0px : root.safe-area-top;
+                    safe-area-bottom: root.safe-area-bottom;
                     virtual-keyboard-height: root.kb-height;
-                    connection-stage:        root.active-conversation.connection-stage;
-                    go-back =>               { current-screen = 0; }
-                    send-message(msg) =>     { root.send-group-message(msg); }
-                    open-contact-info =>     {
+                    connection-stage: root.active-conversation.connection-stage;
+                    go-back => {
+                        current-screen = 0;
+                    }
+                    send-message(msg) => {
+                        root.send-group-message(msg);
+                    }
+                    open-contact-info => {
                         active-conversation.return-screen = 2;
                         current-screen = 10;
                     }
-                    request-delete-conversation =>   {
+                    request-delete-conversation => {
                         root.confirm-modal-title = "Delete Group Thread";
                         root.confirm-modal-subtitle = "This will remove the group from your list. Other members will remain.";
                         root.confirm-modal-action = "delete-conversation";
@@ -382,38 +484,48 @@ export component AppWindow inherits Window {
                         root.is-confirm-modal-group = true;
                         root.show-confirm-modal = true;
                     }
-                    retry-queued =>          { root.retry-queued(); }
+                    retry-queued => {
+                        root.retry-queued();
+                    }
                 }
 
                 // Screen 3 — Add Contact
                 if current-screen == 3: AddContactScreen {
-                    is-desktop:    root.is-desktop;
+                    is-desktop: root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
                     safe-area-bottom: root.safe-area-bottom;
-                    go-back =>     { current-screen = navigation-return-screen; }
-                    add-contact(id) => { root.add-contact(id); }
+                    go-back => {
+                        current-screen = navigation-return-screen;
+                    }
+                    add-contact(id) => {
+                        root.add-contact(id);
+                    }
                 }
 
                 // Screen 9 — Contact Details
                 if current-screen == 9: ContactDetailsScreen {
-                    is-desktop:    root.is-desktop;
+                    is-desktop: root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
                     safe-area-bottom: root.safe-area-bottom;
-                    peer-name:     root.active-conversation.title;
+                    peer-name: root.active-conversation.title;
                     peer-initials: root.active-conversation.initials;
-                    peer-node-id:  root.active-conversation.id;
+                    peer-node-id: root.active-conversation.id;
                     endpoint-ticket: root.active-conversation.ticket;
                     connection-mode: root.active-conversation.kind;
                     connection-stage: root.active-conversation.connection-stage;
-                    is-online:     root.active-conversation.is-online;
-                    is-verified:   root.active-conversation.is-verified;
-                    go-back =>     { current-screen = root.active-conversation.return-screen; }
-                    chat-now =>    {
+                    is-online: root.active-conversation.is-online;
+                    is-verified: root.active-conversation.is-verified;
+                    go-back => {
+                        current-screen = root.active-conversation.return-screen;
+                    }
+                    chat-now => {
                         root.load-conversation(root.active-conversation.id, root.active-conversation.kind == "group");
                         current-screen = root.active-conversation.kind == "group" ? 2 : 1;
                     }
-                    request-verification => { current-screen = 13; }
-                    request-clear-history =>  {
+                    request-verification => {
+                        current-screen = 13;
+                    }
+                    request-clear-history => {
                         root.confirm-modal-title = "Clear Chat History";
                         root.confirm-modal-subtitle = "All messages with " + root.active-conversation.title + " will be wiped.";
                         root.confirm-modal-action = "clear-conversation";
@@ -429,33 +541,35 @@ export component AppWindow inherits Window {
                         root.is-confirm-modal-group = false;
                         root.show-confirm-modal = true;
                     }
-                    copy-text(text) => { root.copy-text(text); }
+                    copy-text(text) => {
+                        root.copy-text(text);
+                    }
                 }
 
                 // Screen 10 — Conversation Actions
                 if current-screen == 10: ConversationActionsScreen {
-                    is-desktop:    root.is-desktop;
-                    is-group:      root.active-conversation.kind == "group";
-                    title:         root.active-conversation.title;
-                    subtitle:      root.active-conversation.kind == "group"
-                        ? (root.active-conversation.member-count == "" ? "Group thread" : root.active-conversation.member-count + " members connected")
-                        : root.active-conversation.connection-stage;
-                    primary-id:    root.active-conversation.id;
-                    secondary-id:  root.active-conversation.ticket;
-                    initials:      root.active-conversation.initials;
-                    connection-note: root.active-conversation.kind == "group"
-                        ? "Actions for this shared group thread."
-                        : (root.active-conversation.is-verified ? "Verified peer" : "Verification pending");
-                    is-online:     root.active-conversation.kind == "group" ? true : root.active-conversation.is-online;
-                    is-verified:   root.active-conversation.kind == "group" ? true : root.active-conversation.is-verified;
-                    member-count:  root.active-conversation.member-count;
+                    is-desktop: root.is-desktop;
+                    is-group: root.active-conversation.kind == "group";
+                    title: root.active-conversation.title;
+                    subtitle: root.active-conversation.kind == "group" ? (root.active-conversation.member-count == "" ? "Group thread" : root.active-conversation.member-count + " members connected") : root.active-conversation.connection-stage;
+                    primary-id: root.active-conversation.id;
+                    secondary-id: root.active-conversation.ticket;
+                    initials: root.active-conversation.initials;
+                    connection-note: root.active-conversation.kind == "group" ? "Actions for this shared group thread." : (root.active-conversation.is-verified ? "Verified peer" : "Verification pending");
+                    is-online: root.active-conversation.kind == "group" ? true : root.active-conversation.is-online;
+                    is-verified: root.active-conversation.kind == "group" ? true : root.active-conversation.is-verified;
+                    member-count: root.active-conversation.member-count;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
-                    go-back =>     { current-screen = root.active-conversation.return-screen; }
-                    open-chat =>   {
+                    go-back => {
+                        current-screen = root.active-conversation.return-screen;
+                    }
+                    open-chat => {
                         root.load-conversation(root.active-conversation.id, root.active-conversation.kind == "group");
                         current-screen = root.active-conversation.kind == "group" ? 2 : 1;
                     }
-                    retry-queued => { root.retry-queued(); }
+                    retry-queued => {
+                        root.retry-queued();
+                    }
                     request-clear-history => {
                         root.confirm-modal-title = "Clear Local History";
                         root.confirm-modal-subtitle = "Wipe all messages in this " + (root.active-conversation.kind == "group" ? "group" : "chat") + ".";
@@ -476,25 +590,33 @@ export component AppWindow inherits Window {
 
                 // Screen 5 — Settings
                 if current-screen == 5: SettingsScreen {
-                    is-desktop:    root.is-desktop;
-                    display-name:  root.my-display-name;
-                    node-id:       root.my-node-id;
+                    is-desktop: root.is-desktop;
+                    display-name: root.my-display-name;
+                    node-id: root.my-node-id;
                     endpoint-ticket: root.my-endpoint-ticket;
-                    direct-peers:  root.direct-peers;
-                    relay-peers:   root.relay-peers;
+                    direct-peers: root.direct-peers;
+                    relay-peers: root.relay-peers;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
                     safe-area-bottom: root.safe-area-bottom;
-                    go-back =>     { current-screen = 0; }
-                    copy-node-id => { root.copy-node-id(); }
-                    open-debug-console => { current-screen = 14; }
-                    edit-display-name => { current-screen = 11; }
-                    request-clear-history => { 
+                    go-back => {
+                        current-screen = 0;
+                    }
+                    copy-node-id => {
+                        root.copy-node-id();
+                    }
+                    open-debug-console => {
+                        current-screen = 14;
+                    }
+                    edit-display-name => {
+                        current-screen = 11;
+                    }
+                    request-clear-history => {
                         root.confirm-modal-title = "Clear All Messages";
                         root.confirm-modal-subtitle = "This will permanently delete all chat history. Your identity and contacts will remain.";
                         root.confirm-modal-action = "clear-messages";
                         root.show-confirm-modal = true;
                     }
-                    request-reset-identity => { 
+                    request-reset-identity => {
                         root.confirm-modal-title = "Delete Vault Identity";
                         root.confirm-modal-subtitle = "CRITICAL: This will destroy your private keys and all contacts. NO RECOVERY POSSIBLE.";
                         root.confirm-modal-action = "delete-identity";
@@ -504,23 +626,31 @@ export component AppWindow inherits Window {
 
                 // Screen 7 — Select Members (for new group)
                 if current-screen == 7: SelectMembersScreen {
-                    is-desktop:    root.is-desktop;
+                    is-desktop: root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
                     safe-area-bottom: root.safe-area-bottom;
-                    contacts:      root.group-member-candidates;
+                    contacts: root.group-member-candidates;
                     selected-count: root.selected-group-member-count;
-                    go-back =>     { current-screen = 6; }
-                    toggle-selection(id) => { root.toggle-group-member(id); }
-                    next-step =>   { current-screen = 8; }
+                    go-back => {
+                        current-screen = 6;
+                    }
+                    toggle-selection(id) => {
+                        root.toggle-group-member(id);
+                    }
+                    next-step => {
+                        current-screen = 8;
+                    }
                 }
 
                 // Screen 8 — Create Group
                 if current-screen == 8: CreateGroupScreen {
-                    is-desktop:    root.is-desktop;
+                    is-desktop: root.is-desktop;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
                     safe-area-bottom: root.safe-area-bottom;
-                    member-count:  root.selected-group-member-count;
-                    go-back =>     { current-screen = 7; }
+                    member-count: root.selected-group-member-count;
+                    go-back => {
+                        current-screen = 7;
+                    }
                     launch-group(name) => {
                         root.launch-group(name);
                         current-screen = 0;
@@ -529,11 +659,13 @@ export component AppWindow inherits Window {
 
                 // Screen 11 — Edit Profile Name
                 if current-screen == 11: EditNameScreen {
-                    is-desktop:    root.is-desktop;
-                    display-name:  root.my-display-name;
+                    is-desktop: root.is-desktop;
+                    display-name: root.my-display-name;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
                     safe-area-bottom: root.safe-area-bottom;
-                    go-back =>     { current-screen = 5; }
+                    go-back => {
+                        current-screen = 5;
+                    }
                     confirm-name(name) => {
                         root.confirm-name-change(name);
                         current-screen = 5; // Return to settings
@@ -542,16 +674,23 @@ export component AppWindow inherits Window {
 
                 // Screen 14 — Debug Console
                 if current-screen == 14: DiagnosticsScreen {
-                    is-desktop:    root.is-desktop;
-                    node-id:       root.my-node-id;
-                    relay-url:     root.relay-url;
-                    direct-peers:  root.direct-peers;
-                    relay-peers:   root.relay-peers;
-                    logs:          root.debug-logs;
+                    is-desktop: root.is-desktop;
+                    node-id: root.my-node-id;
+                    relay-url: root.relay-url;
+                    direct-peers: root.direct-peers;
+                    relay-peers: root.relay-peers;
+                    logs: root.debug-logs;
                     safe-area-top: is-desktop ? 0px : root.safe-area-top;
                     safe-area-bottom: root.safe-area-bottom;
-                    go-back =>     { current-screen = 5; }
-                    clear-logs =>  { root.clear-debug-logs(); }
+                    go-back => {
+                        current-screen = 5;
+                    }
+                    clear-logs => {
+                        root.clear-debug-logs();
+                    }
+                    copy-logs => {
+                        root.copy-debug-logs();
+                    }
                 }
             }
         }
@@ -563,7 +702,8 @@ export component AppWindow inherits Window {
     // has-identity = true after identity is generated and persisted.
     // ════════════════════════════════════════════════════════════════════
     if !has-identity: Rectangle {
-        width: parent.width; height: parent.height;
+        width: parent.width;
+        height: parent.height;
         background: AppTheme.surface-primary;
 
         // Step 0 — Welcome
@@ -575,11 +715,10 @@ export component AppWindow inherits Window {
                 root.setup-step = 1;
             }
         }
-
         // Step 1 or 2 — Name input (setup-step == 2 shows loading state)
         if setup-step == 1 || setup-step == 2: SetupNameScreen {
-            generating:    root.setup-step == 2;
-            is-desktop:    root.is-desktop;
+            generating: root.setup-step == 2;
+            is-desktop: root.is-desktop;
             safe-area-top: root.safe-area-top;
             safe-area-bottom: root.safe-area-bottom;
             go-back => {
@@ -597,12 +736,14 @@ export component AppWindow inherits Window {
         // Step 3 — Identity card (shown after Rust confirms identity generated)
         if setup-step == 3: IdentityCardScreen {
             display-name: root.my-display-name;
-            node-id:      root.my-node-id;
+            node-id: root.my-node-id;
             endpoint-ticket: root.my-endpoint-ticket;
-            is-desktop:   root.is-desktop;
+            is-desktop: root.is-desktop;
             safe-area-top: root.safe-area-top;
             safe-area-bottom: root.safe-area-bottom;
-            copy-ticket(ticket) => { root.copy-node-id(); }
+            copy-ticket(ticket) => {
+                root.copy-node-id();
+            }
             go-to-chats => {
                 root.setup-complete();
                 // Rust sets has-identity = true, which dismisses this overlay.
@@ -615,14 +756,16 @@ export component AppWindow inherits Window {
     // Covers the entire window. Dismissed when Rust clears the lock flag.
     // ════════════════════════════════════════════════════════════════════
     if is-locked: Rectangle {
-        width: parent.width; height: parent.height;
+        width: parent.width;
+        height: parent.height;
         background: AppTheme.surface-primary;
 
         WelcomeScreen {
             is-locked: true;
             is-desktop: root.is-desktop;
             safe-area-bottom: root.safe-area-bottom;
-            get-started => {} // unused in locked mode
+            get-started => {
+            } // unused in locked mode
             unlock(pin) => {
                 root.is-locked = false;
                 root.current-screen = 0;
@@ -652,9 +795,9 @@ export component AppWindow inherits Window {
             spacing: 12px;
             alignment: start;
 
-                VerticalLayout {
-                    horizontal-stretch: 1;
-                    spacing: 8px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 8px;
 
                 HorizontalLayout {
                     alignment: space-between;
@@ -664,6 +807,7 @@ export component AppWindow inherits Window {
                         font-weight: 700;
                         color: #FFFFFF;
                     }
+
                     Text {
                         text: "Copyable";
                         font-size: 11px;
@@ -696,7 +840,8 @@ export component AppWindow inherits Window {
                         runtime-error-log = "";
                     }
                     Rectangle {
-                        width: 100%; height: 100%;
+                        width: 100%;
+                        height: 100%;
                         border-radius: 10px;
                         background: AppTheme.surface-tertiary;
                         border-width: 1px;
@@ -712,7 +857,11 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                copy-error-input := TextInput { width: 0px; height: 0px; opacity: 0; }
+                copy-error-input := TextInput {
+                    width: 0px;
+                    height: 0px;
+                    opacity: 0;
+                }
 
                 TouchArea {
                     width: 84px;
@@ -725,7 +874,8 @@ export component AppWindow inherits Window {
                         root.copy-runtime-error(runtime-error-log);
                     }
                     Rectangle {
-                        width: 100%; height: 100%;
+                        width: 100%;
+                        height: 100%;
                         border-radius: 10px;
                         background: AppTheme.accent-danger;
                         Text {
@@ -750,16 +900,15 @@ export component AppWindow inherits Window {
         subtitle: root.confirm-modal-subtitle;
         confirm-text: root.confirm-modal-action == "delete-identity" ? "Destroy Everything" : root.confirm-modal-action;
         action-slug: root.confirm-modal-action;
-        error-msg: root.confirm-modal-error;
-        pin: root.confirm-modal-pin;
-        
+        error-msg <=> root.confirm-modal-error;
+        pin <=> root.confirm-modal-pin;
         cancel => {
             root.show-confirm-modal = false;
             root.confirm-modal-error = "";
             root.confirm-modal-pin = "";
         }
-        
         confirm(pin) => {
+            root.show-confirm-modal = false;
             root.confirm-modal-pin = pin;
             if (root.confirm-modal-action == "clear-conversation") {
                 root.clear-conversation(root.confirm-modal-target, root.is-confirm-modal-group, pin);

@@ -349,7 +349,7 @@ pub struct MessageRecord {
 /// Returns an error on duplicate ID or write failure.
 pub fn insert_message(conn: &Connection, msg: &MessageRecord) -> Result<()> {
     conn.execute(
-        "INSERT INTO messages (id, type, target_id, sender_id, content, timestamp, status)
+        "INSERT OR IGNORE INTO messages (id, type, target_id, sender_id, content, timestamp, status)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
             msg.id.to_string(),
@@ -488,7 +488,7 @@ pub fn list_queued_messages(conn: &Connection, target_id: &str) -> Result<Vec<Me
     let mut stmt = conn
         .prepare(
             "SELECT id, type, target_id, sender_id, content, timestamp, status
-             FROM messages WHERE target_id = ?1 AND status = 'queued' ORDER BY timestamp ASC",
+             FROM messages WHERE target_id = ?1 AND status IN ('queued', 'sent') ORDER BY timestamp ASC",
         )
         .context("failed to prepare list_queued_messages statement")?;
 

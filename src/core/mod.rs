@@ -658,9 +658,10 @@ impl NodeChatWorker {
                 self.touch_peer_activity(&peer_id);
                 self.peer_via_relay.insert(peer_id.clone(), via_relay);
                 self.emit(AppEvent::PeerOnlineStatus {
-                    peer: node_id,
+                    peer: node_id.clone(),
                     online: true,
                     via_relay,
+                    session_ready: self.has_session(&node_id),
                 });
                 if let Err(e) = self.flush_offline_queue_for_peer(&peer_id).await {
                     tracing::error!(peer = %peer_id, "failed to flush queued messages after connect: {:?}", e);
@@ -670,9 +671,10 @@ impl NodeChatWorker {
             NetworkEvent::PeerDisconnected { node_id } => {
                 if self.app_foreground {
                     self.emit(AppEvent::PeerOnlineStatus {
-                        peer: node_id,
+                        peer: node_id.clone(),
                         online: false,
                         via_relay: false,
+                        session_ready: false,
                     });
                 }
                 Ok(())
@@ -742,6 +744,7 @@ impl NodeChatWorker {
                 peer: from.clone(),
                 online: true,
                 via_relay: false,
+                session_ready: true,
             });
             self.emit(AppEvent::PeerContactDetails {
                 peer: from.clone(),
@@ -848,6 +851,7 @@ impl NodeChatWorker {
                     peer: from.clone(),
                     online: true,
                     via_relay: false,
+                    session_ready: self.has_session(&from),
                 });
                 if let Err(e) = self.send_peer_health_pong(&from, nonce).await {
                     tracing::debug!(peer = %from, msg = %nonce, "failed to send health pong: {:?}", e);
@@ -859,6 +863,7 @@ impl NodeChatWorker {
                     peer: from.clone(),
                     online: true,
                     via_relay: false,
+                    session_ready: self.has_session(&from),
                 });
                 self.touch_peer_activity(&from);
             }
@@ -1324,8 +1329,9 @@ impl NodeChatWorker {
                 .unwrap_or(false);
             self.emit(AppEvent::PeerOnlineStatus {
                 peer: target.clone(),
-                online: has_session,
+                online: self.network.has_connection(&target),
                 via_relay: false,
+                session_ready: has_session,
             });
             self.emit(AppEvent::PeerHandshakeStage {
                 peer: target_for_stage,
@@ -1424,14 +1430,16 @@ impl NodeChatWorker {
             payload[ticket_len_offset],
             payload[ticket_len_offset + 1],
         ]) as usize;
-        if payload.len() != ticket_len_offset + 2 + ticket_len {
+
+        if payload.len() < ticket_len_offset + 2 + ticket_len {
             return None;
         }
 
         let ticket = if ticket_len == 0 {
             None
         } else {
-            let raw_ticket = &payload[ticket_len_offset + 2..];
+            let ticket_start = ticket_len_offset + 2;
+            let raw_ticket = &payload[ticket_start..ticket_start + ticket_len];
             Some(String::from_utf8(raw_ticket.to_vec()).ok()?)
         };
 
@@ -1439,17 +1447,21 @@ impl NodeChatWorker {
         if payload.len() < name_offset + 2 {
             return Some((is_ack, pubkey, ticket, None));
         }
+
         let display_name_len = u16::from_be_bytes([
             payload[name_offset],
             payload[name_offset + 1],
         ]) as usize;
+
         if payload.len() != name_offset + 2 + display_name_len {
             return None;
         }
+
         let display_name = if display_name_len == 0 {
             None
         } else {
-            let raw_name = &payload[name_offset + 2..];
+            let name_start = name_offset + 2;
+            let raw_name = &payload[name_start..name_start + display_name_len];
             Some(String::from_utf8(raw_name.to_vec()).ok()?)
         };
 
@@ -1810,6 +1822,7 @@ impl NodeChatWorker {
                     .into_iter()
                     .map(|preview| ChatPreviewData {
                         is_online: self.network.has_connection(&preview.id),
+                        is_session_ready: self.has_session(&preview.id),
                         id: preview.id,
                         name: preview.name,
                         initials: preview.initials,
@@ -1838,25 +1851,25 @@ impl NodeChatWorker {
             Ok(peers) => {
                 let contacts = peers
                     .into_iter()
-                    .map(|peer| ContactDirectoryData {
-                        id: peer.node_id.clone(),
-                        is_online: self.network.has_connection(&peer.node_id),
-                        name: peer.display_name.clone(),
-                        initials: peer
-                            .display_name
-                            .split_whitespace()
-                            .filter_map(|part| part.chars().next())
-                            .take(2)
-                            .map(|ch| ch.to_ascii_uppercase())
-                            .collect::<String>(),
-                        node_id: peer.node_id.clone(),
-                        is_relay: *self.peer_via_relay.get(&peer.node_id).unwrap_or(&false),
-                        is_verified: peer.verified,
+                    .map(|contact| {
+                        let initials = queries::derive_initials(&contact.display_name);
+                        ContactDirectoryData {
+                            id: contact.node_id.clone(),
+                            name: contact.display_name,
+                            initials,
+                            node_id: contact.node_id.clone(),
+                            is_online: self.network.has_connection(&contact.node_id),
+                            is_session_ready: self.has_session(&contact.node_id),
+                            is_relay: self.peer_via_relay.get(&contact.node_id).copied().unwrap_or(false),
+                            is_verified: contact.verified,
+                        }
                     })
                     .collect();
                 self.emit(AppEvent::ContactsUpdated { contacts });
             }
-            Err(e) => tracing::error!("failed to rebuild contacts list: {:?}", e),
+            Err(e) => {
+                tracing::error!("failed to list peers for UI directory update: {:?}", e);
+            }
         }
     }
 
@@ -1897,6 +1910,7 @@ impl NodeChatWorker {
             peer: node_id.to_owned(),
             online: false,
             via_relay: false,
+            session_ready: false,
         });
         self.emit_chat_list();
     }
@@ -1972,6 +1986,14 @@ impl NodeChatWorker {
         }
 
         Ok(())
+    }
+
+    /// Returns `true` if a live E2EE session key exists for the given peer.
+    fn has_session(&self, node_id: &str) -> bool {
+        self.crypto
+            .as_ref()
+            .map(|crypto| crypto.has_session(node_id))
+            .unwrap_or(false)
     }
 
 }

@@ -8,6 +8,7 @@ export struct ContactData {
     initials: string,
     node-id: string,
     is-online: bool,
+    is-session-ready: bool,
     is-relay: bool,
     is-verified: bool,
 }
@@ -19,7 +20,7 @@ export component ContactsScreen inherits Rectangle {
     in property <length> safe-area-bottom: 0px;
 
     callback go-back();
-    callback open-contact(string, string, string, bool, bool, bool, bool);
+    callback open-contact(string, string, string, bool, bool, bool, bool, bool);
     callback add-contact();
     callback new-group();
 
@@ -99,6 +100,7 @@ export component ContactsScreen inherits Rectangle {
                     last-message: contact.node-id;
                     timestamp:   "";
                     is-online:   contact.is-online;
+                    is-session-ready: contact.is-session-ready;
                     is-relay:    contact.is-relay;
                     is-verified: contact.is-verified;
                     clicked => {
@@ -108,6 +110,7 @@ export component ContactsScreen inherits Rectangle {
                             contact.initials,
                             false,
                             contact.is-online,
+                            contact.is-session-ready,
                             contact.is-relay,
                             contact.is-verified,
                         );
