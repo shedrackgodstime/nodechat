@@ -76,7 +76,12 @@ pub fn run_app(db_dir: Option<std::path::PathBuf>) -> anyhow::Result<()> {
     let db_path_bg = db_path.clone();
     runtime.spawn(async move {
         match core::NodeChatWorker::new(rx_commands, tx_events_bg, &db_path_bg).await {
-            Ok(worker) => worker.run().await,
+            Ok(mut worker) => {
+                if let Err(e) = worker.initialize_persisted_state().await {
+                    tracing::error!("failed to hydrate persisted state: {:?}", e);
+                }
+                worker.run().await;
+            }
             Err(e)     => tracing::error!("failed to start backend worker: {:?}", e),
         }
     });
