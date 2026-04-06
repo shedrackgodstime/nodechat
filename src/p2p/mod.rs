@@ -203,11 +203,20 @@ impl NetworkManager {
     ///
     /// # Errors
     /// Returns an error if the subscription fails.
-    pub async fn subscribe_group(&mut self, topic_id: &str) -> Result<()> {
+    pub async fn subscribe_group(&mut self, topic_id: &str, bootstrap: Vec<String>) -> Result<()> {
         if self.subscribed_topics.contains(topic_id) {
             return Ok(()); // idempotent — RULES.md P-05
         }
-        group::subscribe(self, topic_id).await?;
+        
+        // Parse hex node IDs into binary IDs for iroh-gossip
+        let mut bootstrap_ids = Vec::new();
+        for id_hex in bootstrap {
+            if let Ok(id) = id_hex.parse::<iroh::EndpointId>() {
+                bootstrap_ids.push(id);
+            }
+        }
+
+        group::subscribe(self, topic_id, bootstrap_ids).await?;
         self.subscribed_topics.insert(topic_id.to_owned());
         Ok(())
     }

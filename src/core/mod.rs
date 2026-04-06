@@ -62,6 +62,12 @@ const DIRECT_MESSAGE_KIND_READ: u8 = 3;
 const DIRECT_MESSAGE_KIND_PING: u8 = 4;
 /// Encrypted frame kind for a health pong.
 const DIRECT_MESSAGE_KIND_PONG: u8 = 5;
+/// Prefix used for group-sync frames over gossip.
+const GOSSIP_SYNC_MAGIC: &[u8; 4] = b"NC1G";
+/// Gossip sync frame kind for a request.
+const GOSSIP_SYNC_KIND_REQUEST: u8 = 1;
+/// Gossip sync frame kind for a response.
+const GOSSIP_SYNC_KIND_RESPONSE: u8 = 2;
 
 enum DirectPayload {
     Text { message_id: Uuid, plaintext: Vec<u8> },
@@ -172,6 +178,35 @@ impl NodeChatWorker {
             tx_events,
             rx_network,
         })
+    }
+
+    /// Hydrates the crypto engine with persisted group keys and joins gossip topics.
+    pub async fn initialize_persisted_state(&mut self) -> Result<()> {
+        let groups = queries::list_groups(&mut self.db)?;
+        let mut group_ids = Vec::new();
+
+        if let Some(ref mut crypto) = self.crypto {
+            for group in groups {
+                if group.symmetric_key.len() == 32 {
+                    let mut key = [0u8; 32];
+                    key.copy_from_slice(&group.symmetric_key);
+                    crypto.register_group_key(&group.topic_id, key);
+                    group_ids.push(group.topic_id.clone());
+                }
+            }
+        }
+
+        // Now that crypto is released, do the async network work
+        let bootstrap = self.network.active_connections();
+        for topic_id in group_ids {
+            if let Err(e) = self.network.subscribe_group(&topic_id, bootstrap.clone()).await {
+                tracing::error!(topic = %topic_id, "failed to re-subscribe to group: {:?}", e);
+            } else {
+                // Request initial sync for each group we re-joined
+                let _ = self.broadcast_group_sync_request(&topic_id).await;
+            }
+        }
+        Ok(())
     }
 
     /// Run the actor select loop. Never returns under normal operation.
@@ -448,8 +483,14 @@ impl NodeChatWorker {
         };
         queries::insert_group(&self.db, &record).context("failed to store group")?;
 
-        self.network.subscribe_group(&topic_id).await
+        let bootstrap = self.network.active_connections();
+        self.network.subscribe_group(&topic_id, bootstrap).await
             .context("failed to subscribe to new group topic")?;
+
+        // Request initial sync (though we are the founder, we might be re-joining on another device)
+        if let Err(e) = self.broadcast_group_sync_request(&topic_id).await {
+            tracing::warn!(topic = %topic_id, "failed to send initial group sync request: {:?}", e);
+        }
 
         tracing::info!(topic = %topic_id, "group created");
         let selected_members = self.group_member_selection.clone();
@@ -492,10 +533,16 @@ impl NodeChatWorker {
             queries::insert_group(&self.db, &record).context("failed to store accepted group invite")?;
         }
 
+        let bootstrap = self.network.active_connections();
         self.network
-            .subscribe_group(&topic)
+            .subscribe_group(&topic, bootstrap)
             .await
             .context("failed to subscribe to invited group topic")?;
+
+        // Request initial sync to catch up on history
+        if let Err(e) = self.broadcast_group_sync_request(&topic).await {
+            tracing::warn!(topic = %topic, "failed to send group sync request: {:?}", e);
+        }
 
         self.emit_chat_list();
         Ok(())
@@ -883,6 +930,24 @@ impl NodeChatWorker {
         from: String,
         payload: Vec<u8>,
     ) -> Result<()> {
+        // Check for Group Sync magic prefix (NC1G)
+        if payload.starts_with(GOSSIP_SYNC_MAGIC) && payload.len() > 4 {
+            let kind = payload[4];
+            let inner = &payload[5..];
+            match kind {
+                GOSSIP_SYNC_KIND_REQUEST => {
+                    return self.handle_group_sync_request(&topic, inner).await;
+                }
+                GOSSIP_SYNC_KIND_RESPONSE => {
+                    return self.handle_group_sync_response(&topic, inner).await;
+                }
+                _ => {
+                    tracing::warn!(topic = %topic, peer = %from, "unknown gossip sync kind: {}", kind);
+                    return Ok(());
+                }
+            }
+        }
+
         let crypto = match self.crypto.as_mut() {
             Some(c) => c,
             None => return Ok(()),
@@ -1989,6 +2054,113 @@ impl NodeChatWorker {
         Ok(())
     }
 
+    /// Build a group-sync request frame.
+    fn build_group_sync_request_frame(&self, last_ts: i64) -> Vec<u8> {
+        let mut frame = Vec::with_capacity(4 + 1 + 8);
+        frame.extend_from_slice(GOSSIP_SYNC_MAGIC);
+        frame.push(GOSSIP_SYNC_KIND_REQUEST);
+        frame.extend_from_slice(&last_ts.to_be_bytes());
+        frame
+    }
+
+    /// Build a group-sync response frame containing many messages.
+    fn build_group_sync_response_frame(&self, topic: &str, messages: &[queries::MessageRecord]) -> Result<Vec<u8>> {
+        let crypto = self.crypto.as_ref().context("no crypto")?;
+        let mut inner = Vec::new();
+        // Format: [count: u32] [[id: 16b] [sender_id_len: u16] [sender_id] [ts: i64] [content_len: u32] [content]]...
+        inner.extend_from_slice(&(messages.len() as u32).to_be_bytes());
+        for msg in messages {
+            inner.extend_from_slice(msg.id.as_bytes());
+            inner.extend_from_slice(&(msg.sender_id.len() as u16).to_be_bytes());
+            inner.extend_from_slice(msg.sender_id.as_bytes());
+            inner.extend_from_slice(&msg.timestamp.to_be_bytes());
+            let content = msg.content.as_bytes();
+            inner.extend_from_slice(&(content.len() as u32).to_be_bytes());
+            inner.extend_from_slice(content);
+        }
+
+        let ciphertext = crypto.encrypt_group(topic, &inner)?;
+        let mut frame = Vec::with_capacity(4 + 1 + ciphertext.len());
+        frame.extend_from_slice(GOSSIP_SYNC_MAGIC);
+        frame.push(GOSSIP_SYNC_KIND_RESPONSE);
+        frame.extend_from_slice(&ciphertext);
+        Ok(frame)
+    }
+
+    async fn broadcast_group_sync_request(&mut self, topic: &str) -> Result<()> {
+        let messages = queries::list_messages(&self.db, topic)?;
+        let last_ts = messages.last().map(|m| m.timestamp).unwrap_or(0);
+        let frame = self.build_group_sync_request_frame(last_ts);
+        self.network.broadcast_group(topic, frame).await
+    }
+
+    async fn handle_group_sync_request(&mut self, topic: &str, payload: &[u8]) -> Result<()> {
+        if payload.len() < 8 { return Ok(()); }
+        let mut ts_bytes = [0u8; 8];
+        ts_bytes.copy_from_slice(&payload[0..8]);
+        let since_ts = i64::from_be_bytes(ts_bytes);
+
+        // Limit the number of messages in one sync response to avoid gossip overflow
+        let messages = queries::list_messages_since(&self.db, topic, since_ts, 50)?;
+        if messages.is_empty() { return Ok(()); }
+
+        let frame = self.build_group_sync_response_frame(topic, &messages)?;
+        self.network.broadcast_group(topic, frame).await
+    }
+
+    async fn handle_group_sync_response(&mut self, topic: &str, payload: &[u8]) -> Result<()> {
+        let crypto = match self.crypto.as_ref() {
+            Some(c) => c,
+            None => return Ok(()),
+        };
+        let inner = crypto.decrypt_group(topic, payload)?;
+        if inner.len() < 4 { return Ok(()); }
+
+        let mut pos = 0;
+        let count = u32::from_be_bytes(inner[0..4].try_into()?);
+        pos += 4;
+
+        let mut imported = 0;
+        for _ in 0..count {
+            if pos + 16 + 2 > inner.len() { break; }
+            let id = Uuid::from_slice(&inner[pos..pos+16])?;
+            pos += 16;
+            let sender_id_len = u16::from_be_bytes(inner[pos..pos+2].try_into()?) as usize;
+            pos += 2;
+            if pos + sender_id_len + 8 + 4 > inner.len() { break; }
+            let sender_id = String::from_utf8_lossy(&inner[pos..pos+sender_id_len]).to_string();
+            pos += sender_id_len;
+            let timestamp = i64::from_be_bytes(inner[pos..pos+8].try_into()?);
+            pos += 8;
+            let content_len = u32::from_be_bytes(inner[pos..pos+4].try_into()?) as usize;
+            pos += 4;
+            if pos + content_len > inner.len() { break; }
+            let content = String::from_utf8_lossy(&inner[pos..pos+content_len]).to_string();
+            pos += content_len;
+
+            let record = queries::MessageRecord {
+                id,
+                msg_type: "group".to_owned(),
+                target_id: topic.to_owned(),
+                sender_id,
+                content,
+                timestamp,
+                status: MessageStatus::Sent, // Synced messages are 'Sent'
+            };
+            if queries::insert_message(&self.db, &record).is_ok() {
+                imported += 1;
+            }
+        }
+
+        if imported > 0 {
+            tracing::info!(topic = %topic, imported = imported, "imported group messages via gossip sync");
+            self.emit_conversation_messages(topic, true)?;
+            self.emit_chat_list();
+        }
+
+        Ok(())
+    }
+
     /// Returns `true` if a live E2EE session key exists for the given peer.
     fn has_session(&self, node_id: &str) -> bool {
         self.crypto
@@ -1996,7 +2168,6 @@ impl NodeChatWorker {
             .map(|crypto| crypto.has_session(node_id))
             .unwrap_or(false)
     }
-
 }
 
 /// Returns the current time as a UTC Unix timestamp in seconds.

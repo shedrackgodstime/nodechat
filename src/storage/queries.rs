@@ -436,6 +436,55 @@ pub fn advance_message_status(
     Ok(())
 }
 
+/// Fetch all messages in a conversation since a given timestamp, with a limit.
+pub fn list_messages_since(
+    conn: &Connection,
+    target_id: &str,
+    since_ts: i64,
+    limit: usize,
+) -> Result<Vec<MessageRecord>> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, type, target_id, sender_id, content, timestamp, status
+             FROM messages 
+             WHERE target_id = ?1 AND timestamp > ?2 
+             ORDER BY timestamp ASC 
+             LIMIT ?3",
+        )
+        .context("failed to prepare list_messages_since statement")?;
+
+    let messages = stmt
+        .query_map(params![target_id, since_ts, limit], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, i64>(5)?,
+                row.get::<_, String>(6)?,
+            ))
+        })
+        .context("failed to query messages since")?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .context("failed to collect messages since")?;
+
+    messages
+        .into_iter()
+        .map(|(id, msg_type, target_id, sender_id, content, timestamp, status_str)| {
+            Ok(MessageRecord {
+                id: Uuid::parse_str(&id).with_context(|| format!("invalid UUID {:?}", id))?,
+                msg_type,
+                target_id,
+                sender_id,
+                content,
+                timestamp,
+                status: MessageStatus::from_db_str(&status_str)?,
+            })
+        })
+        .collect()
+}
+
 /// Fetch all messages in a conversation (single peer or group topic), ordered by timestamp.
 ///
 /// # Errors

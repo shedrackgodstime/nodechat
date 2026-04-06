@@ -15,7 +15,11 @@ use super::{NetworkManager, NetworkEvent};
 ///
 /// # Errors
 /// Returns an error if the gossip subscription fails.
-pub(crate) async fn subscribe(manager: &mut NetworkManager, topic_id: &str) -> Result<()> {
+pub(crate) async fn subscribe(
+    manager: &mut NetworkManager,
+    topic_id: &str,
+    bootstrap: Vec<iroh::EndpointId>,
+) -> Result<()> {
     let gossip = manager.gossip.as_ref()
         .ok_or_else(|| anyhow::anyhow!("gossip not initialised"))?;
     let event_tx = manager.event_tx.clone();
@@ -23,8 +27,8 @@ pub(crate) async fn subscribe(manager: &mut NetworkManager, topic_id: &str) -> R
     let id = derive_topic_id(topic_id);
     let topic_id_owned = topic_id.to_owned();
 
-    // Join the topic swarm (bootstrap peers empty for now — discovery handles it)
-    let (_sender, mut receiver) = gossip.subscribe(id, vec![]).await?.split();
+    // Join the topic swarm with bootstrap peers (RULES.md P-02)
+    let (_sender, mut receiver) = gossip.subscribe(id, bootstrap).await?.split();
 
     tokio::spawn(async move {
         tracing::info!("Subscribed to gossip topic: {}", topic_id_owned);
