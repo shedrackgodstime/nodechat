@@ -1,0 +1,109 @@
+// NodeChat New — Message Composer Component
+// ---------------------------------------------------------
+// The input bar anchored at the bottom of ChatView.
+// Keyboard-safe: sits above the virtual keyboard on mobile.
+// Supports: text input, send button, disabled state.
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+
+export component Composer inherits Rectangle {
+    in property <bool> is-disabled: false;
+    in property <string> placeholder: "Message...";
+
+    callback send-message(string);
+
+    // Internal state
+    property <string> draft: "";
+
+    height: 64px;
+    background: AppTheme.surface-secondary;
+    border-color: AppTheme.divider;
+
+    HorizontalLayout {
+        padding-left: AppTheme.sp-md;
+        padding-right: AppTheme.sp-md;
+        padding-top: AppTheme.sp-sm;
+        padding-bottom: AppTheme.sp-sm;
+        spacing: AppTheme.sp-sm;
+        alignment: center;
+
+        // --- Text Input Area ---
+        Rectangle {
+            horizontal-stretch: 1;
+            height: 40px;
+            border-radius: AppTheme.radius-pill;
+            background: AppTheme.surface-tertiary;
+            border-color: input.has-focus ? AppTheme.accent : AppTheme.border;
+            border-width: 1px;
+
+            // Animate border on focus
+            animate border-color { duration: AppTheme.dur-short; }
+
+            HorizontalLayout {
+                padding-left: AppTheme.sp-md;
+                padding-right: AppTheme.sp-md;
+
+                // Placeholder text overlay (Slint TextInput has no placeholder-text)
+                if root.draft == "" : Text {
+                    text: root.placeholder;
+                    font-size: 15px;
+                    color: AppTheme.text-tertiary;
+                    vertical-alignment: center;
+                }
+
+                input := TextInput {
+                    text <=> root.draft;
+                    font-size: 15px;
+                    color: root.is-disabled ? AppTheme.text-tertiary : AppTheme.text-primary;
+                    enabled: !root.is-disabled;
+                    vertical-alignment: center;
+                    single-line: true;
+
+                    accepted => {
+                        if root.draft != "" && !root.is-disabled {
+                            root.send-message(root.draft);
+                            root.draft = "";
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Send Button ---
+        TouchArea {
+            width: 40px;
+            height: 40px;
+            enabled: root.draft != "" && !root.is-disabled;
+
+            clicked => {
+                if root.draft != "" && !root.is-disabled {
+                    root.send-message(root.draft);
+                    root.draft = "";
+                }
+            }
+
+            Rectangle {
+                border-radius: 20px;
+                background: root.draft != "" && !root.is-disabled
+                    ? AppTheme.accent
+                    : AppTheme.surface-hover;
+
+                animate background { duration: AppTheme.dur-short; }
+
+                Text {
+                    text: "↑";
+                    font-size: 20px;
+                    font-weight: 700;
+                    color: root.draft != "" && !root.is-disabled
+                        ? AppTheme.text-inverted
+                        : AppTheme.text-tertiary;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+
+                    animate color { duration: AppTheme.dur-short; }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,92 @@
+// NodeChat Design System — Simple & Systemic
+// ---------------------------------------------------------
+// This theme system borrows best-practices from Slint's
+// official demos (Printer Demo, Energy Monitor).
+// ---------------------------------------------------------
+
+export struct Font {
+    size: length,
+    weight: int,
+}
+
+export struct TypoSystem {
+    label: Font,
+    body: Font,
+    header: Font,
+    title: Font,
+}
+
+export struct MeasurementSystem {
+    xs: length,
+    sm: length,
+    md: length,
+    lg: length,
+    xl: length,
+    radius-sm: length,
+    radius-md: length,
+    radius-lg: length,
+    radius-xl: length,
+    radius-pill: length,
+}
+
+export global AppTheme {
+    // --- 1. Measurement System (8pt Grid) ---
+    out property <MeasurementSystem> space: {
+        xs: 4px, sm: 8px, md: 16px, lg: 24px, xl: 32px,
+        radius-sm: 4px, radius-md: 8px, radius-lg: 12px, radius-xl: 16px, radius-pill: 999px
+    };
+
+    // --- 2. Typography System ---
+    out property <TypoSystem> typo: {
+        label: { size: 11px, weight: 600 },
+        body:  { size: 14px, weight: 400 },
+        header: { size: 16px, weight: 700 },
+        title:  { size: 24px, weight: 800 }
+    };
+
+    // --- 3. Color Palette (Simple & High Utility) ---
+    // Base Surfaces
+    out property <color> surface-primary:   #09090B;   // Main Background
+    out property <color> surface-secondary: #121215;   // Headers / Secondary Cards
+    out property <color> surface-tertiary:  #1A1A1E;   // Inputs / Dividers
+    out property <color> surface-hover:     #242429;
+    
+    // Accents
+    out property <color> accent:          #3F8CFF;   // Branded Blue
+    out property <color> accent-soft:     rgba(63, 140, 255, 0.1);
+    out property <color> accent-success:  #22C55E;
+    out property <color> accent-warning:  #F59E0B;
+    out property <color> accent-danger:   #EF4444;
+
+    // Typography Colors
+    out property <color> text-primary:   #FAFAFA;
+    out property <color> text-secondary: #A1A1AA;
+    out property <color> text-tertiary:  #52525B;
+    out property <color> text-inverted:  #000000;
+
+    // Chat Bubbles
+    out property <color> bubble-out:      #3F8CFF;
+    out property <color> bubble-in:       #27272A;
+
+    // Borders
+    out property <color> divider: #1E1E22;
+    out property <color> border:  #27272A;
+
+    // --- 4. Animation ---
+    out property <duration> dur-short: 150ms;
+    out property <duration> dur-md:    300ms;
+
+    // Legacy Aliases (to prevent breaking current components temporarily)
+    out property <length> sp-xs: 4px;
+    out property <length> sp-sm: 8px;
+    out property <length> sp-md: 16px;
+    out property <length> sp-lg: 24px;
+    out property <length> sp-xl: 32px;
+    out property <length> radius-sm: 4px;
+    out property <length> radius-md: 8px;
+    out property <length> radius-lg: 12px;
+    out property <length> radius-xl: 16px;
+    out property <length> radius-pill: 999px;
+    out property <color> surface-glass: #1A1A1E;
+    out property <color> accent-gradient: #3F8CFF;
+}

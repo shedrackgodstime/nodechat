@@ -1,0 +1,313 @@
+// NodeChat New — Root Application Shell
+// ---------------------------------------------------------
+// This file serves as the primary layout controller.
+// It manages:
+//   - Responsive breakpoints (Mobile vs Tablet vs Desktop)
+//   - Safe areas for mobile/keyboard
+//   - Navigation state (Routing)
+//   - Theme token application
+// ---------------------------------------------------------
+
+import { AppTheme } from "./theme.slint";
+import { ChatListScreen, ChatPreview } from "./screens/chat_list.slint";
+import { ChatViewScreen, MessageData } from "./screens/chat_view.slint";
+import { SettingsScreen } from "./screens/settings_screen.slint";
+import { ConfirmModal } from "./components/confirm_modal.slint";
+import { ContactsScreen, ContactData } from "./screens/contacts_screen.slint";
+import { NavBar } from "./components/nav_bar.slint";
+
+export { ChatPreview, MessageData }
+
+export enum DeviceType { mobile, tablet, desktop }
+
+export struct ConversationContext {
+    kind: string,           // "direct" | "group"
+    id: string,
+    title: string,
+    initials: string,
+    is-online: bool,
+    is-relay: bool,
+    is-verified: bool,
+    is-session-ready: bool,
+    connection-stage: string,
+    return-screen: int,
+}
+
+export component AppWindow inherits Window {
+    title: "NodeChat";
+
+    // --- Window Constraints ---
+    min-width: 360px;
+    min-height: 560px;
+    preferred-width: 1080px;
+    preferred-height: 800px;
+    background: AppTheme.surface-primary;
+
+    // --- Shell State ---
+    // Breakpoints: Mobile (< 700px), Tablet (700px - 1000px), Desktop (> 1000px)
+    out property <DeviceType> device: root.width > 1000px ? DeviceType.desktop : root.width > 700px ? DeviceType.tablet : DeviceType.mobile;
+    out property <bool> is-desktop: root.device == DeviceType.desktop || root.device == DeviceType.tablet;
+    
+    // Decoupled width property to prevent binding loops in layout negotiation
+    property <length> concrete-sidebar-width: (root.device == DeviceType.desktop) ? 320px : (root.device == DeviceType.tablet ? 170px : 0px);
+    
+    in-out property <int> current-screen: 0; 
+    in-out property <bool> has-identity: false;
+    in-out property <bool> is-locked: false;
+
+    // --- App Data ---
+    in property <string> display-name: "Shedrack G.";
+    in property <string> initials: "SG";
+    in property <string> endpoint-ticket: "";
+    in property <[ChatPreview]> chats: [];
+    in property <[ContactData]> contacts: [];
+    in property <[MessageData]> active-messages: [];
+    in-out property <ConversationContext> active-conversation: {
+        kind: "direct", id: "", title: "", initials: "",
+        is-online: false, is-relay: false, is-verified: false,
+        is-session-ready: false, connection-stage: "", return-screen: 0,
+    };
+    in property <int> direct-peers: 0;
+    in property <int> relay-peers: 0;
+    in property <bool> is-offline: false;
+
+    // --- Modal State ---
+    in-out property <bool> confirm-modal-show: false;
+    in-out property <string> confirm-modal-title: "Confirm Action";
+    in-out property <string> confirm-modal-subtitle: "Are you sure you want to do this?";
+    in-out property <string> confirm-modal-slug: "";
+    in-out property <string> confirm-modal-err: "";
+    in-out property <bool> confirm-modal-checked: false;
+
+    // --- Callbacks ---
+    callback open-settings;
+    callback open-contacts;
+    callback add-contact;
+    callback open-chat(ChatPreview);
+
+    open-settings => { root.current-screen = 3; }
+    open-contacts => { root.current-screen = 4; }
+    add-contact => { /* Implement ticket entry popup would go here */ }
+    
+    open-chat(chat) => {
+        root.load-conversation(chat.id, chat.is-group);
+        root.active-conversation = {
+            kind: chat.is-group ? "group" : "direct",
+            id: chat.id, title: chat.name, initials: chat.initials,
+            is-online: chat.is-online, is-relay: chat.is-relay,
+            is-verified: chat.is-verified, is-session-ready: false,
+            connection-stage: "", return-screen: 0,
+        };
+        root.current-screen = chat.is-group ? 2 : 1;
+    }
+
+    callback send-message(string);
+    callback send-group-message(string);
+    callback load-conversation(string, bool);
+    callback open-contact-info();
+    callback open-group-info();
+    callback accept-group-invite(string, string, string);
+    callback retry-queued();
+    callback request-delete-conversation();
+    callback confirm-modal-confirmed(string, string);
+    callback edit-display-name();
+    callback copy-node-id();
+    callback change-password();
+    callback open-debug-console();
+    callback request-clear-history();
+    callback request-reset-identity();
+
+    // --- Safe Areas ---
+    property <length> safe-area-top: root.safe-area-insets.top;
+    property <length> safe-area-bottom: root.safe-area-insets.bottom;
+    property <length> kb-height: root.virtual-keyboard-size.height;
+
+    // --- Application Root Shell ---
+    Rectangle {
+        background: AppTheme.surface-primary;
+
+        // 1. SIDEBAR (Absolute positioning to break layout loops)
+        Rectangle {
+            x: 0;
+            y: 0;
+            width: root.concrete-sidebar-width;
+            height: 100%;
+            clip: true;
+            visible: root.concrete-sidebar-width > 0;
+            background: AppTheme.surface-secondary;
+
+            VerticalLayout {
+                spacing: 0;
+                
+                if root.device == DeviceType.desktop : VerticalLayout {
+                    spacing: 0;
+                    ChatListScreen {
+                        vertical-stretch: 1;
+                        is-desktop: true;
+                        chats: root.chats;
+                        direct-peers: root.direct-peers;
+                        relay-peers: root.relay-peers;
+                        is-offline: root.is-offline;
+                        open-chat(chat) => { root.open-chat(chat); }
+                        add-contact => { root.add-contact(); }
+                        open-contacts => { root.open-contacts(); }
+                        open-settings => { root.open-settings(); }
+                    }
+                    NavBar {
+                        height: 72px;
+                        active-screen: root.current-screen;
+                        nav-to(id) => { root.current-screen = id; }
+                    }
+                }
+
+                if root.device == DeviceType.tablet : HorizontalLayout {
+                    spacing: 0;
+                    vertical-stretch: 1;
+                    NavBar {
+                        width: 90px;
+                        active-screen: root.current-screen;
+                        is-vertical: true;
+                        nav-to(id) => { root.current-screen = id; }
+                        add-contact-clicked => { root.add-contact(); }
+                    }
+                    ChatListScreen {
+                        horizontal-stretch: 1;
+                        is-desktop: true;
+                        compact: true;
+                        chats: root.chats;
+                        direct-peers: root.direct-peers;
+                        relay-peers: root.relay-peers;
+                        is-offline: root.is-offline;
+                        open-chat(chat) => { root.open-chat(chat); }
+                        add-contact => { root.add-contact(); }
+                        open-contacts => { root.open-contacts(); }
+                        open-settings => { root.open-settings(); }
+                    }
+                }
+            }
+
+            Rectangle { x: parent.width - 1px; width: 1px; background: AppTheme.divider; }
+        }
+
+        // 2. PRIMARY CONTENT AREA (Absolute positioning to break layout loops)
+        Rectangle {
+            x: root.concrete-sidebar-width;
+            y: 0;
+            width: parent.width - root.concrete-sidebar-width;
+            height: 100%;
+
+            VerticalLayout {
+                spacing: 0;
+
+                // Safe area spacer (Mobile only)
+                if !root.is-desktop : Rectangle { 
+                    height: root.safe-area-top; 
+                    background: AppTheme.surface-primary; 
+                    vertical-stretch: 0;
+                }
+                
+                // Screen Content
+                Rectangle {
+                    vertical-stretch: 1;
+                    clip: true;
+
+                    if root.device == DeviceType.mobile && root.current-screen == 0 : ChatListScreen {
+                        is-desktop: false;
+                        chats: root.chats;
+                        direct-peers: root.direct-peers;
+                        relay-peers: root.relay-peers;
+                        is-offline: root.is-offline;
+                        open-chat(chat) => { root.open-chat(chat); }
+                        add-contact => { root.add-contact(); }
+                        open-contacts => { root.open-contacts(); }
+                        open-settings => { root.open-settings(); }
+                    }
+
+                    if root.is-desktop && root.current-screen == 0 : VerticalLayout {
+                        alignment: center;
+                        spacing: AppTheme.space.md;
+                        padding: AppTheme.space.xl;
+                        Text { text: "💬"; font-size: 56px; horizontal-alignment: center; }
+                        Text { text: "Select a conversation"; font-size: 20px; font-weight: 700; color: AppTheme.text-primary; horizontal-alignment: center; }
+                        Text { text: "Choose a chat from the left panel to begin."; font-size: 14px; color: AppTheme.text-secondary; horizontal-alignment: center; }
+                    }
+
+                    if root.current-screen == 1 || root.current-screen == 2 : ChatViewScreen {
+                        is-desktop: root.is-desktop;
+                        peer-name: root.active-conversation.title;
+                        peer-initials: root.active-conversation.initials;
+                        peer-node-id: root.active-conversation.id;
+                        connection-mode: root.active-conversation.kind;
+                        is-online: root.active-conversation.is-online || root.active-conversation.kind == "group";
+                        is-relay: root.active-conversation.is-relay;
+                        is-verified: root.active-conversation.is-verified || root.active-conversation.kind == "group";
+                        connection-stage: root.active-conversation.connection-stage;
+                        messages: root.active-messages;
+                        virtual-keyboard-height: root.kb-height;
+                        go-back => { root.current-screen = root.active-conversation.return-screen; }
+                        send-message(msg) => { 
+                            if root.active-conversation.kind == "group" { root.send-group-message(msg); }
+                            else { root.send-message(msg); }
+                        }
+                        open-contact-info => { 
+                            if root.active-conversation.kind == "group" { root.open-group-info(); }
+                            else { root.open-contact-info(); }
+                        }
+                        retry-queued => { root.retry-queued(); }
+                        request-delete-conversation => { root.request-delete-conversation(); }
+                    }
+
+                    if root.current-screen == 3 : SettingsScreen {
+                        display-name: root.display-name;
+                        initials: root.initials;
+                        endpoint-ticket: root.endpoint-ticket;
+                        back-clicked => { root.current-screen = 0; }
+                        edit-display-name => { root.edit-display-name(); }
+                        copy-node-id => { root.copy-node-id(); }
+                        change-password => { root.change-password(); }
+                        open-debug-console => { root.open-debug-console(); }
+                        request-clear-history => { root.request-clear-history(); }
+                        request-reset-identity => { root.request-reset-identity(); }
+                    }
+                    if root.current-screen == 4 : ContactsScreen {
+                        is-desktop: root.is-desktop;
+                        contacts: root.contacts;
+                        back-clicked => { root.current-screen = 0; }
+                        add-contact => { root.add-contact(); }
+                        new-group => { root.open-settings(); }
+                        open-contact(contact) => {
+                            root.load-conversation(contact.id, false);
+                            root.active-conversation = {
+                                kind: "direct", id: contact.id, title: contact.name, initials: contact.initials,
+                                is-online: contact.is-online, is-relay: contact.is-relay,
+                                is-verified: contact.is-verified, is-session-ready: false,
+                                connection-stage: "", return-screen: 4,
+                            };
+                            root.current-screen = 1;
+                        }
+                    }
+                }
+
+                // Mobile Navigation Bar
+                if root.device == DeviceType.mobile && (root.current-screen == 0 || root.current-screen == 3 || root.current-screen == 4) : NavBar {
+                    height: 72px + root.safe-area-bottom;
+                    vertical-stretch: 0;
+                    active-screen: root.current-screen;
+                    nav-to(id) => { root.current-screen = id; }
+                    safe-area-bottom: root.safe-area-bottom;
+                }
+            }
+        }
+
+        // 3. GLOBAL MODALS
+        if root.confirm-modal-show : ConfirmModal {
+            title: root.confirm-modal-title;
+            subtitle: root.confirm-modal-subtitle;
+            action-slug: root.confirm-modal-slug;
+            error-msg: root.confirm-modal-err;
+            is-checked <=> root.confirm-modal-checked;
+            cancel => { root.confirm-modal-show = false; }
+            confirm(pin) => { root.confirm-modal-confirmed(root.confirm-modal-slug, pin); }
+        }
+    }
+}
