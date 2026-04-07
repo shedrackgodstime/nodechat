@@ -1,0 +1,116 @@
+// NodeChat New — Contact Row Component
+// ---------------------------------------------------------
+// Specialized row for the Contacts screen.
+// Focuses on Node identity, online status, and verification.
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+
+export struct ContactData {
+    id: string,
+    name: string,
+    initials: string,
+    node-id: string,
+    is-online: bool,
+    is-session-ready: bool,
+    is-relay: bool,
+    is-verified: bool,
+}
+
+export component ContactRow inherits Rectangle {
+    in property <ContactData> data;
+
+    callback clicked();
+
+    height: 64px;
+    background: transparent;
+    border-radius: AppTheme.radius-md;
+
+    states [
+        hovered when touch.has-hover : {
+            background: AppTheme.surface-hover;
+        }
+    ]
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: AppTheme.sp-md;
+        padding-right: AppTheme.sp-md;
+        spacing: AppTheme.sp-md;
+        alignment: start;
+
+        // --- Avatar / Status ---
+        Rectangle {
+            width: 44px;
+            height: 44px;
+            border-radius: 22px;
+            background: AppTheme.surface-tertiary;
+            border-color: data.is-online ? AppTheme.accent-success : transparent;
+            border-width: data.is-online ? 2px : 0px;
+            y: (parent.height - self.height) / 2;
+
+            Text {
+                text: data.initials;
+                font-size: 15px;
+                font-weight: 700;
+                color: AppTheme.text-primary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            if data.is-online || data.is-relay : Rectangle {
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                background: data.is-relay ? AppTheme.accent-warning : AppTheme.accent-success;
+                border-color: AppTheme.surface-primary;
+                border-width: 1.5px;
+                x: parent.width - self.width;
+                y: parent.height - self.height;
+            }
+        }
+
+        // --- Information ---
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 1px;
+
+            HorizontalLayout {
+                spacing: AppTheme.sp-xs;
+                Text {
+                    text: data.name;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: AppTheme.text-primary;
+                    overflow: elide;
+                }
+                if data.is-verified : Text {
+                    text: "✓";
+                    font-size: 12px;
+                    color: AppTheme.accent-success;
+                    vertical-alignment: center;
+                }
+            }
+
+            Text {
+                text: data.node-id;
+                font-size: 12px;
+                color: AppTheme.text-tertiary;
+                font-family: "monospace";
+                overflow: elide;
+            }
+        }
+
+        // --- Arrow ---
+        Text {
+            text: "›";
+            font-size: 20px;
+            color: AppTheme.text-tertiary;
+            vertical-alignment: center;
+        }
+    }
+}

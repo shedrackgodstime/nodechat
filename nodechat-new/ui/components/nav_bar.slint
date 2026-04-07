@@ -1,0 +1,169 @@
+// NodeChat New — Navigation Bar (Horizontal & Vertical)
+// ---------------------------------------------------------
+// This component automatically adapts to Horizontal (Mobile/Desktop)
+// and Vertical (Tablet Rail) orientations.
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+
+component NavItem inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <bool> active;
+    in property <bool> compact: false;
+    in property <bool> is-vertical: false;
+    in property <color> icon-color: root.active ? AppTheme.accent : AppTheme.text-tertiary;
+    callback clicked;
+
+    background: transparent;
+    border-radius: AppTheme.radius-md;
+    
+    // Subtle Hover Effect
+    states [
+        hovered when touch.has-hover && !active : {
+            background: AppTheme.surface-hover;
+        }
+    ]
+
+    // --- Active Page Indicator (Minimalist Line) ---
+    if active : Rectangle {
+        width: is-vertical ? 3px : 24px;
+        height: is-vertical ? 18px : 3px;
+        background: AppTheme.accent;
+        border-radius: AppTheme.radius-pill;
+        
+        // Position: Left edge for vertical rail, Bottom center for horizontal bar
+        x: is-vertical ? 2px : (parent.width - self.width) / 2;
+        y: is-vertical ? (parent.height - self.height) / 2 : (parent.height - self.height - 6px);
+    }
+    
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+        
+        VerticalLayout {
+            alignment: center;
+            spacing: compact ? 0 : 4px; // Increased spacing for visibility
+            padding-top: (is-vertical ? 0 : 4px); // Lift content slightly in horizontal mode
+            
+            HorizontalLayout {
+                alignment: center;
+                Image {
+                    source: root.icon;
+                    width: 24px; // Slightly larger icons (up from 22px)
+                    height: 24px;
+                    colorize: root.icon-color;
+                }
+            }
+            
+            if !compact : Text {
+                text: root.text;
+                font-size: 11px;
+                font-weight: 700;
+                color: root.active ? AppTheme.accent : AppTheme.text-tertiary;
+                horizontal-alignment: center;
+                overflow: elide;
+            }
+        }
+    }
+}
+
+export component NavBar inherits Rectangle {
+    in property <int> active-screen: 0;
+    in property <length> safe-area-bottom: 0px;
+    in property <bool> compact: false;
+    in property <bool> is-vertical: false;
+    
+    callback nav-to(int);
+    callback add-contact-clicked();
+
+    background: AppTheme.surface-secondary;
+    border-color: AppTheme.divider;
+    border-width: 1px;
+
+    // Orientation-specific internal layouts
+    if !is-vertical : VerticalLayout {
+        padding-bottom: root.safe_area_bottom;
+
+        HorizontalLayout {
+            padding-left: compact ? 4px : AppTheme.space.md;
+            padding-right: compact ? 4px : AppTheme.space.md;
+            spacing: compact ? 4px : AppTheme.space.xs;
+            alignment: space-around;
+
+            NavItem {
+                icon: @image-url("../images/nav/chats.svg");
+                text: "Chats";
+                compact: root.compact;
+                active: root.active-screen == 0 || root.active-screen == 1 || root.active-screen == 2;
+                clicked => { root.nav-to(0); }
+            }
+
+            NavItem {
+                icon: @image-url("../images/nav/contacts.svg");
+                text: "Contacts";
+                compact: root.compact;
+                active: root.active-screen == 4;
+                clicked => { root.nav-to(4); }
+            }
+
+            NavItem {
+                icon: @image-url("../images/nav/settings.svg");
+                text: "Settings";
+                compact: root.compact;
+                active: root.active-screen == 3;
+                clicked => { root.nav-to(3); }
+            }
+        }
+    }
+
+    if is-vertical : VerticalLayout {
+        padding-top: AppTheme.space.md;
+        padding-bottom: AppTheme.space.md;
+        spacing: AppTheme.space.md;
+        alignment: start;
+
+        // Tablet-only Add Button at the top of the rail
+        NavItem {
+            height: 54px;
+            icon: @image-url("../images/nav/add.svg");
+            text: "Add";
+            compact: root.compact;
+            is-vertical: true;
+            active: false;
+            icon-color: AppTheme.accent;
+            clicked => { root.add-contact-clicked(); }
+        }
+
+        Rectangle { height: 1px; background: AppTheme.divider; x: 12px; width: parent.width - 24px; }
+
+        NavItem {
+            height: 68px; // Increased height for vertical rail
+            icon: @image-url("../images/nav/chats.svg");
+            text: "Chats";
+            compact: root.compact;
+            is-vertical: true;
+            active: root.active-screen == 0 || root.active-screen == 1 || root.active-screen == 2;
+            clicked => { root.nav-to(0); }
+        }
+
+        NavItem {
+            height: 68px;
+            icon: @image-url("../images/nav/contacts.svg");
+            text: "Contacts";
+            compact: root.compact;
+            is-vertical: true;
+            active: root.active-screen == 4;
+            clicked => { root.nav-to(4); }
+        }
+
+        NavItem {
+            height: 68px;
+            icon: @image-url("../images/nav/settings.svg");
+            text: "Settings";
+            compact: root.compact;
+            is-vertical: true;
+            active: root.active-screen == 3;
+            clicked => { root.nav-to(3); }
+        }
+    }
+}

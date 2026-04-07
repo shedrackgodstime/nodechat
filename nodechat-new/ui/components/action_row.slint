@@ -1,0 +1,120 @@
+// NodeChat New — Action Row Component
+// ---------------------------------------------------------
+// Standardised row for settings, profile, and list views.
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+
+export component ActionRow inherits Rectangle {
+    in property <string> icon: "";
+    in property <image> icon-svg: @image-url("");
+    in property <color> icon-color: AppTheme.accent;
+    in property <string> title: "Setting";
+    in property <string> subtitle: "";
+    in property <string> accessory: "arrow"; // "arrow", "none", "toggle"
+    in property <bool> is-toggle-on: false;
+    in property <color> title-color: AppTheme.text-primary;
+    
+    callback clicked();
+    callback toggled(bool);
+
+    height: subtitle == "" ? 56px : 68px;
+    background: transparent;
+    border-radius: AppTheme.space.radius-md;
+    clip: true;
+
+    states [
+        hovered when touch.has-hover : {
+            background: AppTheme.surface-hover;
+        }
+    ]
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: AppTheme.space.md;
+        padding-right: AppTheme.space.md;
+        spacing: AppTheme.space.md;
+        alignment: start;
+
+        // --- Left Icon ---
+        if (icon != "" || icon-svg.width > 0) : Rectangle {
+            width: 38px;
+            height: 38px;
+            border-radius: AppTheme.space.radius-sm;
+            background: AppTheme.surface-tertiary;
+            y: (parent.height - self.height) / 2;
+
+            if icon-svg.width > 0 : Image {
+                source: root.icon-svg;
+                width: 20px;
+                height: 20px;
+                colorize: root.icon-color;
+            }
+
+            if icon-svg.width == 0 && icon != "" : Text {
+                text: root.icon;
+                font-size: AppTheme.typo.header.size;
+                font-weight: AppTheme.typo.header.weight;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        // --- Text Labels ---
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 2px;
+
+            Text {
+                text: root.title;
+                font-size: AppTheme.typo.header.size;
+                font-weight: AppTheme.typo.header.weight;
+                color: root.title-color;
+                overflow: elide;
+            }
+
+            if root.subtitle != "" : Text {
+                text: root.subtitle;
+                font-size: AppTheme.typo.label.size;
+                font-weight: AppTheme.typo.label.weight;
+                color: AppTheme.text-tertiary;
+                overflow: elide;
+            }
+        }
+
+        // --- Right Accessory ---
+        if accessory == "arrow" : Text {
+            text: "›";
+            font-size: 24px;
+            font-weight: 600;
+            color: AppTheme.text-tertiary;
+            vertical-alignment: center;
+        }
+
+        if accessory == "toggle" : Rectangle {
+            width: 44px;
+            height: 24px;
+            border-radius: 12px;
+            background: root.is-toggle-on ? AppTheme.accent : AppTheme.surface-tertiary;
+            y: (parent.height - self.height) / 2;
+
+            animate background { duration: AppTheme.dur-short; }
+
+            Rectangle {
+                x: root.is-toggle-on ? (parent.width - 20px - 2px) : 2px;
+                width: 20px;
+                height: 20px;
+                border-radius: 10px;
+                background: #FFFFFF;
+                y: (parent.height - self.height) / 2;
+                animate x { duration: AppTheme.dur-short; easing: ease-in-out; }
+            }
+
+            TouchArea { clicked => { root.toggled(!root.is-toggle-on); } }
+        }
+    }
+}

@@ -1,0 +1,40 @@
+[package]
+name = "nodechat-new"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow = "=1.0.102"
+slint = { version = "=1.15.1", features = ["backend-winit"] }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+slint = { version = "=1.15.1", default-features = false, features = ["backend-winit", "renderer-software", "compat-1-2"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+slint = { version = "=1.15.1", features = ["backend-android-activity-06"] }
+android-activity = "0.6.0"
+
+[build-dependencies]
+slint-build = "=1.15.1"
+
+[package.metadata.android]
+apk_name = "NodeChatNew"
+label = "NodeChat New"
+package = "com.nodechat.app.new"
+target_sdk_version = 33
+min_sdk_version = 24
+
+[[package.metadata.android.uses_permission]]
+name = "android.permission.INTERNET"
+
+[[package.metadata.android.uses_permission]]
+name = "android.permission.ACCESS_NETWORK_STATE"
+
+[package.metadata.android.signing.release]
+path = "../release.keystore"
+keystore_password = "nodechat"
+key_alias = "nodechat"
+key_password = "nodechat"

@@ -1,0 +1,176 @@
+// NodeChat New — Contacts Directory
+// ---------------------------------------------------------
+// Peer address book for 1:1 and group communication.
+// Layout:
+//   1. Quick Actions (Add Contact, Create Group)
+//   2. Peer Directory (Scrollable list of ContactRows)
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+import { PageShell } from "../components/page_shell.slint";
+import { ContactRow, ContactData } from "../components/contact_row.slint";
+
+export { ContactData }
+
+export component ContactsScreen inherits PageShell {
+    title: "Contacts";
+    subtitle: "Your P2P Network";
+    show-back: true;
+
+    in property <[ContactData]> contacts: [];
+
+    callback add-contact();
+    callback new-group();
+    callback open-contact(ContactData);
+
+    background: transparent;
+
+    VerticalLayout {
+        spacing: AppTheme.sp-lg;
+        padding-bottom: AppTheme.sp-xl;
+
+        // --- 1. Quick Actions ---
+        VerticalLayout {
+            spacing: AppTheme.sp-sm;
+            HorizontalLayout {
+                padding-left: AppTheme.sp-sm;
+                Text {
+                    text: "QUICK ACTIONS";
+                    font-size: 11px;
+                    font-weight: 800;
+                    color: AppTheme.text-tertiary;
+                    letter-spacing: 1px;
+                }
+            }
+
+            Rectangle {
+                background: AppTheme.surface-secondary;
+                border-radius: AppTheme.radius-lg;
+                border-width: 1px;
+                border-color: AppTheme.divider;
+                clip: true;
+
+                VerticalLayout {
+                    TouchArea {
+                        height: 64px;
+                        clicked => { root.add-contact(); }
+                        
+                        Rectangle {
+                            background: ta-add.has-hover ? AppTheme.surface-hover : transparent;
+                            ta-add := TouchArea { }
+
+                            HorizontalLayout {
+                                padding-left: AppTheme.sp-md;
+                                padding-right: AppTheme.sp-md;
+                                spacing: AppTheme.sp-md;
+                                alignment: center;
+
+                                Rectangle {
+                                    width: 38px;
+                                    height: 38px;
+                                    border-radius: AppTheme.radius-sm;
+                                    background: AppTheme.accent-soft;
+                                    Image {
+                                        source: @image-url("../images/nav/add.svg");
+                                        width: 20px;
+                                        height: 20px;
+                                        colorize: AppTheme.accent;
+                                    }
+                                }
+                                Text {
+                                    text: "Add Peer by Ticket";
+                                    font-size: 15px;
+                                    font-weight: 700;
+                                    color: AppTheme.accent;
+                                    horizontal-stretch: 1;
+                                    vertical-alignment: center;
+                                }
+                                Text { text: "›"; font-size: 20px; color: AppTheme.text-tertiary; vertical-alignment: center; }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout { padding-left: 68px; Rectangle { height: 1px; background: AppTheme.divider; } }
+
+                    TouchArea {
+                        height: 64px;
+                        clicked => { root.new-group(); }
+                        
+                        Rectangle {
+                            background: ta-grp.has-hover ? AppTheme.surface-hover : transparent;
+                            ta-grp := TouchArea { }
+
+                            HorizontalLayout {
+                                padding-left: AppTheme.sp-md;
+                                padding-right: AppTheme.sp-md;
+                                spacing: AppTheme.sp-md;
+                                alignment: center;
+
+                                Rectangle {
+                                    width: 38px;
+                                    height: 38px;
+                                    border-radius: AppTheme.radius-sm;
+                                    background: rgba(255, 149, 0, 0.1);
+                                    Image {
+                                        source: @image-url("../images/nav/contacts.svg");
+                                        width: 20px;
+                                        height: 20px;
+                                        colorize: #FF9500;
+                                    }
+                                }
+                                Text {
+                                    text: "New Group Chat";
+                                    font-size: 15px;
+                                    font-weight: 700;
+                                    color: #FF9500;
+                                    horizontal-stretch: 1;
+                                    vertical-alignment: center;
+                                }
+                                Text { text: "›"; font-size: 20px; color: AppTheme.text-tertiary; vertical-alignment: center; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 2. Directory ---
+        VerticalLayout {
+            spacing: AppTheme.sp-sm;
+            HorizontalLayout {
+                padding-left: AppTheme.sp-sm;
+                Text {
+                    text: "PEER DIRECTORY";
+                    font-size: 11px;
+                    font-weight: 800;
+                    color: AppTheme.text-tertiary;
+                    letter-spacing: 1px;
+                }
+            }
+
+            if contacts.length == 0 : Rectangle {
+                height: 200px;
+                background: AppTheme.surface-secondary;
+                border-radius: AppTheme.radius-lg;
+                border-width: 1px;
+                border-color: AppTheme.divider;
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "👤"; font-size: 40px; horizontal-alignment: center; }
+                    Text { text: "Your address book is empty"; font-size: 16px; font-weight: 700; color: AppTheme.text-primary; horizontal-alignment: center; }
+                    Text { text: "Invite friends via ticket to start chatting."; font-size: 13px; color: AppTheme.text-tertiary; horizontal-alignment: center; }
+                }
+            }
+
+            VerticalLayout {
+                spacing: 2px;
+                for contact in root.contacts : ContactRow {
+                    data: contact;
+                    clicked => { root.open-contact(contact); }
+                }
+            }
+        }
+    }
+}
