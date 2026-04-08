@@ -2,7 +2,11 @@
 // ---------------------------------------------------------
 // Renders a single chat message.
 // Supports: outgoing vs incoming, timestamps, status,
-// invite bubbles, system messages, and verified badges.
+// invite bubbles, system messages.
+//
+// Width strategy: asymmetric padding (not max-width) to avoid
+// ScrollView binding loops while keeping bubbles ~70% wide.
+// The 'is-desktop' flag tightens the offset for narrow panels.
 // ---------------------------------------------------------
 
 import { AppTheme } from "../theme.slint";
@@ -22,19 +26,24 @@ export struct MessageData {
     status: string,   // "sent" | "delivered" | "failed" | "queued"
 }
 
-export component MessageBubble inherits Rectangle {
+export component MessageBubble inherits VerticalLayout {
+    spacing: 0;
+
     in property <MessageData> data;
+    in property <bool> is-desktop: false; // Tightens offset for narrow panels
 
-    callback open-invite(string, string, string, bool); // topic, name, key, is_joined
+    callback open-invite(string, string, string, bool);
 
-    background: transparent;
-    // Spacing is handled by the parent list layout
+    // Responsive offset: smaller on desktop panels, larger on mobile
+    property <length> bubble-offset: is-desktop ? 48px : 72px;
 
-    // --- System Message (centered, no bubble) ---
+    // --- System Message ---
     if data.is-system : HorizontalLayout {
         alignment: center;
         padding-top: AppTheme.space.sm;
         padding-bottom: AppTheme.space.sm;
+        padding-left: AppTheme.space.xl;
+        padding-right: AppTheme.space.xl;
 
         Rectangle {
             border-radius: AppTheme.space.radius-pill;
@@ -52,6 +61,7 @@ export component MessageBubble inherits Rectangle {
                     font-weight: AppTheme.typo.label.weight;
                     color: AppTheme.text-tertiary;
                     horizontal-alignment: center;
+                    wrap: word-wrap;
                 }
             }
         }
@@ -60,8 +70,10 @@ export component MessageBubble inherits Rectangle {
     // --- Group Invite Bubble ---
     if data.is-invite && !data.is-system : HorizontalLayout {
         alignment: data.is-outgoing ? end : start;
-        padding-left: data.is-outgoing ? AppTheme.space.xl : AppTheme.space.md;
-        padding-right: data.is-outgoing ? AppTheme.space.md : AppTheme.space.xl;
+        padding-top: AppTheme.space.xs;
+        padding-bottom: AppTheme.space.xs;
+        padding-left: data.is-outgoing ? AppTheme.space.xl : AppTheme.space.sm;
+        padding-right: data.is-outgoing ? AppTheme.space.sm : AppTheme.space.xl;
 
         Rectangle {
             max-width: 280px;
@@ -115,17 +127,22 @@ export component MessageBubble inherits Rectangle {
     }
 
     // --- Standard Chat Bubble ---
+    // Asymmetric padding: outgoing → pushed right, incoming → pushed left.
+    // Offset scales with is-desktop to keep bubbles proportional on all panels.
     if !data.is-system && !data.is-invite : HorizontalLayout {
         alignment: data.is-outgoing ? end : start;
-        padding-left: data.is-outgoing ? 60px : AppTheme.space.md;
-        padding-right: data.is-outgoing ? AppTheme.space.md : 60px;
+        padding-top: AppTheme.space.xs;
+        padding-bottom: AppTheme.space.xs;
+        padding-left: data.is-outgoing ? bubble-offset : AppTheme.space.sm;
+        padding-right: data.is-outgoing ? AppTheme.space.sm : bubble-offset;
 
         VerticalLayout {
             spacing: 2px;
 
-            // Sender label for group messages (incoming only)
+            // Sender name — incoming group messages only
             if !data.is-outgoing && data.sender != "" : HorizontalLayout {
                 padding-left: AppTheme.space.sm;
+
                 Text {
                     text: data.sender;
                     font-size: AppTheme.typo.label.size;
@@ -134,7 +151,7 @@ export component MessageBubble inherits Rectangle {
                 }
             }
 
-            // The Bubble
+            // The bubble body
             Rectangle {
                 border-radius: AppTheme.space.radius-lg;
                 background: data.is-outgoing ? AppTheme.bubble-out : AppTheme.bubble-in;
@@ -150,11 +167,11 @@ export component MessageBubble inherits Rectangle {
                         text: data.text;
                         font-size: AppTheme.typo.body.size;
                         font-weight: AppTheme.typo.body.weight;
-                        color: data.is-outgoing ? #FFFFFF : AppTheme.text-primary; // Simple high contrast
+                        color: data.is-outgoing ? #FFFFFF : AppTheme.text-primary;
                         wrap: word-wrap;
                     }
 
-                    // Timestamp + Status Row
+                    // Timestamp + status row
                     HorizontalLayout {
                         alignment: end;
                         spacing: AppTheme.space.xs;
@@ -169,18 +186,34 @@ export component MessageBubble inherits Rectangle {
                             vertical-alignment: center;
                         }
 
-                        // Status indicator (outgoing only)
-                        if data.is-outgoing : Text {
-                            text: data.status == "delivered" ? "✓✓"
-                                : data.status == "sent"      ? "✓"
-                                : data.status == "failed"    ? "✗"
-                                : data.status == "queued"    ? "⏱"
-                                : "";
+                        // SVG status indicator (outgoing only) — cross-platform safe
+                        if data.is-outgoing && data.status == "delivered" : Image {
+                            source: @image-url("../images/nav/check-check.svg");
+                            width: 14px;
+                            height: 14px;
+                            colorize: AppTheme.accent-success;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        if data.is-outgoing && data.status == "sent" : Image {
+                            source: @image-url("../images/nav/check-check.svg");
+                            width: 14px;
+                            height: 14px;
+                            colorize: rgba(255, 255, 255, 0.5);
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        if data.is-outgoing && data.status == "failed" : Text {
+                            text: "✗";
                             font-size: AppTheme.typo.label.size;
-                            font-weight: AppTheme.typo.label.weight;
-                            color: data.status == "delivered" ? AppTheme.accent-success
-                                : data.status == "failed"     ? AppTheme.accent-danger
-                                : rgba(255, 255, 255, 0.5);
+                            color: AppTheme.accent-danger;
+                            vertical-alignment: center;
+                        }
+
+                        if data.is-outgoing && data.status == "queued" : Text {
+                            text: "⏱";
+                            font-size: AppTheme.typo.label.size;
+                            color: rgba(255, 255, 255, 0.5);
                             vertical-alignment: center;
                         }
                     }

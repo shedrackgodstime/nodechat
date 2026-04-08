@@ -1,0 +1,84 @@
+// NodeChat New — Premium Reusable Button
+// ---------------------------------------------------------
+// Standardised button system with support for:
+//   - Primary (Accent)
+//   - Secondary (Surface)
+//   - Ghost (Transparent)
+//   - Danger (Red)
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+
+export component Button inherits Rectangle {
+    in property <string> text: "Button";
+    in property <image> icon-svg: @image-url("");
+    in property <string> kind: "primary"; // "primary" | "secondary" | "ghost" | "danger"
+    in property <bool> enabled: true;
+    in property <bool> full-width: false;
+    
+    callback clicked();
+
+    height: 44px;
+    min-width: 120px;
+    horizontal-stretch: root.full-width ? 1 : 0;
+    border-radius: AppTheme.radius-md;
+    clip: true;
+
+    // --- Kinetic Backgrounds ---
+    background: kind == "primary" ? AppTheme.accent 
+              : kind == "secondary" ? AppTheme.surface-tertiary 
+              : kind == "danger" ? AppTheme.accent-danger
+              : transparent;
+
+    border-width: kind == "secondary" ? 1px : 0px;
+    border-color: AppTheme.divider;
+
+    states [
+        disabled when !enabled : {
+            opacity: 0.5;
+            background: AppTheme.surface-tertiary;
+        }
+        pressed when touch.pressed : {
+            opacity: 0.8;
+            background: kind == "primary" ? AppTheme.accent.darker(10%) : AppTheme.surface-hover;
+        }
+        hovered when touch.has-hover : {
+            background: kind == "primary" ? AppTheme.accent.brighter(5%) 
+                      : kind == "danger" ? AppTheme.accent-danger.brighter(5%)
+                      : AppTheme.surface-hover;
+        }
+    ]
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        
+        VerticalLayout {
+            alignment: center;
+
+            HorizontalLayout {
+                spacing: AppTheme.sp-sm;
+                alignment: center;
+
+                if icon-svg.width > 0 : Image {
+                    source: root.icon-svg;
+                    width: 18px;
+                    height: 18px;
+                    colorize: kind == "primary" || kind == "danger" ? #FFFFFF : AppTheme.text-primary;
+                }
+
+                Text {
+                    text: root.text;
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: kind == "primary" || kind == "danger" ? #FFFFFF : AppTheme.text-primary;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

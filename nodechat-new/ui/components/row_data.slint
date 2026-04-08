@@ -1,0 +1,26 @@
+// NodeChat New — Unified Row Data Models
+// ---------------------------------------------------------
+
+export struct ChatPreview {
+    id: string,
+    name: string,
+    initials: string,
+    last-message: string,
+    timestamp: string,
+    unread: int,
+    is-group: bool,
+    is-online: bool,
+    is-relay: bool,
+    is-verified: bool,
+}
+
+export struct ContactData {
+    id: string,
+    name: string,
+    initials: string,
+    node-id: string,
+    is-online: bool,
+    is-session-ready: bool,
+    is-relay: bool,
+    is-verified: bool,
+}

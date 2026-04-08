@@ -74,6 +74,7 @@ export component PageShell inherits Rectangle {
         ScrollView {
             vertical-stretch: 1;
             viewport-height: body.preferred-height;
+            viewport-width: parent.width;
             
             body := VerticalLayout {
                 padding: AppTheme.sp-md;

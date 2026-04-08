@@ -2,7 +2,7 @@
 // ---------------------------------------------------------
 // The input bar anchored at the bottom of ChatView.
 // Keyboard-safe: sits above the virtual keyboard on mobile.
-// Supports: text input, send button, disabled state.
+// Supports: text input, attachment (future), send button, disabled state.
 // ---------------------------------------------------------
 
 import { AppTheme } from "../theme.slint";
@@ -16,22 +16,44 @@ export component Composer inherits Rectangle {
     // Internal state
     property <string> draft: "";
 
-    height: 64px;
+    // Dynamic height: standard bar look
+    height: 68px;
     background: AppTheme.surface-secondary;
     border-color: AppTheme.divider;
 
     HorizontalLayout {
-        padding-left: AppTheme.sp-md;
-        padding-right: AppTheme.sp-md;
+        padding-left: AppTheme.sp-sm;
+        padding-right: AppTheme.sp-sm;
         padding-top: AppTheme.sp-sm;
         padding-bottom: AppTheme.sp-sm;
-        spacing: AppTheme.sp-sm;
+        spacing: AppTheme.sp-xs;
         alignment: center;
+
+        // --- Attachment Button ---
+        TouchArea {
+            width: 40px;
+            height: 40px;
+            enabled: !root.is-disabled;
+
+            Rectangle {
+                border-radius: 20px;
+                background: transparent;
+
+                Image {
+                    source: @image-url("../images/nav/paperclip.svg");
+                    width: 20px;
+                    height: 20px;
+                    colorize: root.is-disabled ? AppTheme.text-tertiary : AppTheme.text-secondary;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
 
         // --- Text Input Area ---
         Rectangle {
             horizontal-stretch: 1;
-            height: 40px;
+            height: 42px;
             border-radius: AppTheme.radius-pill;
             background: AppTheme.surface-tertiary;
             border-color: input.has-focus ? AppTheme.accent : AppTheme.border;
@@ -42,9 +64,9 @@ export component Composer inherits Rectangle {
 
             HorizontalLayout {
                 padding-left: AppTheme.sp-md;
-                padding-right: AppTheme.sp-md;
+                padding-right: AppTheme.sp-sm;
 
-                // Placeholder text overlay (Slint TextInput has no placeholder-text)
+                // Placeholder text overlay
                 if root.draft == "" : Text {
                     text: root.placeholder;
                     font-size: 15px;
@@ -59,6 +81,7 @@ export component Composer inherits Rectangle {
                     enabled: !root.is-disabled;
                     vertical-alignment: center;
                     single-line: true;
+                    horizontal-stretch: 1;
 
                     accepted => {
                         if root.draft != "" && !root.is-disabled {
@@ -70,10 +93,10 @@ export component Composer inherits Rectangle {
             }
         }
 
-        // --- Send Button ---
+        // --- Send Button (SVG icon, accent when active) ---
         TouchArea {
-            width: 40px;
-            height: 40px;
+            width: 42px;
+            height: 42px;
             enabled: root.draft != "" && !root.is-disabled;
 
             clicked => {
@@ -84,24 +107,24 @@ export component Composer inherits Rectangle {
             }
 
             Rectangle {
-                border-radius: 20px;
+                border-radius: 21px;
                 background: root.draft != "" && !root.is-disabled
                     ? AppTheme.accent
                     : AppTheme.surface-hover;
 
                 animate background { duration: AppTheme.dur-short; }
 
-                Text {
-                    text: "↑";
-                    font-size: 20px;
-                    font-weight: 700;
-                    color: root.draft != "" && !root.is-disabled
-                        ? AppTheme.text-inverted
+                Image {
+                    source: @image-url("../images/nav/send.svg");
+                    width: 18px;
+                    height: 18px;
+                    colorize: root.draft != "" && !root.is-disabled
+                        ? #FFFFFF
                         : AppTheme.text-tertiary;
                     horizontal-alignment: center;
                     vertical-alignment: center;
 
-                    animate color { duration: AppTheme.dur-short; }
+                    animate colorize { duration: AppTheme.dur-short; }
                 }
             }
         }
