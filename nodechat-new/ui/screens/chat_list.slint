@@ -7,13 +7,16 @@
 
 import { ScrollView } from "std-widgets.slint";
 import { AppTheme } from "../theme.slint";
-import { ChatRow, ChatPreview } from "../components/chat_row.slint";
+import { ChatPreview } from "../components/row_data.slint";
+import { ActionRow } from "../components/action_row.slint";
+import { Button } from "../components/button.slint";
 
 export { ChatPreview }
 
 export component ChatListScreen inherits Rectangle {
     in property <bool> is-desktop: false;
     in property <bool> compact: false;
+    in property <string> active-id: "";
     in property <[ChatPreview]> chats: [];
     in property <int> direct-peers: 0;
     in property <int> relay-peers: 0;
@@ -29,7 +32,7 @@ export component ChatListScreen inherits Rectangle {
     VerticalLayout {
         spacing: 0;
 
-        if !compact : VerticalLayout {
+        if !compact: VerticalLayout {
             // --- Header Bar ---
             Rectangle {
                 height: is-desktop ? 80px : 60px;
@@ -38,66 +41,52 @@ export component ChatListScreen inherits Rectangle {
 
                 HorizontalLayout {
                     padding-left: AppTheme.space.md;
-                    padding-right: AppTheme.space.sm;
-                    spacing: AppTheme.space.sm;
-                    alignment: start;
+                    padding-right: 2px; // Absolute far right
+                    alignment: stretch;
 
-                    VerticalLayout {
-                        alignment: center;
+                    // --- Left: Brand & Status ---
+                    HorizontalLayout {
+                        spacing: AppTheme.space.sm;
+                        alignment: start;
                         horizontal-stretch: 1;
 
-                        Text {
-                            text: "Chats";
-                            font-size: AppTheme.typo.title.size;
-                            font-weight: AppTheme.typo.title.weight;
-                            color: AppTheme.text-primary;
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "Chats";
+                                font-size: AppTheme.typo.title.size;
+                                font-weight: AppTheme.typo.title.weight;
+                                color: AppTheme.text-primary;
+                            }
                         }
 
-                        // Network Status Badge
-                        Rectangle {
-                            height: 18px;
-                            width: status-text.preferred-width + 12px;
-                            x: 0;
-
+                        // System Status Dot (Integrated)
+                        VerticalLayout {
+                            alignment: center;
                             Rectangle {
-                                border-radius: AppTheme.space.radius-sm;
-                                background: is-offline ? AppTheme.accent-danger
-                                    : (relay-peers > 0 ? AppTheme.accent-warning : AppTheme.accent-success);
-                                opacity: 0.1;
-                            }
-
-                            status-text := Text {
-                                text: is-offline ? "OFFLINE"
-                                    : (relay-peers > 0 ? "RELAY"
-                                        : "DIRECT");
-                                font-size: AppTheme.typo.label.size;
-                                font-weight: AppTheme.typo.label.weight;
-                                color: is-offline ? AppTheme.accent-danger
-                                    : (relay-peers > 0 ? AppTheme.accent-warning : AppTheme.accent-success);
-                                vertical-alignment: center;
-                                horizontal-alignment: center;
+                                width: 8px;
+                                height: 8px;
+                                border-radius: 4px;
+                                background: is-offline ? AppTheme.accent-danger : (relay-peers > 0 ? AppTheme.accent-warning : AppTheme.accent-success);
                             }
                         }
                     }
 
-                    // Action Buttons (Simple rounded square)
-                    TouchArea {
-                        width: 40px;
-                        height: 40px;
-                        y: (parent.height - self.height) / 2;
-                        clicked => { root.add-contact(); }
+                    // --- Right: Key Actions ---
+                    HorizontalLayout {
+                        spacing: AppTheme.space.xs;
+                        alignment: end;
 
-                        Rectangle {
-                            border-radius: AppTheme.space.radius-md;
-                            background: AppTheme.surface-tertiary;
-                            border-width: 1px;
-                            border-color: AppTheme.divider;
-
+                        TouchArea {
+                            width: 44px;
+                            clicked => { root.add-contact(); }
                             Image {
                                 source: @image-url("../images/nav/add.svg");
-                                width: 20px;
-                                height: 20px;
+                                width: 22px;
+                                height: 22px;
                                 colorize: AppTheme.accent;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
                             }
                         }
                     }
@@ -108,23 +97,52 @@ export component ChatListScreen inherits Rectangle {
                 height: 1px;
                 background: AppTheme.divider;
             }
+            
+            // Header-to-list breathing room
+            Rectangle { height: AppTheme.space.sm; }
         }
 
         // --- Chat List Body ---
-        if chats.length == 0 && !compact : VerticalLayout {
+        if chats.length == 0 && !compact: VerticalLayout {
             alignment: center;
             spacing: AppTheme.space.md;
             vertical-stretch: 1;
             padding: AppTheme.space.xl;
 
-            Text { text: "💬"; font-size: 48px; horizontal-alignment: center; }
-            Text { text: "No conversations yet"; font-size: AppTheme.typo.header.size; font-weight: AppTheme.typo.header.weight; color: AppTheme.text-primary; horizontal-alignment: center; }
-            Text { text: "Add a contact to start chatting."; font-size: AppTheme.typo.body.size; font-weight: AppTheme.typo.body.weight; color: AppTheme.text-secondary; horizontal-alignment: center; wrap: word-wrap; }
+            Text {
+                text: "💬";
+                font-size: 48px;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: "No conversations yet";
+                font-size: AppTheme.typo.header.size;
+                font-weight: AppTheme.typo.header.weight;
+                color: AppTheme.text-primary;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: "Add a contact to start chatting.";
+                font-size: AppTheme.typo.body.size;
+                font-weight: AppTheme.typo.body.weight;
+                color: AppTheme.text-secondary;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+            Button {
+                text: "Add New Peer";
+                icon-svg: @image-url("../images/nav/add.svg");
+                kind: "primary";
+                clicked => { root.add-contact(); }
+            }
         }
 
-        if chats.length > 0 : ScrollView {
+        if chats.length > 0: ScrollView {
             vertical-stretch: 1;
             viewport-height: list-body.preferred-height;
+            viewport-width: parent.width;
 
             list-body := VerticalLayout {
                 padding-left: AppTheme.space.sm;
@@ -133,10 +151,20 @@ export component ChatListScreen inherits Rectangle {
                 padding-bottom: AppTheme.space.sm;
                 spacing: 2px;
 
-                for chat in root.chats : ChatRow {
-                    data: chat;
+                for chat in root.chats: ActionRow {
+                    title: chat.name;
+                    subtitle: chat.last-message;
+                    initials: chat.initials;
+                    timestamp: chat.timestamp;
+                    badge-count: chat.unread;
+                    is-online: chat.is-online;
+                    is-relay: chat.is-relay;
+                    is-verified: chat.is-verified;
+                    is-selected: chat.id == root.active-id;
                     compact: root.compact;
-                    clicked => { root.open-chat(chat); }
+                    clicked => {
+                        root.open-chat(chat);
+                    }
                 }
             }
         }

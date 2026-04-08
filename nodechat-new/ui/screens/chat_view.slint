@@ -47,9 +47,9 @@ export component ChatViewScreen inherits Rectangle {
 
             HorizontalLayout {
                 padding-left: AppTheme.sp-sm;
-                padding-right: AppTheme.sp-sm;
+                padding-right: 2px; // Absolute far right
                 spacing: AppTheme.sp-sm;
-                alignment: start;
+                alignment: stretch;
 
                 // Back Button
                 TouchArea {
@@ -69,19 +69,34 @@ export component ChatViewScreen inherits Rectangle {
                 Rectangle {
                     width: 38px;
                     height: 38px;
-                    border-radius: 19px;
-                    background: AppTheme.accent-soft;
-                    border-color: is-online ? AppTheme.accent-success : transparent;
-                    border-width: is-online ? 2px : 0px;
                     y: (parent.height - self.height) / 2;
 
-                    Text {
-                        text: peer-initials;
-                        font-size: 13px;
-                        font-weight: 700;
-                        color: AppTheme.accent;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+                    Rectangle {
+                        width: 100%;
+                        height: 100%;
+                        border-radius: 19px;
+                        background: AppTheme.accent-soft;
+
+                        Text {
+                            text: root.peer-initials;
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.accent;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        // Presence Dot
+                        if is-online || is-relay : Rectangle {
+                            width: 12px;
+                            height: 12px;
+                            border-radius: 6px;
+                            background: is-relay ? AppTheme.accent-warning : AppTheme.accent-success;
+                            border-color: AppTheme.surface-secondary;
+                            border-width: 2px;
+                            x: parent.width - self.width - 1px;
+                            y: parent.height - self.height - 1px;
+                        }
                     }
                 }
 
@@ -102,13 +117,6 @@ export component ChatViewScreen inherits Rectangle {
                             overflow: elide;
                         }
 
-                        // Verified badge
-                        if is-verified : Text {
-                            text: "✓";
-                            font-size: 12px;
-                            color: AppTheme.accent-success;
-                            vertical-alignment: center;
-                        }
                     }
 
                     Text {
@@ -127,10 +135,11 @@ export component ChatViewScreen inherits Rectangle {
                     width: 44px;
                     clicked => { root.open-contact-info(); }
 
-                    Text {
-                        text: "ⓘ";
-                        font-size: 20px;
-                        color: AppTheme.text-secondary;
+                    Image {
+                        source: @image-url("../images/nav/dots-vertical.svg");
+                        width: 24px;
+                        height: 24px;
+                        colorize: AppTheme.text-secondary;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
@@ -148,10 +157,11 @@ export component ChatViewScreen inherits Rectangle {
         ScrollView {
             vertical-stretch: 1;
             viewport-height: msg-list.preferred-height;
+            viewport-width: self.width;
 
             msg-list := VerticalLayout {
                 padding: AppTheme.sp-sm;
-                spacing: 4px;
+                spacing: AppTheme.sp-sm;
                 alignment: end; // Messages anchor to bottom
 
                 if messages.length == 0 : VerticalLayout {
@@ -184,6 +194,7 @@ export component ChatViewScreen inherits Rectangle {
 
                 for msg in root.messages : MessageBubble {
                     data: msg;
+                    is-desktop: root.is-desktop;
                     open-invite(topic, name, key, joined) => {
                         root.open-invite(topic, name, key, joined);
                     }
@@ -196,13 +207,6 @@ export component ChatViewScreen inherits Rectangle {
             is-disabled: !is-online && connection-mode == "direct";
             placeholder: is-online ? "Message..." : "Connecting...";
             send-message(msg) => { root.send-message(msg); }
-        }
-
-        // Keyboard spacer — pushes composer above virtual keyboard on mobile
-        Rectangle {
-            height: root.virtual-keyboard-height;
-            background: transparent;
-            animate height { duration: AppTheme.dur-short; }
         }
     }
 }

@@ -180,9 +180,8 @@ export component SettingsScreen inherits PageShell {
                 VerticalLayout {
                     ActionRow {
                         icon-svg: @image-url("../images/nav/delete.svg");
-                        icon-color: AppTheme.accent-danger;
                         title: "Clear Message History";
-                        title-color: AppTheme.accent-danger;
+                        is-danger: true;
                         clicked => { root.request-clear-history(); }
                     }
                     HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
@@ -190,7 +189,7 @@ export component SettingsScreen inherits PageShell {
                         icon: "⚠️";
                         title: "Reset Identity";
                         subtitle: "Destroys all local keys and messages";
-                        title-color: AppTheme.accent-danger;
+                        is-danger: true;
                         clicked => { root.request-reset-identity(); }
                     }
                 }

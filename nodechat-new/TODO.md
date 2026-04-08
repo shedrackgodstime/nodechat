@@ -17,30 +17,31 @@ Structural integrity and platform parity are established.
 
 ---
 
-## 🍱 Phase 1: Unified Row & List Experience
+## ✅ Phase 1: Unified Row & List Experience
 *Objective: Eliminate "jampacked" lists and move to a unified component language.*
 
-- [ ] **Unified ActionRow**: Replace `ChatRow` and `ContactRow` with a single `ActionRow` component that supports avatars, badges, and status icons consistently.
-- [ ] **List Scaffolding**: Standardize `padding` and `spacing` across all `ChatList`, `ContactsList`, and `Settings` sections.
-- [ ] **Empty State Evolution**: Move the "Select a conversation" text into a card-based component that can appear either in the primary area or list area.
+- [x] **Unified ActionRow**: Replaced `ChatRow` and `ContactRow` with a single `ActionRow` component that supports avatars, badges, and status icons consistently.
+- [x] **Centralized Data Models**: Decoupled messaging and network data into `row_data.slint`.
+- [x] **Systemic List Highlighting**: Integrated `active-id` selection logic across Desktop, Tablet, and Mobile.
+- [x] **Legacy Decommissioned**: Removed outdated row components to ensure a clean, debt-free codebase.
 
 ---
 
-## ⌨️ Phase 2: Interaction & Mobile Excellence
+## ✅ Phase 2: Interaction & Mobile Excellence
 *Objective: Professional mobile behavior (keyboard and focus).*
 
-- [ ] **Keyboard-Safe Content**: Ensure `VerticalLayout` in the Primary Content area properly respects `root.kb-height` to prevent overlapping with the chat composer.
-- [ ] **Global Focus Controller**: Add `clear-focus()` to the `nav-to()` callback in `app.slint` to resolve "ghost focus" on screen switches.
-- [ ] **ScrollView Stabilization**: Ensure all primary screens (Chat View, Contacts, Settings) are wrapped in specialized scroll containers that prevent horizontal overflow.
+- [x] **Keyboard-Safe Content**: Shell-level keyboard spacer in `app.slint` protects ALL screens (Settings, Contacts, Chats).
+- [x] **Smart Navigation**: Mobile NavBar automatically hides when the keyboard is active to maximize screen space.
+- [x] **ScrollView Stabilization**: Locked `viewport-width` on all primary surfaces to prevent horizontal overflow and jitter.
 
 ---
 
 ## 🛠️ Phase 3: High-Utility Components
 *Objective: Standardize forms and modals.*
 
+- [x] **Premium Button System**: Engineered a unified button component (Primary, Secondary, Danger, Ghost) with kinetic animations.
 - [ ] **Unified Form Shell**: Create a shared layout for `AddContact`, `ChangePassword`, and `EditName` that places labels and inputs in a predictive, keyboard-aware column.
 - [ ] **Premium Modals**: Modernize the `ConfirmModal` backdrop (blur/glassmorphism) and button weighting.
-- [ ] **Input Focus Policy**: Use `forward-focus` correctly on all wrapped input elements to ensure immediate reachability.
 
 ---
 
