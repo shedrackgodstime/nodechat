@@ -358,6 +358,7 @@ export component AppWindow inherits Window {
     callback open-debug-console();
     callback request-clear-history();
     callback request-reset-identity();
+    callback open-url(string);
 
     // --- Safe Areas ---
     property <length> safe-area-top: root.safe-area-insets.top;
@@ -532,7 +533,7 @@ export component AppWindow inherits Window {
                             version: "0.1.0",
                             version-type: "Beta Build",
                             description: "Privacy Focused. Peer-to-Peer.",
-                            website: "https://nodechat.org",
+                            website: "https://nodechat.pages.dev",
                             repo: "https://github.com/shedrackgodstime/nodechat"
                         };
 
@@ -579,16 +580,17 @@ export component AppWindow inherits Window {
 
                     if root.current-screen == 6: AboutScreen {
                         width: 100%; height: 100%;
+                        is-desktop: root.is-desktop;
                         app-info: {
                             name: "NodeChat",
                             version: "0.1.0",
                             version-type: "Beta Build",
                             description: "Privacy Focused. Peer-to-Peer.",
-                            website: "https://nodechat.org",
+                            website: "https://nodechat.pages.dev",
                             repo: "https://github.com/shedrackgodstime/nodechat"
                         };
                         back-clicked => { root.current-screen = 3; }
-                        open-url(url) => { /* Handle in Rust */ }
+                        open-url(url) => { root.open-url(url); }
                     }
                 }
 
