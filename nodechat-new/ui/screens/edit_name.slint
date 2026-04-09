@@ -1,0 +1,81 @@
+// NodeChat New — Edit Profile Name Screen
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+import { Button } from "../components/button.slint";
+import { FormInput } from "../components/form_input.slint";
+
+export component EditNameScreen inherits Rectangle {
+    in property <bool> is-desktop: false;
+    in property <string> display-name: "";
+    
+    callback back-clicked();
+    callback confirm-name(string);
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: 0;
+
+        // 1. Header
+        Rectangle {
+            height: is-desktop ? 80px : 64px;
+            background: AppTheme.surface-secondary;
+
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: AppTheme.divider;
+            }
+
+            HorizontalLayout {
+                padding-left: AppTheme.sp-md;
+                padding-right: AppTheme.sp-md;
+                spacing: AppTheme.sp-md;
+                alignment: start;
+
+                TouchArea {
+                    width: 32px;
+                    clicked => { root.back-clicked(); }
+                    Text { text: "←"; font-size: 24px; color: AppTheme.text-primary; vertical-alignment: center; }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: "Edit Profile Name"; font-size: is-desktop ? 28px : 18px; font-weight: 700; color: AppTheme.text-primary; }
+                    Text { text: "How others see you"; font-size: 13px; color: AppTheme.text-secondary; }
+                }
+            }
+        }
+
+        // 2. Content
+        VerticalLayout {
+            padding: AppTheme.sp-lg;
+            spacing: AppTheme.sp-lg;
+
+            Text {
+                text: "PROFILE NAME";
+                font-size: 11px;
+                font-weight: 800;
+                color: AppTheme.text-tertiary;
+                letter-spacing: 1px;
+            }
+
+            name-input := FormInput {
+                placeholder: "Enter display name...";
+                initial-text: root.display-name;
+            }
+
+            Button {
+                text: "Save Changes";
+                kind: "primary";
+                enabled: name-input.text != "" && name-input.text != root.display-name;
+                clicked => { root.confirm-name(name-input.text); }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+        }
+    }
+}

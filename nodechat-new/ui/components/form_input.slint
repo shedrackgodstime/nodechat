@@ -1,0 +1,43 @@
+// NodeChat New — Form Input Component
+// ---------------------------------------------------------
+// Standardised text input component for forms (Name, Password, etc)
+
+import { AppTheme } from "../theme.slint";
+
+export component FormInput inherits Rectangle {
+    in property <string> placeholder: "Enter text...";
+    in property <string> initial-text: "";
+    in property <InputType> input-type: InputType.text;
+    out property <string> text: input.text;
+
+    // A hack to set the text externally if needed
+    public function set-text(t: string) {
+        input.text = t;
+    }
+
+    height: 56px;
+    background: AppTheme.surface-secondary;
+    border-radius: AppTheme.radius-md;
+    border-width: 1px;
+    border-color: input.has-focus ? AppTheme.accent : AppTheme.divider;
+
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        
+        input := TextInput {
+            vertical-alignment: center;
+            font-size: 15px;
+            color: #FFFFFF;
+            single-line: true;
+            text: root.initial-text;
+            input-type: root.input-type;
+
+            if self.text == "" && !self.has-focus : Text {
+                text: root.placeholder;
+                color: AppTheme.text-tertiary;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
