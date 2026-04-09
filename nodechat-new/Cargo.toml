@@ -1,6 +1,7 @@
 [package]
 name = "nodechat-new"
 version = "0.1.0"
+description = "Privacy Focused. Peer-to-Peer."
 edition = "2024"
 
 [lib]

@@ -1,0 +1,45 @@
+// NodeChat New — Real-time Debug View
+// ---------------------------------------------------------
+
+import { AppTheme, VertScroll } from "../theme.slint";
+
+export component DebugView inherits Rectangle {
+    in property <string> debug-logs: "Initializing P2P stack...\nWaiting for Iroh connection...\nNode Identity: x25519:abc...123\nListening on port 54321...";
+    
+    background: #000000;
+    border-radius: AppTheme.radius-md;
+    border-width: 1px;
+    border-color: AppTheme.accent;
+
+    VerticalLayout {
+        padding: AppTheme.sp-md;
+        spacing: AppTheme.sp-sm;
+
+        HorizontalLayout {
+            Text { text: "REAL-TIME DIAGNOSTICS"; font-size: 11px; font-weight: 800; color: AppTheme.accent; }
+            Rectangle { horizontal-stretch: 1; }
+            Text { text: "RUNNING"; font-size: 10px; color: AppTheme.accent-success; vertical-alignment: center; }
+        }
+
+        Rectangle {
+            height: 200px;
+            background: #09090B;
+            border-radius: 4px;
+            
+            VertScroll {
+                vertical-stretch: 1;
+                viewport-height: logs-txt.preferred-height;
+                
+                logs-txt := Text {
+                    width: parent.width;
+                    padding: 8px;
+                    text: root.debug-logs;
+                    font-size: 12px;
+                    font-family: "monospace";
+                    color: #A1A1AA;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}

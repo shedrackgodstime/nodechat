@@ -16,6 +16,8 @@ import { SettingsScreen } from "./screens/settings_screen.slint";
 import { ConfirmModal } from "./components/confirm_modal.slint";
 import { ContactsScreen } from "./screens/contacts_screen.slint";
 import { NavBar } from "./components/nav_bar.slint";
+import { AddScreen } from "./screens/add_screen.slint";
+import { AboutScreen } from "./screens/about_screen.slint";
 
 export { ChatPreview, MessageData }
 
@@ -257,7 +259,9 @@ export component AppWindow inherits Window {
     open-contacts => {
         root.current-screen = 4;
     }
-    add-contact => { /* Implement ticket entry popup would go here */ }
+    add-contact => {
+        root.current-screen = 5;
+    }
     open-chat(chat) => {
         root.load-conversation(chat.id, chat.is-group);
         root.active-conversation = {
@@ -449,7 +453,7 @@ export component AppWindow inherits Window {
             horizontal-stretch: 1;
             height: 100%;
             background: AppTheme.surface-primary;
-            clip: true; 
+            clip: true;
 
             VerticalLayout {
                 spacing: 0;
@@ -467,53 +471,31 @@ export component AppWindow inherits Window {
                     clip: true;
 
                     if root.device == DeviceType.mobile && root.current-screen == 0: ChatListScreen {
+                        width: 100%; height: 100%;
                         is-desktop: false;
                         chats: root.chats;
                         direct-peers: root.direct-peers;
                         relay-peers: root.relay-peers;
                         is-offline: root.is-offline;
                         active-id: root.active-conversation.id;
-                        open-chat(chat) => {
-                            root.open-chat(chat);
-                        }
-                        add-contact => {
-                            root.add-contact();
-                        }
-                        open-contacts => {
-                            root.open-contacts();
-                        }
-                        open-settings => {
-                            root.open-settings();
-                        }
+                        open-chat(chat) => { root.open-chat(chat); }
+                        add-contact => { root.add-contact(); }
+                        open-contacts => { root.open-contacts(); }
+                        open-settings => { root.open-settings(); }
                     }
 
                     if root.is-desktop && root.current-screen == 0: VerticalLayout {
+                        width: 100%; height: 100%;
                         alignment: center;
-                        spacing: AppTheme.space.md;
-                        padding: AppTheme.space.xl;
-                        Text {
-                            text: "💬";
-                            font-size: 56px;
-                            horizontal-alignment: center;
-                        }
-
-                        Text {
-                            text: "Select a conversation";
-                            font-size: 20px;
-                            font-weight: 700;
-                            color: AppTheme.text-primary;
-                            horizontal-alignment: center;
-                        }
-
-                        Text {
-                            text: "Choose a chat from the left panel to begin.";
-                            font-size: 14px;
-                            color: AppTheme.text-secondary;
-                            horizontal-alignment: center;
-                        }
+                        spacing: AppTheme.sp-lg;
+                        padding: AppTheme.sp-xl;
+                        Text { text: "💬"; font-size: 56px; horizontal-alignment: center; }
+                        Text { text: "Select a conversation"; font-size: 20px; font-weight: 700; color: AppTheme.text-primary; horizontal-alignment: center; }
+                        Text { text: "Choose a chat from the left panel to begin."; font-size: 14px; color: AppTheme.text-secondary; horizontal-alignment: center; }
                     }
 
                     if root.current-screen == 1 || root.current-screen == 2: ChatViewScreen {
+                        width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
                         peer-name: root.active-conversation.title;
                         peer-initials: root.active-conversation.initials;
@@ -525,69 +507,51 @@ export component AppWindow inherits Window {
                         connection-stage: root.active-conversation.connection-stage;
                         messages: root.active-messages;
                         virtual-keyboard-height: root.kb-height;
-                        go-back => {
-                            root.current-screen = root.active-conversation.return-screen;
-                        }
+                        go-back => { root.current-screen = root.active-conversation.return-screen; }
                         send-message(msg) => {
-                            if root.active-conversation.kind == "group" {
-                                root.send-group-message(msg);
-                            } else {
-                                root.send-message(msg);
-                            }
+                            if root.active-conversation.kind == "group" { root.send-group-message(msg); }
+                            else { root.send-message(msg); }
                         }
                         open-contact-info => {
-                            if root.active-conversation.kind == "group" {
-                                root.open-group-info();
-                            } else {
-                                root.open-contact-info();
-                            }
+                            if root.active-conversation.kind == "group" { root.open-group-info(); }
+                            else { root.open-contact-info(); }
                         }
-                        retry-queued => {
-                            root.retry-queued();
-                        }
-                        request-delete-conversation => {
-                            root.request-delete-conversation();
-                        }
+                        retry-queued => { root.retry-queued(); }
+                        request-delete-conversation => { root.request-delete-conversation(); }
                     }
 
                     if root.current-screen == 3: SettingsScreen {
+                        width: 100%; height: 100%;
+                        is-desktop: root.is-desktop;
                         display-name: root.display-name;
                         initials: root.initials;
                         endpoint-ticket: root.endpoint-ticket;
-                        back-clicked => {
-                            root.current-screen = 0;
-                        }
-                        edit-display-name => {
-                            root.edit-display-name();
-                        }
-                        copy-node-id => {
-                            root.copy-node-id();
-                        }
-                        change-password => {
-                            root.change-password();
-                        }
-                        open-debug-console => {
-                            root.open-debug-console();
-                        }
-                        request-clear-history => {
-                            root.request-clear-history();
-                        }
-                        request-reset-identity => {
-                            root.request-reset-identity();
-                        }
+                        
+                        app-info: {
+                            name: "NodeChat",
+                            version: "0.1.0",
+                            version-type: "Beta Build",
+                            description: "Privacy Focused. Peer-to-Peer.",
+                            website: "https://nodechat.org",
+                            repo: "https://github.com/shedrackgodstime/nodechat"
+                        };
+
+                        back-clicked => { root.current-screen = 0; }
+                        edit-display-name => { root.edit-display-name(); }
+                        copy-node-id => { root.copy-node-id(); }
+                        change-password => { root.change-password(); }
+                        open-about => { root.current-screen = 6; } 
+                        request-clear-history => { root.request-clear-history(); }
+                        request-reset-identity => { root.request-reset-identity(); }
                     }
+
                     if root.current-screen == 4: ContactsScreen {
+                        width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
                         contacts: root.contacts;
-                        back-clicked => {
-                            root.current-screen = 0;
-                        }
-                        add-contact => {
-                            root.add-contact();
-                        }
-                        new-group => {
-                            root.open-settings();
-                        }
+                        back-clicked => { root.current-screen = 0; }
+                        add-contact => { root.add-contact(); }
+                        new-group => { root.open-settings(); }
                         open-contact(contact) => {
                             root.load-conversation(contact.id, false);
                             root.active-conversation = {
@@ -605,24 +569,41 @@ export component AppWindow inherits Window {
                             root.current-screen = 1;
                         }
                     }
+
+                    if root.current-screen == 5: AddScreen {
+                        width: 100%; height: 100%;
+                        is-desktop: root.is-desktop;
+                        back-clicked => { root.current-screen = 0; }
+                        add-ticket(t) => { root.current-screen = 0; }
+                    }
+
+                    if root.current-screen == 6: AboutScreen {
+                        width: 100%; height: 100%;
+                        app-info: {
+                            name: "NodeChat",
+                            version: "0.1.0",
+                            version-type: "Beta Build",
+                            description: "Privacy Focused. Peer-to-Peer.",
+                            website: "https://nodechat.org",
+                            repo: "https://github.com/shedrackgodstime/nodechat"
+                        };
+                        back-clicked => { root.current-screen = 3; }
+                        open-url(url) => { /* Handle in Rust */ }
+                    }
                 }
 
-                // Systemic Keyboard Spacer (Mobile only)
-                // Ensures all screens (Settings, Contacts, etc.) stay above the keyboard.
+                // Keyboard Spacer (Mobile only)
                 if root.device == DeviceType.mobile && root.kb-height > 0px: Rectangle {
                     height: root.kb-height;
                     vertical-stretch: 0;
-                    animate height { duration: AppTheme.dur-short; }
                 }
 
                 // Mobile Navigation Bar
-                if root.device == DeviceType.mobile && root.kb-height < 20px && (root.current-screen == 0 || root.current-screen == 3 || root.current-screen == 4): NavBar {
+                if root.device == DeviceType.mobile && root.kb-height < 20px && (root.current-screen == 0 || root.current-screen == 3 || root.current-screen == 4) : NavBar {
                     height: 72px + root.safe-area-bottom;
                     vertical-stretch: 0;
                     active-screen: root.current-screen;
-                    nav-to(id) => {
-                        root.current-screen = id;
-                    }
+                    nav-to(id) => { root.current-screen = id; }
                     safe-area-bottom: root.safe-area-bottom;
                 }
             }
