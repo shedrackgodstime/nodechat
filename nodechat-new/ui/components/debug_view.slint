@@ -6,6 +6,8 @@ import { AppTheme, VertScroll } from "../theme.slint";
 export component DebugView inherits Rectangle {
     in property <string> debug-logs: "Initializing P2P stack...\nWaiting for Iroh connection...\nNode Identity: x25519:abc...123\nListening on port 54321...";
     
+    callback copy-clicked(string);
+
     background: #000000;
     border-radius: AppTheme.radius-md;
     border-width: 1px;
@@ -16,9 +18,30 @@ export component DebugView inherits Rectangle {
         spacing: AppTheme.sp-sm;
 
         HorizontalLayout {
-            Text { text: "REAL-TIME DIAGNOSTICS"; font-size: 11px; font-weight: 800; color: AppTheme.accent; }
+            Text { text: "REAL-TIME DIAGNOSTICS"; font-size: 11px; font-weight: 800; color: AppTheme.accent; vertical-alignment: center; }
             Rectangle { horizontal-stretch: 1; }
-            Text { text: "RUNNING"; font-size: 10px; color: AppTheme.accent-success; vertical-alignment: center; }
+            
+            copy-touch := TouchArea {
+                clicked => { root.copy-clicked(root.debug-logs); }
+                width: 60px;
+                height: 24px;
+                
+                Rectangle {
+                    background: copy-touch.pressed ? AppTheme.accent : AppTheme.surface-tertiary;
+                    border-radius: 4px;
+                    border-width: 1px;
+                    border-color: AppTheme.accent;
+                    
+                    Text {
+                        text: "COPY";
+                        font-size: 10px;
+                        font-weight: 800;
+                        color: copy-touch.pressed ? #000000 : AppTheme.accent;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
         }
 
         Rectangle {

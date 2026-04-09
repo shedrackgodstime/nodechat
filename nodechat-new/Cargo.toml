@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 anyhow = "=1.0.102"
 slint = { version = "=1.15.1", features = ["backend-winit"] }
+open = "5.3.2"
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 slint = { version = "=1.15.1", default-features = false, features = ["backend-winit", "renderer-software", "compat-1-2"] }

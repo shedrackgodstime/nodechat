@@ -74,18 +74,15 @@ warning: nodechat-new@0.1.0:     |
 warning: nodechat-new@0.1.0: 453 |         Rectangle {
 warning: nodechat-new@0.1.0:     |         ^^^^^^^^^^
     Checking nodechat-new v0.1.0 (/home/kristency/Projects/nodechat/nodechat-new)
-error[E0599]: no variant named `OpenUrl` found for enum `contract::Command`
-   --> src/mock_backend.rs:489:22
-    |
-489 |             Command::OpenUrl { url } => {
-    |                      ^^^^^^^ variant not found in `contract::Command`
-    |
-   ::: src/contract.rs:215:1
-    |
-215 | pub enum Command {
-    | ---------------- variant `OpenUrl` not found here
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `open`
+ --> src/ui.rs:9:17
+  |
+9 |         let _ = open::that(url.as_str());
+  |                 ^^^^ use of unresolved module or unlinked crate `open`
+  |
+  = help: if you wanted to use a crate named `open`, use `cargo add open` to add it to your `Cargo.toml`
 
-For more information about this error, try `rustc --explain E0599`.
+For more information about this error, try `rustc --explain E0433`.
 warning: nodechat-new@0.1.0: warning: padding-top only has effect on layout elements
 warning: nodechat-new@0.1.0:    --> /home/kristency/Projects/nodechat/nodechat-new/ui/screens/settings_screen.slint:200:34
 warning: nodechat-new@0.1.0:     |
