@@ -1,0 +1,97 @@
+// NodeChat New — Add Peer Screen
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+import { Button } from "../components/button.slint";
+
+export component AddScreen inherits Rectangle {
+    in property <bool> is-desktop: false;
+    
+    callback back-clicked();
+    callback add-ticket(string);
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: 0;
+
+        // 1. Header
+        Rectangle {
+            height: is-desktop ? 80px : 64px;
+            background: AppTheme.surface-secondary;
+
+            // Bottom border
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: AppTheme.divider;
+            }
+
+            HorizontalLayout {
+                padding-left: AppTheme.sp-md;
+                padding-right: AppTheme.sp-md;
+                spacing: AppTheme.sp-md;
+                alignment: start;
+
+                TouchArea {
+                    width: 32px;
+                    clicked => { root.back-clicked(); }
+                    Text { text: "←"; font-size: 24px; color: AppTheme.text-primary; vertical-alignment: center; }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: "Add Peer"; font-size: is-desktop ? 28px : 18px; font-weight: 700; color: AppTheme.text-primary; }
+                    Text { text: "Expand your P2P Network"; font-size: 13px; color: AppTheme.text-secondary; }
+                }
+            }
+        }
+
+        // 2. Content
+        VerticalLayout {
+            padding: AppTheme.sp-lg;
+            spacing: AppTheme.sp-lg;
+
+            Text {
+                text: "ENTER JOIN TICKET";
+                font-size: 11px;
+                font-weight: 800;
+                color: AppTheme.text-tertiary;
+                letter-spacing: 1px;
+            }
+
+            Rectangle {
+                height: 56px;
+                background: AppTheme.surface-secondary;
+                border-radius: AppTheme.radius-md;
+                border-width: 1px;
+                border-color: AppTheme.divider;
+
+                input := TextInput {
+                    vertical-alignment: center;
+                    padding-left: 16px;
+                    font-size: 15px;
+                    color: #FFFFFF;
+                    single-line: true;
+                    if self.text == "" : Text {
+                        text: "Paste peer ticket code...";
+                        color: AppTheme.text-tertiary;
+                        vertical-alignment: center;
+                        padding-left: 16px;
+                    }
+                }
+            }
+
+            Button {
+                text: "Add Peer to Contacts";
+                kind: "primary";
+                enabled: input.text != "";
+                clicked => { root.add-ticket(input.text); }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+        }
+    }
+}

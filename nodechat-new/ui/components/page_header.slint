@@ -1,0 +1,58 @@
+// NodeChat New — Unified Page Header
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+
+export component PageHeader inherits Rectangle {
+    in property <string> title: "Header";
+    in property <string> subtitle: "";
+    in property <bool> show-back: true;
+    in property <bool> is-desktop: false;
+    
+    callback back-clicked();
+
+    height: is-desktop ? 80px : 64px;
+    background: is-desktop ? transparent : AppTheme.surface-secondary;
+    border-color: AppTheme.divider;
+    border-width: is-desktop ? 0px : 1px;
+
+    HorizontalLayout {
+        padding-left: AppTheme.sp-md;
+        padding-right: AppTheme.sp-md;
+        spacing: AppTheme.sp-md;
+        alignment: start;
+
+        // Back Button
+        if show-back : TouchArea {
+            width: 32px;
+            height: 100%;
+            clicked => { root.back-clicked(); }
+            
+            Text {
+                text: "←";
+                font-size: 24px;
+                color: AppTheme.text-primary;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 0;
+
+            Text {
+                text: root.title;
+                font-size: is-desktop ? 28px : 18px;
+                font-weight: 700;
+                color: AppTheme.text-primary;
+            }
+
+            if root.subtitle != "" : Text {
+                text: root.subtitle;
+                font-size: 13px;
+                color: AppTheme.text-secondary;
+            }
+        }
+    }
+}

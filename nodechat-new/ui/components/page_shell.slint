@@ -17,6 +17,8 @@ export component PageShell inherits Rectangle {
     background: transparent;
     
     VerticalLayout {
+        width: 100%;
+        height: 100%;
         spacing: 0;
 
         // 1. PAGE HEADER (Unified across platforms)
@@ -73,14 +75,11 @@ export component PageShell inherits Rectangle {
         // 2. SCROLLABLE BODY (vertical only)
         VertScroll {
             vertical-stretch: 1;
-            viewport-height: body.preferred-height;
-
-            body := VerticalLayout {
-                width: parent.width;
+            
+            VerticalLayout {
                 padding: AppTheme.sp-md;
                 spacing: AppTheme.sp-md;
                 alignment: start;
-
                 @children
             }
         }

@@ -1,209 +1,205 @@
 // NodeChat New — Settings Screen
 // ---------------------------------------------------------
-// Global application settings.
-// Uses ActionRow for consistent list items and PageShell for the header.
-// ---------------------------------------------------------
 
-import { AppTheme } from "../theme.slint";
-import { PageShell } from "../components/page_shell.slint";
+import { AppTheme, VertScroll } from "../theme.slint";
 import { ActionRow } from "../components/action_row.slint";
+import { AppInfo } from "../components/row_data.slint";
 
-export component SettingsScreen inherits PageShell {
-    title: "Settings";
-    subtitle: "Node Identity & Preferences";
-    show-back: true;
+export component SettingsScreen inherits Rectangle {
+    in property <AppInfo> app-info;
 
     in property <string> display-name: "User";
     in property <string> initials: "U";
     in property <string> node-id: "";
     in property <string> endpoint-ticket: "";
+    in property <bool> is-desktop: false;
 
+    callback back-clicked();
     callback edit-display-name();
     callback copy-node-id();
     callback change-password();
-    callback open-debug-console();
+    callback open-about(); // New callback to navigate to About page
     callback request-clear-history();
     callback request-reset-identity();
 
-    // Settings are usually grouped in sections
-    VerticalLayout {
-        spacing: AppTheme.sp-lg;
-        padding-bottom: AppTheme.sp-xl;
+    background: AppTheme.surface-primary;
 
-        // --- 1. Profile Preview ---
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: 0;
+
+        // 1. Header
         Rectangle {
+            height: is-desktop ? 80px : 64px;
             background: AppTheme.surface-secondary;
-            border-radius: AppTheme.radius-lg;
-            border-width: 1px;
-            border-color: AppTheme.divider;
             
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: AppTheme.divider;
+            }
+
             HorizontalLayout {
-                padding: AppTheme.sp-lg;
-                spacing: AppTheme.sp-lg;
+                padding-left: AppTheme.sp-md;
+                padding-right: AppTheme.sp-md;
+                spacing: AppTheme.sp-md;
                 alignment: start;
 
-                // Vibrant Avatar
-                    Rectangle {
-                        width: 64px;
-                        height: 64px;
-                        border-radius: 32px;
-                        background: AppTheme.accent;
-                    
-                    Text {
-                        text: initials;
-                        font-size: 22px;
-                        font-weight: 800;
-                        color: #FFFFFF;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
+                TouchArea {
+                    width: 32px;
+                    clicked => { root.back-clicked(); }
+                    Text { text: "←"; font-size: 24px; color: AppTheme.text-primary; vertical-alignment: center; }
                 }
 
                 VerticalLayout {
                     alignment: center;
-                    spacing: 2px;
-                    Text {
-                        text: display-name;
-                        font-size: 18px;
-                        font-weight: 700;
-                        color: AppTheme.text-primary;
-                    }
-                    Text {
-                        text: "Decentralized Node Identity";
-                        font-size: 13px;
-                        color: AppTheme.text-secondary;
-                    }
+                    Text { text: "Settings"; font-size: is-desktop ? 28px : 18px; font-weight: 700; color: AppTheme.text-primary; }
+                    Text { text: "Manage your P2P Identity"; font-size: 13px; color: AppTheme.text-secondary; }
                 }
             }
         }
 
-        // --- 2. Identity & Connectivity ---
-        VerticalLayout {
-            spacing: AppTheme.sp-sm;
-            HorizontalLayout {
-                padding-left: AppTheme.sp-sm;
+        // 2. Body
+        VertScroll {
+            vertical-stretch: 1;
+            viewport-height: settings-body.preferred-height;
+
+            settings-body := VerticalLayout {
+                width: parent.width;
+                padding: AppTheme.sp-md;
+                spacing: AppTheme.sp-lg;
+                alignment: start;
+
+                // --- 1. Profile Preview ---
+                Rectangle {
+                    background: AppTheme.surface-secondary;
+                    border-radius: AppTheme.radius-lg;
+                    border-width: 1px;
+                    border-color: AppTheme.divider;
+                    
+                    HorizontalLayout {
+                        padding: AppTheme.sp-lg;
+                        spacing: AppTheme.sp-lg;
+                        alignment: start;
+
+                        Rectangle {
+                            width: 64px;
+                            height: 64px;
+                            border-radius: 32px;
+                            background: AppTheme.accent;
+                            Text { text: initials; font-size: 24px; font-weight: 800; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            Text { text: display-name; font-size: 20px; font-weight: 700; color: AppTheme.text-primary; }
+                            Text { text: "Node Status: Online"; font-size: 13px; color: AppTheme.accent-success; }
+                        }
+                    }
+                }
+
+                // --- 2. Identity & Security ---
+                VerticalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "IDENTITY & SECURITY"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+
+                    Rectangle {
+                        background: AppTheme.surface-secondary;
+                        border-radius: AppTheme.radius-lg;
+                        border-width: 1px;
+                        border-color: AppTheme.divider;
+                        clip: true;
+
+                        VerticalLayout {
+                            ActionRow {
+                                icon: "👤";
+                                title: "Display Name";
+                                subtitle: "How others see you in chats";
+                                clicked => { root.edit-display-name(); }
+                            }
+                            HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
+                            ActionRow {
+                                icon: "🎫";
+                                title: "Node Ticket";
+                                subtitle: endpoint-ticket != "" ? endpoint-ticket : "Copy your unique join code";
+                                clicked => { root.copy-node-id(); }
+                            }
+                            HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
+                            ActionRow {
+                                icon: "🔐";
+                                title: "Change Password/PIN";
+                                subtitle: "Update security credentials";
+                                clicked => { root.change-password(); }
+                            }
+                        }
+                    }
+                }
+
+                // --- 3. About & Diagnostics ---
+                VerticalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "INFO & SUPPORT"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+
+                    Rectangle {
+                        background: AppTheme.surface-secondary;
+                        border-radius: AppTheme.radius-lg;
+                        border-width: 1px;
+                        border-color: AppTheme.divider;
+                        clip: true;
+
+                        VerticalLayout {
+                            ActionRow {
+                                icon: "💬";
+                                title: "About NodeChat";
+                                subtitle: "Version, Diagnostics & Credits";
+                                accessory: "arrow";
+                                clicked => { root.open-about(); }
+                            }
+                        }
+                    }
+                }
+
+                // --- 4. Danger Zone ---
+                VerticalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "DANGER ZONE"; font-size: 11px; font-weight: 800; color: AppTheme.accent-danger; letter-spacing: 1px; }
+
+                    Rectangle {
+                        background: AppTheme.surface-secondary;
+                        border-radius: AppTheme.radius-lg;
+                        border-width: 1px;
+                        border-color: AppTheme.divider;
+                        clip: true;
+
+                        VerticalLayout {
+                            ActionRow {
+                                icon: "🗑️";
+                                title: "Clear Message History";
+                                is-danger: true;
+                                clicked => { root.request-clear-history(); }
+                            }
+                            HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
+                            ActionRow {
+                                icon: "🧨";
+                                title: "Reset P2P Identity";
+                                is-danger: true;
+                                clicked => { root.request-reset-identity(); }
+                            }
+                        }
+                    }
+                }
+
+                // Simple Footer
                 Text {
-                    text: "IDENTITY & CONNECTIVITY";
+                    text: root.app-info.name + " " + root.app-info.version;
                     font-size: 11px;
-                    font-weight: 800;
                     color: AppTheme.text-tertiary;
-                    letter-spacing: 1px;
+                    horizontal-alignment: center;
+                    padding-top: AppTheme.sp-lg;
+                    opacity: 0.5;
                 }
-            }
-
-            Rectangle {
-                background: AppTheme.surface-secondary;
-                border-radius: AppTheme.radius-lg;
-                border-width: 1px;
-                border-color: AppTheme.divider;
-                clip: true;
-
-                VerticalLayout {
-                    ActionRow {
-                        icon-svg: @image-url("../images/nav/settings.svg");
-                        title: "Display Name";
-                        subtitle: "How others see you";
-                        clicked => { root.edit-display-name(); }
-                    }
-                    HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
-                    ActionRow {
-                        icon-svg: @image-url("../images/nav/contacts.svg");
-                        title: "Node Ticket";
-                        subtitle: endpoint-ticket != "" ? endpoint-ticket : "Copy your unique join code";
-                        accessory: "none";
-                        clicked => { root.copy-node-id(); }
-                    }
-                    HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
-                    ActionRow {
-                        icon: "🛠️";
-                        title: "Diagnostic Console";
-                        subtitle: "View live P2P networking logs";
-                        clicked => { root.open-debug-console(); }
-                    }
-                }
-            }
-        }
-
-        // --- 3. Security ---
-        VerticalLayout {
-            spacing: AppTheme.sp-sm;
-            HorizontalLayout {
-                padding-left: AppTheme.sp-sm;
-                Text {
-                    text: "SECURITY";
-                    font-size: 11px;
-                    font-weight: 800;
-                    color: AppTheme.text-tertiary;
-                    letter-spacing: 1px;
-                }
-            }
-
-            Rectangle {
-                background: AppTheme.surface-secondary;
-                border-radius: AppTheme.radius-lg;
-                border-width: 1px;
-                border-color: AppTheme.divider;
-                clip: true;
-
-                VerticalLayout {
-                    ActionRow {
-                        icon: "🔒";
-                        title: "Vault Password";
-                        subtitle: "Secure your local message database";
-                        clicked => { root.change-password(); }
-                    }
-                }
-            }
-        }
-
-        // --- 4. Danger Zone ---
-        VerticalLayout {
-            spacing: AppTheme.sp-sm;
-            HorizontalLayout {
-                padding-left: AppTheme.sp-sm;
-                Text {
-                    text: "DANGER ZONE";
-                    font-size: 11px;
-                    font-weight: 800;
-                    color: AppTheme.accent-danger;
-                    letter-spacing: 1px;
-                }
-            }
-
-            Rectangle {
-                background: AppTheme.surface-secondary;
-                border-radius: AppTheme.radius-lg;
-                border-width: 1px;
-                border-color: AppTheme.divider;
-                clip: true;
-
-                VerticalLayout {
-                    ActionRow {
-                        icon-svg: @image-url("../images/nav/delete.svg");
-                        title: "Clear Message History";
-                        is-danger: true;
-                        clicked => { root.request-clear-history(); }
-                    }
-                    HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
-                    ActionRow {
-                        icon: "⚠️";
-                        title: "Reset Identity";
-                        subtitle: "Destroys all local keys and messages";
-                        is-danger: true;
-                        clicked => { root.request-reset-identity(); }
-                    }
-                }
-            }
-        }
-
-        // --- Version Tag ---
-        VerticalLayout {
-            padding-top: AppTheme.sp-lg;
-            Text {
-                text: "NodeChat v1.0.0 Alpha";
-                font-size: 12px;
-                color: AppTheme.text-tertiary;
-                horizontal-alignment: center;
             }
         }
     }

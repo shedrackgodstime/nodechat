@@ -1,0 +1,198 @@
+// NodeChat New — About & Diagnostics Screen
+// ---------------------------------------------------------
+
+import { AppTheme, VertScroll } from "../theme.slint";
+import { ActionRow } from "../components/action_row.slint";
+import { AppInfo } from "../components/row_data.slint";
+import { DebugView } from "../components/debug_view.slint";
+
+export component AboutScreen inherits Rectangle {
+    in property <AppInfo> app-info;
+    
+    // State to toggle debug view
+    property <bool> show-debug: false;
+
+    callback back-clicked();
+    callback open-url(string);
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: 0;
+
+        // 1. Header
+        Rectangle {
+            height: 64px;
+            background: AppTheme.surface-secondary;
+            
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: AppTheme.divider;
+            }
+
+            HorizontalLayout {
+                padding-left: AppTheme.sp-md;
+                padding-right: AppTheme.sp-md;
+                spacing: AppTheme.sp-md;
+                alignment: start;
+
+                TouchArea {
+                    width: 32px;
+                    clicked => { root.back-clicked(); }
+                    Text { text: "←"; font-size: 24px; color: AppTheme.text-primary; vertical-alignment: center; }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: "About & Diagnostics"; font-size: 18px; font-weight: 700; color: AppTheme.text-primary; }
+                }
+            }
+        }
+
+        // 2. Body
+        VertScroll {
+            vertical-stretch: 1;
+            viewport-height: about-body.preferred-height;
+
+            about-body := VerticalLayout {
+                width: parent.width;
+                padding: AppTheme.sp-md;
+                spacing: AppTheme.sp-lg;
+                alignment: start;
+
+                // --- App Identity Block ---
+                VerticalLayout {
+                    spacing: AppTheme.sp-md;
+                    horizontal-stretch: 1;
+                    
+                    Rectangle {
+                        width: 80px; height: 80px;
+                        background: AppTheme.accent;
+                        border-radius: 20px;
+                        horizontal-stretch: 0;
+                        x: (parent.width - self.width) / 2;
+                        Text { text: "💬"; font-size: 40px; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+
+                    Text { text: root.app-info.name; font-size: 24px; font-weight: 800; color: AppTheme.text-primary; horizontal-alignment: center; }
+                    Text { text: root.app-info.version-type + " " + root.app-info.version; font-size: 13px; color: AppTheme.accent; horizontal-alignment: center; }
+                }
+
+                // --- Project Write-up ---
+                VerticalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "PROJECT DESCRIPTION"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+
+                    Rectangle {
+                        background: AppTheme.surface-secondary;
+                        border-radius: AppTheme.radius-lg;
+                        padding: AppTheme.sp-lg;
+                        
+                        Text {
+                            text: "NodeChat is a secure, serverless P2P communication platform developed as a Final Year Polytechnic Project. It leverages the Iroh protocol to provide true data sovereignty, requiring no central servers or user registration.\n\nBuilt natively in Rust with Slint UI, this project explores decentralized identity and E2EE gossip protocols in a consumer-ready package.";
+                            font-size: 14px;
+                            color: AppTheme.text-secondary;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+
+                // --- Links & Connectivity ---
+                VerticalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "COMMUNITY & SUPPORT"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+
+                    Rectangle {
+                        background: AppTheme.surface-secondary;
+                        border-radius: AppTheme.radius-lg;
+                        border-width: 1px;
+                        border-color: AppTheme.divider;
+                        clip: true;
+                        
+                        VerticalLayout {
+                            ActionRow {
+                                icon: "🌐";
+                                title: "Official Website";
+                                accessory: "arrow";
+                                clicked => { root.open-url(root.app-info.website); }
+                            }
+                            HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
+                            ActionRow {
+                                icon: "💻";
+                                title: "Source Code (GitHub)";
+                                subtitle: "Open source on GitHub";
+                                accessory: "arrow";
+                                clicked => { root.open-url(root.app-info.repo); }
+                            }
+                            HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
+                            ActionRow {
+                                icon: "🪲";
+                                title: "Submit a Bug Report";
+                                accessory: "arrow";
+                                clicked => { root.open-url(root.app-info.repo + "/issues"); }
+                            }
+                        }
+                    }
+                }
+
+                // --- Legal & Credits ---
+                VerticalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "CREDITS & LEGAL"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+
+                    Rectangle {
+                        background: AppTheme.surface-secondary;
+                        border-radius: AppTheme.radius-lg;
+                        clip: true;
+                        
+                        VerticalLayout {
+                            ActionRow {
+                                icon: "🎓";
+                                title: "Final Year Student Project";
+                                subtitle: "Polytechnic FW Research framework";
+                            }
+                            HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
+                            ActionRow {
+                                icon: "⚖️";
+                                title: "Open Source Licenses";
+                                subtitle: "MIT / Apache 2.0";
+                                accessory: "arrow";
+                                clicked => { root.open-url(root.app-info.repo + "/blob/main/LICENSE"); }
+                            }
+                        }
+                    }
+                }
+
+                // --- Real-time Diagnostics (Hidden by default) ---
+                VerticalLayout {
+                    spacing: AppTheme.sp-md;
+                    
+                    ActionRow {
+                        icon: "📊";
+                        title: "Real-time Debug Mode";
+                        subtitle: "View low-level network events";
+                        accessory: "toggle";
+                        is-toggle-on: root.show-debug;
+                        toggled(on) => { root.show-debug = on; }
+                    }
+
+                    if root.show-debug : DebugView {
+                        // Inherits properties if needed
+                    }
+                }
+
+                // Footer
+                Text {
+                    text: "© 2026 NodeChat Project · " + root.app-info.description;
+                    font-size: 11px;
+                    color: AppTheme.text-tertiary;
+                    horizontal-alignment: center;
+                    padding: AppTheme.sp-md;
+                }
+            }
+        }
+    }
+}
