@@ -92,7 +92,7 @@ mod tests {
             }
         };
 
-        assert!(!snapshot.chats.is_empty());
+        assert!(!snapshot.chat_list.is_empty());
 
         runtime.ui.send(Command::Refresh).expect("command send should work");
 
