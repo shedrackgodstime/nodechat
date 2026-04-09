@@ -7,8 +7,8 @@
 //   3. Composer (keyboard-safe, fixed bottom)
 // ---------------------------------------------------------
 
-import { ScrollView } from "std-widgets.slint";
-import { AppTheme } from "../theme.slint";
+
+import { AppTheme, VertScroll } from "../theme.slint";
 import { MessageBubble, MessageData } from "../components/message_bubble.slint";
 import { Composer } from "../components/composer.slint";
 
@@ -153,16 +153,20 @@ export component ChatViewScreen inherits Rectangle {
             background: AppTheme.divider;
         }
 
-        // 2. MESSAGE LIST (Scrollable)
-        ScrollView {
+        // 2. MESSAGE LIST (vertical scroll only)
+        VertScroll {
             vertical-stretch: 1;
             viewport-height: msg-list.preferred-height;
-            viewport-width: self.width;
 
             msg-list := VerticalLayout {
+                width: parent.width;
+                preferred-width: 100%;
                 padding: AppTheme.sp-sm;
                 spacing: AppTheme.sp-sm;
-                alignment: end; // Messages anchor to bottom
+                
+                // Vertical Spacer: Replaces expensive 'alignment: end'.
+                // It pushes messages to the bottom but is much faster for scrolling.
+                Rectangle { vertical-stretch: 1; }
 
                 if messages.length == 0 : VerticalLayout {
                     alignment: center;

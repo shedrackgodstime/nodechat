@@ -5,8 +5,8 @@
 // Mobile: renders as a full-screen panel.
 // ---------------------------------------------------------
 
-import { ScrollView } from "std-widgets.slint";
-import { AppTheme } from "../theme.slint";
+
+import { AppTheme, VertScroll } from "../theme.slint";
 import { ChatPreview } from "../components/row_data.slint";
 import { ActionRow } from "../components/action_row.slint";
 import { Button } from "../components/button.slint";
@@ -139,12 +139,12 @@ export component ChatListScreen inherits Rectangle {
             }
         }
 
-        if chats.length > 0: ScrollView {
+        if chats.length > 0: VertScroll {
             vertical-stretch: 1;
             viewport-height: list-body.preferred-height;
-            viewport-width: parent.width;
 
             list-body := VerticalLayout {
+                width: parent.width;
                 padding-left: AppTheme.space.sm;
                 padding-right: AppTheme.space.sm;
                 padding-top: compact ? 0 : AppTheme.space.sm;
@@ -162,9 +162,7 @@ export component ChatListScreen inherits Rectangle {
                     is-verified: chat.is-verified;
                     is-selected: chat.id == root.active-id;
                     compact: root.compact;
-                    clicked => {
-                        root.open-chat(chat);
-                    }
+                    clicked => { root.open-chat(chat); }
                 }
             }
         }

@@ -3,8 +3,8 @@
 // This shell wraps standard screens (Settings, Contacts, etc.)
 // providing a consistent header, padding, and scroll area.
 
-import { ScrollView } from "std-widgets.slint";
-import { AppTheme } from "../theme.slint";
+
+import { AppTheme, VertScroll } from "../theme.slint";
 
 export component PageShell inherits Rectangle {
     in property <string> title: "Header";
@@ -70,17 +70,17 @@ export component PageShell inherits Rectangle {
             }
         }
 
-        // 2. SCROLLABLE BODY
-        ScrollView {
+        // 2. SCROLLABLE BODY (vertical only)
+        VertScroll {
             vertical-stretch: 1;
             viewport-height: body.preferred-height;
-            viewport-width: parent.width;
-            
+
             body := VerticalLayout {
+                width: parent.width;
                 padding: AppTheme.sp-md;
                 spacing: AppTheme.sp-md;
                 alignment: start;
-                
+
                 @children
             }
         }

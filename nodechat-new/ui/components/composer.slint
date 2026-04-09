@@ -1,130 +1,168 @@
-// NodeChat New — Message Composer Component
+// NodeChat New — Precision Message Composer
 // ---------------------------------------------------------
-// The input bar anchored at the bottom of ChatView.
-// Keyboard-safe: sits above the virtual keyboard on mobile.
-// Supports: text input, attachment (future), send button, disabled state.
+// An advanced multi-line input featuring manual scroll tracking
+// and sticky action buttons. Adapted from ChatInput legacy.
 // ---------------------------------------------------------
 
 import { AppTheme } from "../theme.slint";
 
 export component Composer inherits Rectangle {
+    // Component API
     in property <bool> is-disabled: false;
+    in property <bool> is-mobile: false;
     in property <string> placeholder: "Message...";
+    in-out property <string> draft <=> input.text;
 
+    // Callbacks
     callback send-message(string);
+    callback attach-file();
 
-    // Internal state
-    property <string> draft: "";
-
-    // Dynamic height: standard bar look
-    height: 68px;
+    // Height calculation: grows from 52px to 140px
+    height: Math.min(140px, Math.max(52px, input.preferred-height + 16px));
+    
     background: AppTheme.surface-secondary;
     border-color: AppTheme.divider;
+    border-width: 0px; // Seamless look
 
     HorizontalLayout {
-        padding-left: AppTheme.sp-sm;
-        padding-right: AppTheme.sp-sm;
-        padding-top: AppTheme.sp-sm;
-        padding-bottom: AppTheme.sp-sm;
-        spacing: AppTheme.sp-xs;
-        alignment: center;
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
 
-        // --- Attachment Button ---
-        TouchArea {
-            width: 40px;
-            height: 40px;
-            enabled: !root.is-disabled;
-
-            Rectangle {
-                border-radius: 20px;
-                background: transparent;
-
-                Image {
-                    source: @image-url("../images/nav/paperclip.svg");
-                    width: 20px;
-                    height: 20px;
-                    colorize: root.is-disabled ? AppTheme.text-tertiary : AppTheme.text-secondary;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+        // --- Attachment Button (Sticky at bottom) ---
+        VerticalLayout {
+            alignment: end;
+            padding-bottom: 8px;
+            
+            TouchArea {
+                width: 36px;
+                height: 36px;
+                enabled: !root.is-disabled;
+                
+                Rectangle {
+                    border-radius: 18px;
+                    background: parent.has-hover ? AppTheme.surface-hover : transparent;
+                    
+                    Image {
+                        source: @image-url("../images/nav/paperclip.svg");
+                        width: 20px;
+                        height: 20px;
+                        colorize: root.is-disabled ? AppTheme.text-tertiary : AppTheme.text-secondary;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+                
+                clicked => {
+                    input.focus();
+                    root.attach-file();
                 }
             }
         }
 
-        // --- Text Input Area ---
+        // --- Smart Multi-line Input Area ---
         Rectangle {
             horizontal-stretch: 1;
-            height: 42px;
-            border-radius: AppTheme.radius-pill;
             background: AppTheme.surface-tertiary;
-            border-color: input.has-focus ? AppTheme.accent : AppTheme.border;
+            border-radius: 20px;
             border-width: 1px;
+            border-color: input.has-focus ? AppTheme.accent : AppTheme.border;
+            clip: true;
 
-            // Animate border on focus
-            animate border-color { duration: AppTheme.dur-short; }
+            // Background focus catcher (behind Flickable)
+            TouchArea {
+                width: 100%;
+                height: 100%;
+                clicked => { input.focus(); }
+            }
 
-            HorizontalLayout {
-                padding-left: AppTheme.sp-md;
-                padding-right: AppTheme.sp-sm;
+            scroll := Flickable {
+                width: 100%;
+                height: 100%;
+                interactive: true;
+                viewport-width: self.width;
+                viewport-height: Math.max(parent.height, input.preferred-height);
 
-                // Placeholder text overlay
-                if root.draft == "" : Text {
-                    text: root.placeholder;
-                    font-size: 15px;
-                    color: AppTheme.text-tertiary;
-                    vertical-alignment: center;
-                }
+                Rectangle {
+                    width: 100%;
+                    height: input.preferred-height;
+                    
+                    // Manual Placeholder
+                    if input.text == "" : Text {
+                        x: 14px;
+                        width: parent.width - 28px;
+                        height: 100%;
+                        text: root.placeholder;
+                        font-size: 16px;
+                        color: #777777;
+                        vertical-alignment: center;
+                    }
 
-                input := TextInput {
-                    text <=> root.draft;
-                    font-size: 15px;
-                    color: root.is-disabled ? AppTheme.text-tertiary : AppTheme.text-primary;
-                    enabled: !root.is-disabled;
-                    vertical-alignment: center;
-                    single-line: true;
-                    horizontal-stretch: 1;
+                    input := TextInput {
+                        x: 14px;
+                        width: parent.width - 28px;
+                        font-size: 16px;
+                        color: AppTheme.text-primary;
+                        vertical-alignment: center;
+                        single-line: false;
+                        wrap: word-wrap;
+                        enabled: !root.is-disabled;
 
-                    accepted => {
-                        if root.draft != "" && !root.is-disabled {
-                            root.send-message(root.draft);
-                            root.draft = "";
+                        // --- THE MAGIC: Auto-scroll to cursor ---
+                        cursor-position-changed(cursor-pos) => {
+                            if (cursor-pos.y + scroll.viewport-y < 8px) {
+                                scroll.viewport-y = - cursor-pos.y + 8px;
+                            } else if (cursor-pos.y + scroll.viewport-y > scroll.height - 32px) {
+                                scroll.viewport-y = scroll.height - cursor-pos.y - 32px;
+                            }
+                        }
+
+                        key-pressed(event) => {
+                            if (!root.is-mobile && event.text == Key.Return && !event.modifiers.control) {
+                                if (self.text != "") {
+                                    root.send-message(self.text);
+                                    self.text = "";
+                                }
+                                return EventResult.accept;
+                            }
+                            return EventResult.reject;
                         }
                     }
                 }
             }
         }
 
-        // --- Send Button (SVG icon, accent when active) ---
-        TouchArea {
-            width: 42px;
-            height: 42px;
-            enabled: root.draft != "" && !root.is-disabled;
-
-            clicked => {
-                if root.draft != "" && !root.is-disabled {
-                    root.send-message(root.draft);
-                    root.draft = "";
+        // --- Send Button (Sticky at bottom) ---
+        VerticalLayout {
+            alignment: end;
+            padding-bottom: 8px;
+            
+            TouchArea {
+                width: 44px;
+                height: 38px;
+                enabled: input.text != "" && !root.is-disabled;
+                
+                Rectangle {
+                    border-radius: 19px;
+                    background: input.text == "" ? AppTheme.surface-hover : AppTheme.accent;
+                    
+                    animate background { duration: 150ms; }
+                    
+                    Image {
+                        source: @image-url("../images/nav/send.svg");
+                        width: 18px;
+                        height: 18px;
+                        colorize: input.text == "" ? AppTheme.text-tertiary : #ffffff;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
                 }
-            }
-
-            Rectangle {
-                border-radius: 21px;
-                background: root.draft != "" && !root.is-disabled
-                    ? AppTheme.accent
-                    : AppTheme.surface-hover;
-
-                animate background { duration: AppTheme.dur-short; }
-
-                Image {
-                    source: @image-url("../images/nav/send.svg");
-                    width: 18px;
-                    height: 18px;
-                    colorize: root.draft != "" && !root.is-disabled
-                        ? #FFFFFF
-                        : AppTheme.text-tertiary;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-
-                    animate colorize { duration: AppTheme.dur-short; }
+                
+                clicked => {
+                    if (input.text != "") {
+                        root.send-message(input.text);
+                        input.text = "";
+                    }
                 }
             }
         }
