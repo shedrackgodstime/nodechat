@@ -37,10 +37,12 @@ export component ActionRow inherits Rectangle {
     callback toggled(bool);
 
     // --- Layout Constants ---
-    height: root.compact ? 68px : (subtitle != "" ? 72px : 68px); // Standardized height
+    property <length> item-height: root.compact ? 60px : (subtitle != "" ? 72px : 64px); 
+    height: item-height;
+    
     background: root.is-selected ? AppTheme.accent-soft : transparent;
     border-radius: AppTheme.radius-md;
-    clip: true;
+    clip: false; // Only clip at the scrollable container level for better GPU perf
 
     // --- Interactions ---
     states [

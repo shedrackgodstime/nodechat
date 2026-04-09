@@ -90,3 +90,20 @@ export global AppTheme {
     out property <color> surface-glass: #1A1A1E;
     out property <color> accent-gradient: #3F8CFF;
 }
+
+// ---------------------------------------------------------
+// VertScroll — The ONE way to scroll in NodeChat
+// ---------------------------------------------------------
+export component VertScroll inherits Rectangle {
+    in-out property <length> viewport-height <=> flick.viewport-height;
+    in-out property <length> viewport-y <=> flick.viewport-y;
+
+    clip: true; // Allowed here because we inherit from Rectangle
+
+    flick := Flickable {
+        width: 100%;
+        height: 100%;
+        viewport-width: self.width;
+        @children
+    }
+}

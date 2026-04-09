@@ -26,8 +26,9 @@ export struct MessageData {
     status: string,   // "sent" | "delivered" | "failed" | "queued"
 }
 
-export component MessageBubble inherits VerticalLayout {
-    spacing: 0;
+export component MessageBubble inherits Rectangle {
+    // Ensure bubbles adapt correctly to screen size
+    width: 100%;
 
     in property <MessageData> data;
     in property <bool> is-desktop: false; // Tightens offset for narrow panels
@@ -37,8 +38,11 @@ export component MessageBubble inherits VerticalLayout {
     // Responsive offset: smaller on desktop panels, larger on mobile
     property <length> bubble-offset: is-desktop ? 48px : 72px;
 
-    // --- System Message ---
-    if data.is-system : HorizontalLayout {
+    VerticalLayout {
+        spacing: 0;
+
+        // --- System Message ---
+        if data.is-system : HorizontalLayout {
         alignment: center;
         padding-top: AppTheme.space.sm;
         padding-bottom: AppTheme.space.sm;
@@ -220,5 +224,6 @@ export component MessageBubble inherits VerticalLayout {
                 }
             }
         }
+    }
     }
 }
