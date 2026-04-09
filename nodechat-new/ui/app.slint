@@ -10,6 +10,8 @@
 
 import { AppTheme } from "./theme.slint";
 import { ChatPreview, ContactData } from "./components/row_data.slint";
+import { EditNameScreen }    from "./screens/edit_name.slint";
+import { PasswordScreen }    from "./screens/password_screen.slint";
 import { ChatListScreen } from "./screens/chat_list.slint";
 import { ChatViewScreen, MessageData } from "./screens/chat_view.slint";
 import { SettingsScreen } from "./screens/settings_screen.slint";
@@ -54,6 +56,7 @@ export component AppWindow inherits Window {
     // Decoupled width property to prevent binding loops in layout negotiation
     property <length> concrete-sidebar-width: (root.device == DeviceType.desktop) ? 320px : (root.device == DeviceType.tablet ? 170px : 0px);
     in-out property <int> current-screen: 0;
+    in property <bool> has-password: false;
     in-out property <bool> has-identity: false;
     in-out property <bool> is-locked: false;
 
@@ -353,8 +356,10 @@ export component AppWindow inherits Window {
     callback request-delete-conversation();
     callback confirm-modal-confirmed(string, string);
     callback edit-display-name();
+    callback confirm-name-change(string);
     callback copy-node-id();
     callback change-password();
+    callback submit-password(string, string);
     callback open-debug-console();
     callback request-clear-history();
     callback request-reset-identity();
@@ -550,12 +555,22 @@ export component AppWindow inherits Window {
                         };
 
                         back-clicked => { root.current-screen = 0; }
-                        edit-display-name => { root.edit-display-name(); }
+                        edit-display-name => { root.current-screen = 7; }
                         copy-node-id => { root.copy-node-id(); }
-                        change-password => { root.change-password(); }
+                        change-password => { root.current-screen = 8; }
                         open-about => { root.current-screen = 6; } 
-                        request-clear-history => { root.request-clear-history(); }
-                        request-reset-identity => { root.request-reset-identity(); }
+                        request-clear-history => { 
+                            root.confirm-modal-title = "Clear Message History";
+                            root.confirm-modal-subtitle = "Are you sure you want to permanently delete all localized messages and media?";
+                            root.confirm-modal-slug = "clear-history";
+                            root.confirm-modal-show = true;
+                        }
+                        request-reset-identity => { 
+                            root.confirm-modal-title = "Reset P2P Identity";
+                            root.confirm-modal-subtitle = "Your private keys will be destroyed and you will permanently lose access to your network.";
+                            root.confirm-modal-slug = root.has-password ? "delete-identity" : "reset-identity";
+                            root.confirm-modal-show = true;
+                        }
                     }
 
                     if root.current-screen == 4: ContactsScreen {
@@ -605,6 +620,21 @@ export component AppWindow inherits Window {
                         open-url(url) => { root.open-url(url); }
                         copy-logs(logs) => { root.copy-to-clipboard(logs); }
                     }
+
+                    if root.current-screen == 7: EditNameScreen {
+                        is-desktop: root.is-desktop;
+                        display-name: root.display-name;
+                        back-clicked => { root.current-screen = 3; }
+                        confirm-name(name) => { root.confirm-name-change(name); root.current-screen = 3; }
+                    }
+
+                    if root.current-screen == 8: PasswordScreen {
+                        is-desktop: root.is-desktop;
+                        has-password: root.has-password;
+                        back-clicked => { root.current-screen = 3; }
+                        confirm-password(cur, new) => { root.submit-password(cur, new); root.current-screen = 3; }
+                        remove-password(cur) => { root.submit-password(cur, ""); root.current-screen = 3; }
+                    }
                 }
 
                 // Keyboard Spacer (Mobile only)
@@ -619,24 +649,23 @@ export component AppWindow inherits Window {
                     vertical-stretch: 0;
                     active-screen: root.current-screen;
                     nav-to(id) => { root.current-screen = id; }
-                    safe-area-bottom: root.safe-area-bottom;
                 }
-            }
-        }
+            } // Ends VerticalLayout
+        } // Ends Rectangle
+    } // Ends HorizontalLayout
 
-        // 3. GLOBAL MODALS
-        if root.confirm-modal-show: ConfirmModal {
-            title: root.confirm-modal-title;
-            subtitle: root.confirm-modal-subtitle;
-            action-slug: root.confirm-modal-slug;
-            error-msg: root.confirm-modal-err;
-            is-checked <=> root.confirm-modal-checked;
-            cancel => {
-                root.confirm-modal-show = false;
-            }
-            confirm(pin) => {
-                root.confirm-modal-confirmed(root.confirm-modal-slug, pin);
-            }
+    // 3. GLOBAL MODALS
+    if root.confirm-modal-show: ConfirmModal {
+        title: root.confirm-modal-title;
+        subtitle: root.confirm-modal-subtitle;
+        action-slug: root.confirm-modal-slug;
+        error-msg: root.confirm-modal-err;
+        is-checked <=> root.confirm-modal-checked;
+        cancel => {
+            root.confirm-modal-show = false;
+        }
+        confirm(pin) => {
+            root.confirm-modal-confirmed(root.confirm-modal-slug, pin);
         }
     }
 }

@@ -13,6 +13,7 @@ export component SettingsScreen inherits Rectangle {
     in property <string> node-id: "";
     in property <string> endpoint-ticket: "";
     in property <bool> is-desktop: false;
+    in property <bool> has-password: false;
 
     callback back-clicked();
     callback edit-display-name();
@@ -129,8 +130,8 @@ export component SettingsScreen inherits Rectangle {
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
                                 icon: "🔐";
-                                title: "Change Password/PIN";
-                                subtitle: "Update security credentials";
+                                title: root.has-password ? "Change Password/PIN" : "Setup Password/PIN";
+                                subtitle: root.has-password ? "Update security credentials" : "Lock your vault (Optional)";
                                 clicked => { root.change-password(); }
                             }
                         }
@@ -177,6 +178,7 @@ export component SettingsScreen inherits Rectangle {
                             ActionRow {
                                 icon: "🗑️";
                                 title: "Clear Message History";
+                                subtitle: "Delete all local chat history";
                                 is-danger: true;
                                 clicked => { root.request-clear-history(); }
                             }
@@ -184,6 +186,7 @@ export component SettingsScreen inherits Rectangle {
                             ActionRow {
                                 icon: "🧨";
                                 title: "Reset P2P Identity";
+                                subtitle: "Irreversibly destroy vault keys";
                                 is-danger: true;
                                 clicked => { root.request-reset-identity(); }
                             }
