@@ -359,6 +359,18 @@ export component AppWindow inherits Window {
     callback request-clear-history();
     callback request-reset-identity();
     callback open-url(string);
+    callback copy-to-clipboard(string);
+
+    // --- Clipboard Integration ---
+    in-out property <string> clipboard-buffer: "";
+    public function do-copy() {
+        clipboard-input.select-all();
+        clipboard-input.copy();
+    }
+    clipboard-input := TextInput {
+        text: root.clipboard-buffer;
+        visible: false;
+    }
 
     // --- Safe Areas ---
     property <length> safe-area-top: root.safe-area-insets.top;
@@ -591,6 +603,7 @@ export component AppWindow inherits Window {
                         };
                         back-clicked => { root.current-screen = 3; }
                         open-url(url) => { root.open-url(url); }
+                        copy-logs(logs) => { root.copy-to-clipboard(logs); }
                     }
                 }
 
