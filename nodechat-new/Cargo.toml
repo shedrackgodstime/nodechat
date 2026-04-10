@@ -1,7 +1,11 @@
 [package]
 name = "nodechat-new"
 version = "0.1.0"
+authors = ["Shedrack Godstime"]
 description = "Privacy Focused. Peer-to-Peer."
+homepage = "https://nodechat.pages.dev"
+repository = "https://github.com/shedrackgodstime/nodechat"
+
 edition = "2024"
 
 [lib]

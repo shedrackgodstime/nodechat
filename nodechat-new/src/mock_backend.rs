@@ -28,14 +28,7 @@ impl MockBackend {
             has_identity: true,
         };
 
-        let app_info = AppInfoView {
-            name: "NodeChat".to_string(),
-            version: "0.1.0".to_string(),
-            version_type: "Beta Build".to_string(),
-            description: "Privacy Focused. Peer-to-Peer.".to_string(),
-            website: "https://nodechat.pages.dev".to_string(),
-            repo: "https://github.com/shedrackgodstime/nodechat".to_string(),
-        };
+        let app_info = AppInfoView::current();
 
         let contact_list = vec![
             ContactListItem {

@@ -209,6 +209,19 @@ pub struct AppInfoView {
     pub repo: String,
 }
 
+impl AppInfoView {
+    pub fn current() -> Self {
+        Self {
+            name: env!("CARGO_PKG_NAME").to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            version_type: "Beta Build".to_string(),
+            description: env!("CARGO_PKG_DESCRIPTION").to_string(),
+            website: env!("CARGO_PKG_HOMEPAGE").to_string(),
+            repo: env!("CARGO_PKG_REPOSITORY").to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppSnapshot {
     pub identity: IdentityView,
