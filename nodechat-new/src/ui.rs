@@ -5,6 +5,18 @@ use std::thread;
 
 pub fn run_app() -> anyhow::Result<()> {
     let app = AppWindow::new().context("failed to create Slint window")?;
+    
+    // Wire the Hardware Back Button (Android/Mobile)
+    let ui_handle = app.as_weak();
+    app.window().on_close_requested(move || {
+        if let Some(ui) = ui_handle.upgrade() {
+            if ui.invoke_request_back() {
+                return slint::CloseRequestResponse::KeepWindowShown;
+            }
+        }
+        slint::CloseRequestResponse::HideWindow
+    });
+
     let runtime = MockRuntime::start();
     let ui_bridge = runtime.ui.clone();
 
@@ -118,6 +130,14 @@ pub fn run_app() -> anyhow::Result<()> {
             ui.set_clipboard_buffer(text);
             ui.invoke_do_copy();
         }
+    });
+
+    let cmd = ui_bridge.clone();
+    app.on_share_contact(move |id, _targets| {
+        let _ = cmd.send(Command::ShareContact { 
+            contact_id: id.to_string(), 
+            target_contact_ids: Vec::new() 
+        });
     });
 
     app.run().context("failed to run Slint window")?;
