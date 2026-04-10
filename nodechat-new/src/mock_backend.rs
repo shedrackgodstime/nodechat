@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::contract::{
-    AppEvent, AppFlags, AppSnapshot, ChatListItem, Command, ContactListItem, ConversationKind,
+    AppEvent, AppFlags, AppInfoView, AppSnapshot, ChatListItem, Command, ContactListItem, ConversationKind,
     ConversationView, GroupCandidateItem, HistoryScope, IdentityView, MessageItem, MessageKind,
     MessageStatus,
 };
@@ -26,6 +26,15 @@ impl MockBackend {
             endpoint_ticket: "nch-0-demo-ticket".to_string(),
             is_locked: false,
             has_identity: true,
+        };
+
+        let app_info = AppInfoView {
+            name: "NodeChat".to_string(),
+            version: "0.1.0".to_string(),
+            version_type: "Beta Build".to_string(),
+            description: "Privacy Focused. Peer-to-Peer.".to_string(),
+            website: "https://nodechat.pages.dev".to_string(),
+            repo: "https://github.com/shedrackgodstime/nodechat".to_string(),
         };
 
         let contact_list = vec![
@@ -215,6 +224,7 @@ impl MockBackend {
 
         let snapshot = AppSnapshot {
             identity,
+            app_info,
             app_flags: AppFlags {
                 direct_peer_count: 2,
                 relay_peer_count: 1,

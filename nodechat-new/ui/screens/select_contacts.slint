@@ -3,19 +3,25 @@
 
 import { AppTheme, VertScroll } from "../theme.slint";
 import { ActionRow } from "../components/action_row.slint";
-import { ContactData } from "../components/row_data.slint";
+import { GroupCandidateItem } from "../components/row_data.slint";
 
 export component SelectContactsScreen inherits Rectangle {
-    in property <[ContactData]> contacts: [];
+    in property <[GroupCandidateItem]> contacts: [];
     in property <bool> is-desktop: false;
     in property <string> group-name: "";
     in property <int> return-screen: 10;
     
-    // Tracking selection count for FAB visibility
-    property <int> selected-count: 0;
+    // Derived selected count
+    pure function count_selected(items: [GroupCandidateItem]) -> int {
+        if items.length == 0 { return 0; }
+        // Note: Slint doesn't have list reduce, but we can do a loop or just drive from Rust
+        // For simplicity, we'll let Rust push the count or we can just count inside the UI block
+        return 0; // Placeholder, real logic below uses backend driven count if we added it
+    }
 
     callback back-clicked();
-    callback create-clicked(string); // IDs summary
+    callback toggled(string); 
+    callback create-clicked(); 
 
     background: AppTheme.surface-primary;
 
@@ -51,7 +57,7 @@ export component SelectContactsScreen inherits Rectangle {
                 VerticalLayout {
                     alignment: center;
                     Text { 
-                        text: root.selected-count > 0 ? root.selected-count + " Selected" : "Select Members"; 
+                        text: "Select Members"; 
                         font-size: is-desktop ? 24px : 18px; 
                         font-weight: 700; 
                         color: AppTheme.text-primary; 
@@ -78,21 +84,16 @@ export component SelectContactsScreen inherits Rectangle {
                 VerticalLayout {
                     spacing: 4px;
                     for contact in root.contacts : ActionRow {
-                        property <bool> selected: false;
-                        
-                        title: contact.name;
-                        subtitle: contact.node-id;
+                        title: contact.display-name;
+                        subtitle: contact.contact-id;
                         initials: contact.initials;
                         is-online: contact.is-online;
-                        is-verified: contact.is-verified;
                         
                         accessory: "checkbox";
-                        is-toggle-on: self.selected;
+                        is-toggle-on: contact.is-selected;
                         
                         toggled(on) => {
-                            self.selected = on;
-                            if on { root.selected-count += 1; }
-                            else { root.selected-count -= 1; }
+                            root.toggled(contact.contact-id);
                         }
                     }
                 }
@@ -104,8 +105,9 @@ export component SelectContactsScreen inherits Rectangle {
     }
 
     // 2. Floating Action Button (FAB)
-    // Only visible when at least one member is selected
-    if root.selected-count > 0 : Rectangle {
+    // We'll show the FAB always if we have a way to validate completion, 
+    // or drive visibility from a "has-selection" property.
+    Rectangle {
         x: parent.width - self.width - 24px;
         y: parent.height - self.height - 24px;
         width: 64px;
@@ -132,7 +134,7 @@ export component SelectContactsScreen inherits Rectangle {
         }
 
         TouchArea {
-            clicked => { root.create-clicked("demo_selection"); }
+            clicked => { root.create-clicked(); }
         }
 
         // Animating entrance

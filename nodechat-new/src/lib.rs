@@ -2,6 +2,7 @@ pub mod contract;
 pub mod bridge;
 pub mod mock_backend;
 pub mod ui;
+pub mod ui_models;
 
 slint::include_modules!();
 
