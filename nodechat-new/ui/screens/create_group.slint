@@ -4,9 +4,11 @@
 import { AppTheme } from "../theme.slint";
 import { Button } from "../components/button.slint";
 import { FormInput } from "../components/form_input.slint";
+import { AppInfo } from "../components/row_data.slint";
 
 export component CreateGroupScreen inherits Rectangle {
     in property <bool> is-desktop: false;
+    in property <AppInfo> app-info;
     
     callback back-clicked();
     callback create-group(string, string); // name, topic
@@ -66,7 +68,7 @@ export component CreateGroupScreen inherits Rectangle {
                 VerticalLayout {
                     padding: AppTheme.sp-md;
                     Text {
-                        text: "Groups in NodeChat are decentralized swarms. Once created, you can share the Join Ticket with others to invite them.";
+                        text: "Groups in " + root.app-info.name + " are decentralized swarms. Once created, you can share the Join Ticket with others to invite them.";
                         font-size: 13px;
                         color: AppTheme.text-secondary;
                         wrap: word-wrap;

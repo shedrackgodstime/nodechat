@@ -154,7 +154,7 @@ export component SettingsScreen inherits Rectangle {
                         VerticalLayout {
                             ActionRow {
                                 icon: "💬";
-                                title: "About NodeChat";
+                                title: "About " + root.app-info.name;
                                 subtitle: "Version, Diagnostics & Credits";
                                 accessory: "arrow";
                                 clicked => { root.open-about(); }

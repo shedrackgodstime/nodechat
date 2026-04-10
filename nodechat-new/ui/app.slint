@@ -9,7 +9,7 @@
 // ---------------------------------------------------------
 
 import { AppTheme } from "./theme.slint";
-import { ChatPreview, ContactData, GroupData } from "./components/row_data.slint";
+import { ChatPreview, ContactData, GroupData, AppInfo, GroupCandidateItem } from "./components/row_data.slint";
 import { ChatListScreen } from "./screens/chat_list.slint";
 import { ChatViewScreen, MessageData } from "./screens/chat_view.slint";
 import { ContactsScreen } from "./screens/contacts_screen.slint";
@@ -42,7 +42,7 @@ export struct ConversationContext {
 }
 
 export component AppWindow inherits Window {
-    title: "NodeChat";
+    title: root.app-info.name;
 
     // --- Window Constraints ---
     min-width: 0px; 
@@ -60,194 +60,40 @@ export component AppWindow inherits Window {
     property <length> concrete-sidebar-width: (root.device == DeviceType.desktop) ? 320px : (root.device == DeviceType.tablet ? 170px : 0px);
     in-out property <int> current-screen: 0;
     in property <bool> has-password: false;
-    in-out property <bool> has-identity: false;
-    in-out property <bool> is-locked: false;
+    in property <bool> has-identity: false;
+    in property <bool> is-locked: false;
 
-    // --- App Data ---
-    in property <string> display-name: "Shedrack G.";
-    in property <string> initials: "SG";
+    // --- App Data (Driven by Rust) ---
+    in property <string> display-name: "";
+    in property <string> initials: "";
     in property <string> endpoint-ticket: "";
-    in property <[ChatPreview]> chats: [
-        {
-            id: "1",
-            name: "Alice",
-            initials: "A",
-            last-message: "The P2P relay is active now.",
-            timestamp: "12:45",
-            unread: 0,
-            is-group: false,
-            is-online: true,
-            is-relay: false,
-            is-verified: true
-        },
-        {
-            id: "2",
-            name: "Global Dev Group",
-            initials: "GD",
-            last-message: "Let's test the group broadcast.",
-            timestamp: "10:20",
-            unread: 12,
-            is-group: true,
-            is-online: true,
-            is-relay: false,
-            is-verified: false
-        },
-        {
-            id: "3",
-            name: "Bob",
-            initials: "B",
-            last-message: "Are you online?",
-            timestamp: "Yesterday",
-            unread: 0,
-            is-group: false,
-            is-online: false,
-            is-relay: false,
-            is-verified: false
-        },
-        {
-            id: "4",
-            name: "Charlie",
-            initials: "C",
-            last-message: "Connection established via relay 42.",
-            timestamp: "Mon",
-            unread: 2,
-            is-group: false,
-            is-online: true,
-            is-relay: true,
-            is-verified: false
-        },
-        {
-            id: "5",
-            name: "Satoshi",
-            initials: "S",
-            last-message: "The genesis block is ready.",
-            timestamp: "2009",
-            unread: 0,
-            is-group: false,
-            is-online: false,
-            is-relay: false,
-            is-verified: true
-        }
-    ];
-    in property <[ContactData]> contacts: [
-        {
-            id: "1",
-            name: "Alice",
-            initials: "A",
-            node-id: "node_7f8a9b...",
-            is-online: true,
-            is-session-ready: true,
-            is-relay: false,
-            is-verified: true
-        },
-        {
-            id: "3",
-            name: "Bob",
-            initials: "B",
-            node-id: "node_1a2b3c...",
-            is-online: false,
-            is-session-ready: false,
-            is-relay: false,
-            is-verified: false
-        },
-        {
-            id: "4",
-            name: "Charlie",
-            initials: "C",
-            node-id: "node_x9y8z7...",
-            is-online: true,
-            is-session-ready: true,
-            is-relay: true,
-            is-verified: false
-        },
-        {
-            id: "5",
-            name: "Satoshi",
-            initials: "S",
-            node-id: "node_BTC123...",
-            is-online: false,
-            is-session-ready: false,
-            is-relay: false,
-            is-verified: true
-        }
-    ];
-
-    in-out property <[GroupData]> groups: [
-        {
-            id: "g1",
-            name: "Iroh Developers",
-            initials: "ID",
-            topic: "iroh_protocol_discussion_v1_0",
-            secret-key: "sk_abc123xyz_p2p_secure",
-            member-count: 42
-        }
-    ];
-
-    in-out property <GroupData> active-group: root.groups[0];
+    in property <[ChatPreview]> chats: [];
+    in property <[ContactData]> contacts: [];
+    in-out property <[GroupData]> groups: [];
+    in-out property <GroupData> active-group: {
+        id: "",
+        name: "",
+        initials: "",
+        topic: "",
+        secret-key: "",
+        member-count: 0
+    };
 
     // --- Temporary State for Flows ---
     property <string> temp-group-name: "";
     property <string> temp-group-desc: "";
     property <int> group-selection-return: 10;
 
-    in-out property <[MessageData]> active-messages: [
-        {
-            id: "m1",
-            sender: "Alice",
-            text: "Hey! Did you see the new relay protocol?",
-            timestamp: "12:45",
-            is-outgoing: false,
-            is-system: false,
-            is-invite: false,
-            invite-topic: "",
-            invite-name: "",
-            invite-key: "",
-            is-invite-joined: false,
-            status: "read"
-        },
-        {
-            id: "m2",
-            sender: "System",
-            text: "Direct P2P connection established with Alice.",
-            timestamp: "12:46",
-            is-outgoing: false,
-            is-system: true,
-            is-invite: false,
-            invite-topic: "",
-            invite-name: "",
-            invite-key: "",
-            is-invite-joined: false,
-            status: ""
-        },
-        {
-            id: "m3",
-            sender: "Shedrack G.",
-            text: "Yeah, it looks like it's much faster now. I'm seeing sub-50ms latency.",
-            timestamp: "12:47",
-            is-outgoing: true,
-            is-system: false,
-            is-invite: false,
-            invite-topic: "",
-            invite-name: "",
-            invite-key: "",
-            is-invite-joined: false,
-            status: "delivered"
-        },
-        {
-            id: "m4",
-            sender: "Alice",
-            text: "Exactly. The Iroh broadcast layer is doing most of the heavy lifting. I'll send you an invite to the dev group.",
-            timestamp: "12:48",
-            is-outgoing: false,
-            is-system: false,
-            is-invite: false,
-            invite-topic: "",
-            invite-name: "",
-            invite-key: "",
-            is-invite-joined: false,
-            status: "read"
-        }
-    ];
+    in property <AppInfo> app-info: {
+        name: "",
+        version: "",
+        version-type: "",
+        description: "",
+        website: "",
+        repo: ""
+    };
+
+    in property <[MessageData]> active-messages: [];
     in-out property <ConversationContext> active-conversation: {
         kind: "direct",
         id: "",
@@ -260,9 +106,10 @@ export component AppWindow inherits Window {
         connection-stage: "",
         return-screen: 0,
     };
-    in property <int> direct-peers: 2;
-    in property <int> relay-peers: 1;
+    in property <int> direct-peers: 0;
+    in property <int> relay-peers: 0;
     in property <bool> is-offline: false;
+    in property <[GroupCandidateItem]> group-candidates: [];
 
     // --- Modal State ---
     in-out property <bool> confirm-modal-show: false;
@@ -277,6 +124,7 @@ export component AppWindow inherits Window {
     callback open-contacts;
     callback add-contact;
     callback open-chat(ChatPreview);
+    callback add-peer(string);
 
     open-settings => {
         root.current-screen = 3;
@@ -288,83 +136,8 @@ export component AppWindow inherits Window {
         root.current-screen = 5;
     }
     open-chat(chat) => {
+        // Rust handles full state population via Command::LoadConversation
         root.load-conversation(chat.id, chat.is-group);
-        root.active-conversation = {
-            kind: chat.is-group ? "group" : "direct",
-            id: chat.id,
-            title: chat.name,
-            initials: chat.initials,
-            is-online: chat.is-online,
-            is-relay: chat.is-relay,
-            is-verified: chat.is-verified,
-            is-session-ready: false,
-            connection-stage: "",
-            return-screen: 0,
-        };
-
-        // --- Contextual Mock Data Switcher ---
-        if chat.id == "1" {
-            root.active-messages = [
-                { id: "m1", sender: "Alice", text: "Hey! Did you see the new relay protocol?", timestamp: "12:45", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "m2", sender: "Shedrack G.", text: "Yeah, Alice! Sub-50ms latency is huge.", timestamp: "12:47", is-outgoing: true, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "delivered" },
-                { id: "m3", sender: "Alice", text: "Right? The team has been working on it for weeks.", timestamp: "12:48", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "m4", sender: "Alice", text: "I'm testing it now with the new encryption module.", timestamp: "12:48", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "m5", sender: "System", text: "Alice has verified your session.", timestamp: "12:50", is-outgoing: false, is-system: true, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "" },
-                { id: "m6", sender: "Shedrack G.", text: "Awesome. Make sure to check the memory usage as well.", timestamp: "12:51", is-outgoing: true, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "delivered" },
-                { id: "m7", sender: "Shedrack G.", text: "I noticed a slight spike on ARM devices.", timestamp: "12:51", is-outgoing: true, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "m8", sender: "Alice", text: "Good point. I'll profile it on my Raspberry Pi.", timestamp: "12:53", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "m9", sender: "Alice", text: "By the way, here is the group invite for the core devs.", timestamp: "12:55", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "m10", sender: "Alice", text: "", timestamp: "12:55", is-outgoing: false, is-system: false, is-invite: true, invite-topic: "devs", invite-name: "Core Devs", invite-key: "xyz123", is-invite-joined: false, status: "read" }
-            ];
-        } else if chat.id == "2" {
-            root.active-messages = [
-                { id: "g1", sender: "Alice", text: "Has anyone benchmarked the Iroh broadcast yet?", timestamp: "09:00", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "g2", sender: "Bob", text: "I'm seeing 20% faster propagation on ARM64.", timestamp: "09:15", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "g3", sender: "System", text: "Satoshi joined the group via direct link.", timestamp: "10:00", is-outgoing: false, is-system: true, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "" },
-                { id: "g4", sender: "Satoshi", text: "Hello everyone. The network looks stable.", timestamp: "10:05", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "g5", sender: "Shedrack G.", text: "Welcome! Yes, we deployed the new relay fallback.", timestamp: "10:07", is-outgoing: true, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "delivered" },
-                { id: "g6", sender: "Alice", text: "We should probably release v0.9.0 this week.", timestamp: "10:10", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "g7", sender: "Bob", text: "I agree. The UI is looking incredibly polished now.", timestamp: "10:12", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" },
-                { id: "g8", sender: "Shedrack G.", text: "Thanks guys! I've been refining the Slack-like bubble feel and safe-area logic.", timestamp: "10:15", is-outgoing: true, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "delivered" },
-                { id: "g9", sender: "System", text: "Charlie changed the group avatar.", timestamp: "10:18", is-outgoing: false, is-system: true, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "" },
-                { id: "g10", sender: "Charlie", text: "Let's test the group broadcast.", timestamp: "10:20", is-outgoing: false, is-system: false, is-invite: false, invite-topic: "", invite-name: "", invite-key: "", is-invite-joined: false, status: "read" }
-            ];
-        } else if chat.id == "4" {
-            root.active-messages = [
-                {
-                    id: "c1",
-                    sender: "Charlie",
-                    text: "I'm connecting via relay node 42. It works smoothly!",
-                    timestamp: "Mon",
-                    is-outgoing: false,
-                    is-system: false,
-                    is-invite: false,
-                    invite-topic: "",
-                    invite-name: "",
-                    invite-key: "",
-                    is-invite-joined: false,
-                    status: "read"
-                }
-            ];
-        } else {
-            root.active-messages = [
-                {
-                    id: "x1",
-                    sender: chat.name,
-                    text: "Wait, this is a new conversation context with " + chat.name,
-                    timestamp: "Now",
-                    is-outgoing: false,
-                    is-system: false,
-                    is-invite: false,
-                    invite-topic: "",
-                    invite-name: "",
-                    invite-key: "",
-                    is-invite-joined: false,
-                    status: "read"
-                }
-            ];
-        }
-
         root.current-screen = chat.is-group ? 2 : 1;
     }
 
@@ -379,6 +152,9 @@ export component AppWindow inherits Window {
     callback confirm-modal-confirmed(string, string);
     callback edit-display-name();
     callback confirm-name-change(string);
+    callback toggle-verify(string, bool);
+    callback toggle-group-candidate(string);
+    callback create-group(string, string);
     callback copy-node-id();
     callback change-password();
     callback submit-password(string, string);
@@ -565,15 +341,7 @@ export component AppWindow inherits Window {
                         display-name: root.display-name;
                         initials: root.initials;
                         endpoint-ticket: root.endpoint-ticket;
-                        
-                        app-info: {
-                            name: "NodeChat",
-                            version: "0.1.0",
-                            version-type: "Beta Build",
-                            description: "Privacy Focused. Peer-to-Peer.",
-                            website: "https://nodechat.pages.dev",
-                            repo: "https://github.com/shedrackgodstime/nodechat"
-                        };
+                        app-info: root.app-info;
 
                         back-clicked => { root.current-screen = 0; }
                         edit-display-name => { root.current-screen = 7; }
@@ -639,20 +407,16 @@ export component AppWindow inherits Window {
                         width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
                         back-clicked => { root.current-screen = 4; }
-                        add-ticket(t) => { root.current-screen = 4; }
+                        add-ticket(t) => { 
+                            root.add-peer(t);
+                            root.current-screen = 4; 
+                        }
                     }
 
                     if root.current-screen == 6: AboutScreen {
                         width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
-                        app-info: {
-                            name: "NodeChat",
-                            version: "0.1.0",
-                            version-type: "Beta Build",
-                            description: "Privacy Focused. Peer-to-Peer.",
-                            website: "https://nodechat.pages.dev",
-                            repo: "https://github.com/shedrackgodstime/nodechat"
-                        };
+                        app-info: root.app-info;
                         back-clicked => { root.current-screen = 3; }
                         open-url(url) => { root.open-url(url); }
                         copy-logs(logs) => { root.copy-to-clipboard(logs); }
@@ -668,6 +432,7 @@ export component AppWindow inherits Window {
                     if root.current-screen == 8: PasswordScreen {
                         is-desktop: root.is-desktop;
                         has-password: root.has-password;
+                        app-info: root.app-info;
                         back-clicked => { root.current-screen = 3; }
                         confirm-password(cur, new) => { root.submit-password(cur, new); root.current-screen = 3; }
                         remove-password(cur) => { root.submit-password(cur, ""); root.current-screen = 3; }
@@ -709,11 +474,13 @@ export component AppWindow inherits Window {
                             root.group-selection-return = 9;
                             root.current-screen = 11;
                         }
+                        toggle-verify(v) => { root.toggle-verify(root.active-conversation.id, v); }
                     }
 
                     if root.current-screen == 10: CreateGroupScreen {
                         width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
+                        app-info: root.app-info;
                         back-clicked => { root.current-screen = 4; }
                         create-group(name, desc) => {
                             root.temp-group-name = name;
@@ -728,26 +495,12 @@ export component AppWindow inherits Window {
                         is-desktop: root.is-desktop;
                         group-name: root.temp-group-name;
                         return-screen: root.group-selection-return;
-                        contacts: root.contacts;
+                        contacts: root.group-candidates;
                         back-clicked => { root.current-screen = root.group-selection-return; }
-                        create-clicked(ids) => {
-                            if root.group-selection-return == 10 {
-                                root.active-conversation = {
-                                    kind: "group",
-                                    id: "new-p2p-swarm",
-                                    title: root.temp-group-name,
-                                    initials: "G",
-                                    is-online: true,
-                                    is-relay: false,
-                                    is-verified: true,
-                                    is-session-ready: true,
-                                    connection-stage: "",
-                                    return-screen: 0,
-                                };
-                                root.current-screen = 2; // Jump to Group Chat
-                            } else {
-                                root.current-screen = 9; // Return to Info
-                            }
+                        toggled(id) => { root.toggle-group-candidate(id); }
+                        create-clicked() => {
+                             root.create-group(root.temp-group-name, root.temp-group-desc);
+                             root.current-screen = 0; 
                         }
                     }
                 }

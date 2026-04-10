@@ -58,7 +58,7 @@ export component AboutScreen inherits Rectangle {
                 VerticalLayout {
                     alignment: center;
                     Text {
-                        text: "About NodeChat";
+                        text: "About " + root.app-info.name;
                         font-size: is-desktop ? 28px : 18px;
                         font-weight: 700;
                         color: AppTheme.text-primary;
@@ -112,7 +112,7 @@ export component AboutScreen inherits Rectangle {
                         }
 
                         Text {
-                            text: "Privacy Focused. Peer-to-Peer.";
+                            text: root.app-info.description;
                             font-size: 13px;
                             color: AppTheme.text-tertiary;
                             horizontal-alignment: center;
@@ -177,7 +177,7 @@ export component AboutScreen inherits Rectangle {
                             spacing: AppTheme.sp-md;
 
                             Text {
-                                text: "NodeChat is an open-source initiative. We are always open to suggestions, feature requests, and code contributions from the community to help make P2P communication accessible to everyone.";
+                                text: root.app-info.name + " is an open-source initiative. We are always open to suggestions, feature requests, and code contributions from the community to help make P2P communication accessible to everyone.";
                                 font-size: 14px;
                                 color: AppTheme.text-secondary;
                                 wrap: word-wrap;
@@ -280,7 +280,7 @@ export component AboutScreen inherits Rectangle {
                             spacing: AppTheme.sp-md;
 
                             Text {
-                                text: "NodeChat is built on a foundation of modern, secure, and performant technologies that make decentralized communication possible.";
+                                text: root.app-info.name + " is built on a foundation of modern, secure, and performant technologies that make decentralized communication possible.";
                                 font-size: 13px;
                                 color: AppTheme.text-tertiary;
                                 wrap: word-wrap;
@@ -366,7 +366,7 @@ export component AboutScreen inherits Rectangle {
                     padding-bottom: AppTheme.sp-xl;
                     spacing: AppTheme.sp-xs;
                     Text {
-                        text: "© 2026 NodeChat Project";
+                        text: "© 2026 " + root.app-info.name + " Project";
                         font-size: 12px;
                         color: AppTheme.text-tertiary;
                         horizontal-alignment: center;
@@ -378,7 +378,7 @@ export component AboutScreen inherits Rectangle {
                         }
                         mouse-cursor: pointer;
                         Text {
-                            text: "Developed by NodeChat Team";
+                            text: "Developed by " + root.app-info.name + " Team";
                             font-size: 11px;
                             font-weight: 700;
                             color: AppTheme.accent; // Make it look like a link

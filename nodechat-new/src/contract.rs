@@ -200,8 +200,19 @@ pub struct MessageItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppInfoView {
+    pub name: String,
+    pub version: String,
+    pub version_type: String,
+    pub description: String,
+    pub website: String,
+    pub repo: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppSnapshot {
     pub identity: IdentityView,
+    pub app_info: AppInfoView,
     pub app_flags: AppFlags,
     pub chat_list: Vec<ChatListItem>,
     pub contact_list: Vec<ContactListItem>,
