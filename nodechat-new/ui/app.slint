@@ -242,6 +242,8 @@ export component AppWindow inherits Window {
 
     // --- Clipboard Integration ---
     in-out property <string> clipboard-buffer: "";
+    // --- Debug Logs (filled by the tracing subscriber via AppEvent::Log) ---
+    in-out property <string> debug-logs: "[NodeChat] Waiting for events...";
     public function do-copy() {
         clipboard-input.focus();
         clipboard-input.select-all();
@@ -520,6 +522,7 @@ export component AppWindow inherits Window {
                         is-desktop: root.is-desktop;
                         app-info: root.app-info;
                         show-copied: root.global-copied-active;
+                        debug-logs: root.debug-logs;
                         back-clicked => { root.back(); }
                         open-url(url) => { root.open-url(url); }
                         copy-logs(logs) => { 

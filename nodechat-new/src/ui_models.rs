@@ -38,13 +38,24 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         AppEvent::GroupCandidatesUpdated(candidates) => {
             apply_group_candidates(ui, candidates);
         }
+        AppEvent::DebugFeedUpdated(lines) => {
+            let text = lines.join("\n");
+            ui.set_debug_logs(text.into());
+        }
+        AppEvent::Log { level: _, message } => {
+            // Append to the rolling debug log (max 100 lines displayed)
+            let current = ui.get_debug_logs().to_string();
+            let mut lines: Vec<&str> = current.lines().collect();
+            lines.push(Box::leak(message.into_boxed_str()));
+            if lines.len() > 100 { lines.drain(0..lines.len()-100); }
+            ui.set_debug_logs(lines.join("\n").into());
+        }
         AppEvent::StatusNotice(msg) => {
-            println!("[UI FEEDBACK] {}", msg);
+            eprintln!("[STATUS] {}", msg);
         }
         AppEvent::UserError(err) => {
-            println!("[UI ERROR] {}", err);
+            eprintln!("[ERROR] {}", err);
         }
-        _ => {}
     }
 }
 

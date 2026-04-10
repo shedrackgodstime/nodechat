@@ -170,9 +170,17 @@ impl RealBackend {
 
             // ── Add Contact ───────────────────────────────────────────────
             Command::AddContact { ticket_or_peer_id } => {
+                tracing::info!("AddContact: parsing ticket/peer_id (len={})", ticket_or_peer_id.len());
                 let node_id = match iroh_tickets::endpoint::EndpointTicket::deserialize(&ticket_or_peer_id) {
-                    Ok(ticket) => ticket.endpoint_addr().id.to_string(),
-                    Err(_) => ticket_or_peer_id.clone(),
+                    Ok(ticket) => {
+                        let id = ticket.endpoint_addr().id.to_string();
+                        tracing::info!(node_id = %id, "AddContact: parsed as full EndpointTicket");
+                        id
+                    }
+                    Err(e) => {
+                        tracing::warn!("AddContact: not a ticket ({}), treating as raw node_id", e);
+                        ticket_or_peer_id.clone()
+                    }
                 };
                 let peer = PeerRecord {
                     node_id:         node_id.clone(),
@@ -182,6 +190,7 @@ impl RealBackend {
                     verified:        false,
                 };
                 queries::insert_peer(&self.conn, &peer)?;
+                tracing::info!(node_id = %node_id, name = %peer.display_name, "AddContact: peer saved to SQLite");
                 let contact_list = self.build_contact_list()?;
                 let chat_list = self.build_chat_list()?;
                 Ok(vec![
