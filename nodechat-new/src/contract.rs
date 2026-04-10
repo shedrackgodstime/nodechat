@@ -281,6 +281,10 @@ pub enum Command {
         current_pin: String,
         new_pin: String,
     },
+    ShareContact {
+        contact_id: String,
+        target_contact_ids: Vec<String>,
+    },
     UpdateDisplayName {
         display_name: String,
     },

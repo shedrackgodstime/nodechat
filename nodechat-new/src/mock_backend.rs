@@ -414,6 +414,32 @@ impl MockBackend {
                     )]
                 }
             }
+            Command::ShareContact {
+                contact_id,
+                target_contact_ids: _,
+            } => {
+                let targets: Vec<String> = self
+                    .snapshot
+                    .group_candidates
+                    .iter()
+                    .filter(|c| c.is_selected)
+                    .map(|c| c.display_name.clone())
+                    .collect();
+
+                // Reset selection state after action
+                for c in self.snapshot.group_candidates.iter_mut() {
+                    c.is_selected = false;
+                }
+
+                vec![
+                    AppEvent::GroupCandidatesUpdated(self.snapshot.group_candidates.clone()),
+                    AppEvent::StatusNotice(format!(
+                        "shared {} with {}",
+                        contact_id,
+                        targets.join(", ")
+                    )),
+                ]
+            }
             Command::UpdateDisplayName { display_name } => {
                 if display_name.trim().is_empty() {
                     vec![AppEvent::UserError(

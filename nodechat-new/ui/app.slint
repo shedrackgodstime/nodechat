@@ -43,6 +43,19 @@ export struct ConversationContext {
 
 export component AppWindow inherits Window {
     title: root.app-info.name;
+    init => { focus-scope.focus(); }
+
+    forward-focus: focus-scope;
+    focus-scope := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                if (root.request-back()) {
+                    return accept;
+                }
+            }
+            reject
+        }
+    }
 
     // --- Window Constraints ---
     min-width: 0px; 
@@ -70,6 +83,15 @@ export component AppWindow inherits Window {
         root.current-screen = root.last-screen;
         root.last-screen = 0; // Default fallback to Chat List
     }
+
+    // This is the bridge for the Android Hardware Back Button
+    public function request-back() -> bool {
+        if (root.current-screen != 0) {
+            root.back();
+            return true; // Handled
+        }
+        return false; // Not handled (system will minimize/close)
+    }
     in property <bool> has-password: false;
     in property <bool> has-identity: false;
     in property <bool> is-locked: false;
@@ -94,6 +116,7 @@ export component AppWindow inherits Window {
     property <string> temp-group-name: "";
     property <string> temp-group-desc: "";
     property <int> group-selection-return: 10;
+    property <string> sharing-contact-id: "";
 
     in property <AppInfo> app-info: {
         name: "",
@@ -163,6 +186,7 @@ export component AppWindow inherits Window {
     callback confirm-modal-confirmed(string, string);
     callback edit-display-name();
     callback confirm-name-change(string);
+    callback share-contact(string, [string]);
     callback toggle-verify(string, bool);
     callback toggle-group-candidate(string);
     callback create-group(string, string);
@@ -483,7 +507,14 @@ export component AppWindow inherits Window {
                              root.confirm-modal-slug = "delete-chat";
                              root.confirm-modal-show = true;
                         }
-                        add-members => { root.push-screen(11); }
+                        add-members => { 
+                             root.sharing-contact-id = "";
+                             root.push-screen(11); 
+                        }
+                        share-clicked => {
+                             root.sharing-contact-id = root.active-conversation.id;
+                             root.push-screen(11);
+                        }
                         toggle-verify(v) => { root.toggle-verify(root.active-conversation.id, v); }
                     }
 
@@ -501,13 +532,25 @@ export component AppWindow inherits Window {
                     if root.current-screen == 11: SelectContactsScreen {
                         is-desktop: root.is-desktop;
                         contacts: root.group-candidates;
-                        group-name: root.temp-group-name;
-                        back-clicked => { root.back(); }
+                        group-name: root.sharing-contact-id == "" ? root.temp-group-name : "Share Contact";
+                        back-clicked => { 
+                             root.sharing-contact-id = "";
+                             root.back(); 
+                        }
                         toggled(id) => { root.toggle-group-candidate(id); }
                         create-clicked => { 
-                             root.create-group(root.temp-group-name, root.temp-group-desc); 
-                             root.current-screen = 0; 
-                             root.last-screen = 0;
+                             if (root.sharing-contact-id != "") {
+                                 // Collecting selected contacts is handled by Rust side usually 
+                                 // via the group-candidates list states. 
+                                 // We'll call a dedicated command.
+                                 root.share-contact(root.sharing-contact-id, []); 
+                                 root.back();
+                                 root.sharing-contact-id = "";
+                             } else {
+                                 root.create-group(root.temp-group-name, root.temp-group-desc); 
+                                 root.current-screen = 0; 
+                                 root.last-screen = 0;
+                             }
                         }
                     }
                 }

@@ -19,6 +19,7 @@ export component InfoScreen inherits Rectangle {
     callback request-clear-history();
     callback request-delete();
     callback add-members();
+    callback share-clicked();
 
     background: AppTheme.surface-primary;
 
@@ -143,6 +144,12 @@ export component InfoScreen inherits Rectangle {
                         kind: "primary";
                         horizontal-stretch: 1;
                         clicked => { root.chat-clicked(); }
+                    }
+                    if !is-group : Button {
+                        text: "Share Profile";
+                        kind: "secondary";
+                        horizontal-stretch: 1;
+                        clicked => { root.share-clicked(); }
                     }
                     if is-group : Button {
                         text: "Add Member";
