@@ -323,6 +323,8 @@ pub enum AppEvent {
     },
     GroupCandidatesUpdated(Vec<GroupCandidateItem>),
     DebugFeedUpdated(Vec<String>),
+    /// A single log line from the tracing subscriber — level is "ERROR"/"WARN"/"INFO"/"DEBUG".
+    Log { level: String, message: String },
     StatusNotice(String),
     UserError(String),
 }
