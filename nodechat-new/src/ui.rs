@@ -7,15 +7,18 @@ pub fn run_app() -> anyhow::Result<()> {
     let app = AppWindow::new().context("failed to create Slint window")?;
     
     // Wire the Hardware Back Button (Android/Mobile)
-    let ui_handle = app.as_weak();
-    app.window().on_close_requested(move || {
-        if let Some(ui) = ui_handle.upgrade() {
-            if ui.invoke_request_back() {
-                return slint::CloseRequestResponse::KeepWindowShown;
+    #[cfg(target_os = "android")]
+    {
+        let ui_handle = app.as_weak();
+        app.window().on_close_requested(move || {
+            if let Some(ui) = ui_handle.upgrade() {
+                if ui.invoke_request_back() {
+                    return slint::CloseRequestResponse::KeepWindowShown;
+                }
             }
-        }
-        slint::CloseRequestResponse::HideWindow
-    });
+            slint::CloseRequestResponse::HideWindow
+        });
+    }
 
     let runtime = MockRuntime::start();
     let ui_bridge = runtime.ui.clone();

@@ -24,6 +24,8 @@ export component SettingsScreen inherits Rectangle {
     callback request-reset-identity();
 
     background: AppTheme.surface-primary;
+    
+    in property <bool> show-copied: false;
 
     VerticalLayout {
         width: 100%;
@@ -123,10 +125,14 @@ export component SettingsScreen inherits Rectangle {
                             }
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
-                                icon: "🎫";
-                                title: "Node Ticket";
+                                icon: "🔑";
+                                title: "Node ID / Ticket";
                                 subtitle: endpoint-ticket != "" ? endpoint-ticket : "Copy your unique join code";
-                                clicked => { root.copy-node-id(); }
+                                accessory: "copy";
+                                show-copied: root.show-copied;
+                                clicked => { 
+                                    root.copy-node-id(); 
+                                }
                             }
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
@@ -177,7 +183,7 @@ export component SettingsScreen inherits Rectangle {
 
                         VerticalLayout {
                             ActionRow {
-                                icon: "🗑️";
+                                icon: "♻️";
                                 title: "Clear Message History";
                                 subtitle: "Delete all local chat history";
                                 is-danger: true;
@@ -185,7 +191,7 @@ export component SettingsScreen inherits Rectangle {
                             }
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
-                                icon: "🧨";
+                                icon: "⚠️";
                                 title: "Reset P2P Identity";
                                 subtitle: "Irreversibly destroy vault keys";
                                 is-danger: true;

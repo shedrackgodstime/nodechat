@@ -8,9 +8,13 @@ import { FormInput } from "../components/form_input.slint";
 export component AddScreen inherits Rectangle {
     in property <bool> is-desktop: false;
     
+    in property <string> endpoint-ticket: "";
+    
     callback back-clicked();
     callback add-ticket(string);
+    callback copy-ticket(string);
 
+    in property <bool> show-copied: false;
     background: AppTheme.surface-primary;
 
     VerticalLayout {
@@ -74,6 +78,24 @@ export component AddScreen inherits Rectangle {
                 kind: "primary";
                 enabled: input.text != "";
                 clicked => { root.add-ticket(input.text); }
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                spacing: 4px;
+                padding-top: AppTheme.sp-md;
+                Text { text: "Want to be added instead?"; font-size: 13px; color: AppTheme.text-secondary; }
+                TouchArea {
+                    clicked => { 
+                        root.copy-ticket(root.endpoint-ticket); 
+                    }
+                    Text { 
+                        text: root.show-copied ? "COPIED ✅" : "Copy My Ticket"; 
+                        font-size: 13px; 
+                        font-weight: 700; 
+                        color: root.show-copied ? AppTheme.accent-success : AppTheme.accent; 
+                    }
+                }
             }
 
             Rectangle { vertical-stretch: 1; }
