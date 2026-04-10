@@ -27,6 +27,10 @@ export component ActionRow inherits Rectangle {
     in property <bool> is-danger: false;
     in property <bool> compact: false;
     
+    // --- Last Message Status (Chat List Mode) ---
+    in property <bool> is-last-message-outgoing: false;
+    in property <string> last-message-status: ""; // "sent", "delivered", "failed", "queued"
+    
     // --- Appearance ---
     in property <string> accessory: "none"; // "arrow", "toggle", "checkbox", "none"
     in property <bool> is-toggle-on: false;
@@ -114,8 +118,11 @@ export component ActionRow inherits Rectangle {
                     color: root.is-danger ? AppTheme.accent-danger : AppTheme.text-primary;
                     overflow: elide; horizontal-stretch: 1;
                 }
-                if root.is-verified : Text {
-                    text: "✓"; font-size: 12px; color: AppTheme.accent-success; vertical-alignment: center;
+                if root.is-verified : Image {
+                    source: @image-url("../images/nav/check.svg");
+                    width: 14px; height: 14px;
+                    colorize: AppTheme.accent-success;
+                    y: (parent.height - self.height) / 2;
                 }
                 if root.timestamp != "" : Text {
                     text: root.timestamp; font-size: 12px;
@@ -123,9 +130,37 @@ export component ActionRow inherits Rectangle {
                 }
             }
 
-            if root.subtitle != "" : Text {
-                text: root.subtitle; font-size: 13px; font-weight: 500;
-                color: AppTheme.text-tertiary; overflow: elide;
+            if root.subtitle != "" : HorizontalLayout {
+                spacing: 4px;
+                // Status indicator for outgoing messages
+                if root.is-last-message-outgoing : Rectangle {
+                    width: 14px;
+                    height: 14px;
+                    y: (parent.height - self.height) / 2;
+
+                    if root.last-message-status == "delivered" : Image {
+                        source: @image-url("../images/nav/check-check.svg");
+                        width: 14px; height: 14px; colorize: AppTheme.accent-success;
+                    }
+                    if root.last-message-status == "sent" : Image {
+                        source: @image-url("../images/nav/check.svg");
+                        width: 14px; height: 14px; colorize: AppTheme.text-tertiary;
+                    }
+                    if root.last-message-status == "failed" : Image {
+                        source: @image-url("../images/nav/failed.svg");
+                        width: 14px; height: 14px; colorize: AppTheme.accent-danger;
+                    }
+                    if root.last-message-status == "queued" : Image {
+                        source: @image-url("../images/nav/clock.svg");
+                        width: 14px; height: 14px; colorize: AppTheme.text-tertiary;
+                    }
+                }
+
+                Text {
+                    text: root.subtitle; font-size: 13px; font-weight: 500;
+                    color: AppTheme.text-tertiary; overflow: elide;
+                    horizontal-stretch: 1;
+                }
             }
         }
 
@@ -165,8 +200,9 @@ export component ActionRow inherits Rectangle {
                 border-color: root.is-toggle-on ? AppTheme.accent : AppTheme.divider;
                 background: root.is-toggle-on ? AppTheme.accent : transparent;
                 animate background { duration: AppTheme.dur-short; }
-                if root.is-toggle-on : Text {
-                    text: "✓"; font-size: 15px; font-weight: 900; color: #FFFFFF;
+                if root.is-toggle-on : Image {
+                    source: @image-url("../images/nav/check.svg");
+                    width: 14px; height: 14px; colorize: #FFFFFF;
                     horizontal-alignment: center; vertical-alignment: center;
                 }
             }

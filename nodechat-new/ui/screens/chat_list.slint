@@ -161,6 +161,8 @@ export component ChatListScreen inherits Rectangle {
                     is-relay: chat.is-relay;
                     is-verified: chat.is-verified;
                     is-selected: chat.id == root.active-id;
+                    last-message-status: chat.last-message-status;
+                    is-last-message-outgoing: chat.is-last-message-outgoing;
                     compact: root.compact;
                     clicked => { root.open-chat(chat); }
                 }

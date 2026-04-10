@@ -25,7 +25,7 @@ export component ContactsScreen inherits Rectangle {
 
         // 1. Header (Mirrors Info/Password Screen depth)
         Rectangle {
-            height: is-desktop ? 90px : 74px;
+            height: is-desktop ? 80px : 64px;
             background: AppTheme.surface-secondary;
 
             Rectangle {
@@ -80,14 +80,16 @@ export component ContactsScreen inherits Rectangle {
 
                         VerticalLayout {
                             ActionRow {
-                                icon: "➕";
+                                icon-svg: @image-url("../images/nav/add.svg");
+                                icon-color: AppTheme.accent;
                                 title: "Add Peer by Ticket";
                                 subtitle: "Paste a join code to connect";
                                 clicked => { root.add-contact(); }
                             }
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
-                                icon: "👥";
+                                icon-svg: @image-url("../images/nav/chats.svg");
+                                icon-color: AppTheme.accent;
                                 title: "Create New Group Chat";
                                 subtitle: "Broadcast to multiple peers";
                                 clicked => { root.new-group(); }

@@ -68,19 +68,35 @@ fn apply_app_info(ui: &AppWindow, info: AppInfoView) {
 }
 
 fn apply_chats(ui: &AppWindow, chats: Vec<ChatListItem>) {
-    let rows: Vec<ChatPreview> = chats.into_iter().map(|c| ChatPreview {
-        id: c.conversation_id.into(),
-        name: c.title.into(),
-        initials: c.initials.into(),
-        last_message: c.last_message.into(),
-        timestamp: c.timestamp.into(),
+    let rows: Vec<ChatPreview> = chats.iter().map(|c| ChatPreview {
+        id: c.conversation_id.clone().into(),
+        name: c.title.clone().into(),
+        initials: c.initials.clone().into(),
+        last_message: c.last_message.clone().into(),
+        timestamp: c.timestamp.clone().into(),
         unread: c.unread_count,
         is_group: matches!(c.kind, crate::contract::ConversationKind::Group),
         is_online: c.is_online,
         is_relay: c.is_relay,
         is_verified: c.is_verified,
+        last_message_status: c.last_message_status.to_string().into(),
+        is_last_message_outgoing: c.is_last_message_outgoing,
     }).collect();
     ui.set_chats(VecModel::from_slice(&rows).into());
+
+    // Populate Group List for Contacts Screen
+    let groups: Vec<GroupData> = chats.into_iter()
+        .filter(|c| matches!(c.kind, crate::contract::ConversationKind::Group))
+        .map(|c| GroupData {
+            id: c.conversation_id.into(),
+            name: c.title.into(),
+            initials: c.initials.into(),
+            topic: "".into(),
+            secret_key: "".into(),
+            member_count: c.member_count,
+        })
+        .collect();
+    ui.set_groups(VecModel::from_slice(&groups).into());
 }
 
 fn apply_contacts(ui: &AppWindow, contacts: Vec<ContactListItem>) {

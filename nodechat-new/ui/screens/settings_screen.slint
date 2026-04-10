@@ -69,7 +69,7 @@ export component SettingsScreen inherits Rectangle {
             settings-body := VerticalLayout {
                 width: parent.width;
                 padding: AppTheme.sp-md;
-                padding-top: AppTheme.sp-xl;
+                padding-top: AppTheme.sp-md;
                 spacing: AppTheme.sp-lg;
                 alignment: start;
 
@@ -196,13 +196,15 @@ export component SettingsScreen inherits Rectangle {
                 }
 
                 // Simple Footer
-                Text {
-                    text: root.app-info.name + " " + root.app-info.version;
-                    font-size: 11px;
-                    color: AppTheme.text-tertiary;
-                    horizontal-alignment: center;
+                VerticalLayout {
                     padding-top: AppTheme.sp-lg;
-                    opacity: 0.5;
+                    Text {
+                        text: root.app-info.name + " " + root.app-info.version;
+                        font-size: 11px;
+                        color: AppTheme.text-tertiary;
+                        horizontal-alignment: center;
+                        opacity: 0.5;
+                    }
                 }
             }
         }

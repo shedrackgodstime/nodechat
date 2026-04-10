@@ -59,6 +59,17 @@ export component AppWindow inherits Window {
     // Decoupled width property to prevent binding loops in layout negotiation
     property <length> concrete-sidebar-width: (root.device == DeviceType.desktop) ? 320px : (root.device == DeviceType.tablet ? 170px : 0px);
     in-out property <int> current-screen: 0;
+    property <int> last-screen: 0;
+
+    function push-screen(target: int) {
+        root.last-screen = root.current-screen;
+        root.current-screen = target;
+    }
+
+    function back() {
+        root.current-screen = root.last-screen;
+        root.last-screen = 0; // Default fallback to Chat List
+    }
     in property <bool> has-password: false;
     in property <bool> has-identity: false;
     in property <bool> is-locked: false;
@@ -127,18 +138,18 @@ export component AppWindow inherits Window {
     callback add-peer(string);
 
     open-settings => {
-        root.current-screen = 3;
+        root.push-screen(3);
     }
     open-contacts => {
-        root.current-screen = 4;
+        root.push-screen(4);
     }
     add-contact => {
-        root.current-screen = 5;
+        root.push-screen(5);
     }
     open-chat(chat) => {
         // Rust handles full state population via Command::LoadConversation
         root.load-conversation(chat.id, chat.is-group);
-        root.current-screen = chat.is-group ? 2 : 1;
+        root.push-screen(chat.is-group ? 2 : 1);
     }
 
     callback send-message(string);
@@ -181,19 +192,23 @@ export component AppWindow inherits Window {
     property <length> kb-height: root.virtual-keyboard-size.height;
 
     // --- Application Root Shell ---
-    HorizontalLayout {
+    Rectangle {
         width: 100%;
         height: 100%;
-        spacing: 0;
 
         // 1. SIDEBAR (Desktop & Tablet Rail)
-        if root.concrete-sidebar-width > 0px : Rectangle {
+        Rectangle {
+            x: 0;
+            y: 0;
             width: root.concrete-sidebar-width;
             height: 100%;
             clip: true;
             background: AppTheme.surface-secondary;
+            visible: self.width > 0px;
 
             VerticalLayout {
+                width: 100%;
+                height: 100%;
                 spacing: 0;
                 
                 // Desktop Mode — NavBar pinned to bottom via absolute positioning
@@ -230,6 +245,8 @@ export component AppWindow inherits Window {
 
                 // Tablet Mode
                 if root.device == DeviceType.tablet : HorizontalLayout {
+                    width: 100%;
+                    height: 100%;
                     spacing: 0;
                     NavBar {
                         width: 90px;
@@ -261,12 +278,15 @@ export component AppWindow inherits Window {
                 x: parent.width - 1px;
                 width: 1px;
                 background: AppTheme.divider;
+                visible: parent.width > 0.5px;
             }
         }
 
         // 2. PRIMARY CONTENT AREA
         Rectangle {
-            horizontal-stretch: 1;
+            x: root.concrete-sidebar-width;
+            y: 0;
+            width: parent.width - root.concrete-sidebar-width;
             height: 100%;
             background: AppTheme.surface-primary;
             clip: true;
@@ -275,8 +295,8 @@ export component AppWindow inherits Window {
                 spacing: 0;
 
                 // Safe area spacer (Mobile only)
-                if root.device == DeviceType.mobile : Rectangle {
-                    height: root.safe-area-top;
+                Rectangle {
+                    height: root.device == DeviceType.mobile ? root.safe-area-top : 0px;
                     background: AppTheme.surface-secondary;
                     vertical-stretch: 0;
                 }
@@ -323,41 +343,40 @@ export component AppWindow inherits Window {
                         connection-stage: root.active-conversation.connection-stage;
                         messages: root.active-messages;
                         virtual-keyboard-height: root.kb-height;
-                        go-back => { root.current-screen = root.active-conversation.return-screen; }
+                        go-back => { root.back(); }
                         send-message(msg) => {
                             if root.active-conversation.kind == "group" { root.send-group-message(msg); }
                             else { root.send-message(msg); }
                         }
                         open-contact-info => {
-                             root.current-screen = 9;
+                             root.push-screen(9);
                         }
                         retry-queued => { root.retry-queued(); }
                         request-delete-conversation => { root.request-delete-conversation(); }
                     }
 
                     if root.current-screen == 3: SettingsScreen {
-                        width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
                         display-name: root.display-name;
                         initials: root.initials;
+                        node-id: "node_" + root.endpoint-ticket + "...";
                         endpoint-ticket: root.endpoint-ticket;
+                        has-password: root.has-password;
                         app-info: root.app-info;
-
-                        back-clicked => { root.current-screen = 0; }
-                        edit-display-name => { root.current-screen = 7; }
-                        copy-node-id => { root.copy-node-id(); }
-                        change-password => { root.current-screen = 8; }
-                        open-about => { root.current-screen = 6; } 
-                        request-clear-history => { 
-                            root.confirm-modal-title = "Clear Message History";
-                            root.confirm-modal-subtitle = "Are you sure you want to permanently delete all localized messages and media?";
-                            root.confirm-modal-slug = "clear-history";
-                            root.confirm-modal-show = true;
+                        back-clicked => { root.back(); }
+                        edit-display-name => { root.push-screen(6); }
+                        change-password => { root.push-screen(8); }
+                        open-about => { root.push-screen(7); }
+                        request-clear-history => {
+                             root.confirm-modal-slug = "clear-history";
+                             root.confirm-modal-title = "Clear History";
+                             root.confirm-modal-subtitle = "Wipe all messages locally. This cannot be undone.";
+                             root.confirm-modal-show = true;
                         }
-                        request-reset-identity => { 
-                            root.confirm-modal-title = "Reset P2P Identity";
-                            root.confirm-modal-subtitle = "Your private keys will be destroyed and you will permanently lose access to your network.";
-                            root.confirm-modal-slug = root.has-password ? "delete-identity" : "reset-identity";
+                        request-reset-identity => {
+                            root.confirm-modal-slug = "delete-identity";
+                            root.confirm-modal-title = "Nuke Identity";
+                            root.confirm-modal-subtitle = "WARNING: You will lose your Peer ID and Contacts forever.";
                             root.confirm-modal-show = true;
                         }
                     }
@@ -367,9 +386,9 @@ export component AppWindow inherits Window {
                         is-desktop: root.is-desktop;
                         contacts: root.contacts;
                         groups: root.groups;
-                        back-clicked => { root.current-screen = 0; }
-                        add-contact => { root.current-screen = 5; }
-                        new-group => { root.current-screen = 10; }
+                        back-clicked => { root.back(); }
+                        add-contact => { root.push-screen(5); }
+                        new-group => { root.push-screen(10); }
                         open-contact(contact) => {
                             root.active-conversation = {
                                 kind: "direct",
@@ -380,10 +399,10 @@ export component AppWindow inherits Window {
                                 is-relay: contact.is-relay,
                                 is-verified: contact.is-verified,
                                 is-session-ready: contact.is-session-ready,
-                                connection-stage: "",
+                                connection-stage: "Direct connection ready",
                                 return-screen: 4,
                             };
-                            root.current-screen = 9;
+                            root.push-screen(1);
                         }
                         open-group(group) => {
                             root.active-group = group;
@@ -399,43 +418,41 @@ export component AppWindow inherits Window {
                                 connection-stage: "",
                                 return-screen: 4,
                             };
-                            root.current-screen = 9;
+                            root.push-screen(9);
                         }
                     }
 
                     if root.current-screen == 5: AddScreen {
-                        width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
-                        back-clicked => { root.current-screen = 4; }
-                        add-ticket(t) => { 
-                            root.add-peer(t);
-                            root.current-screen = 4; 
+                        back-clicked => { root.back(); }
+                        add-ticket(ticket) => { 
+                             root.add-peer(ticket);
+                             root.back();
                         }
                     }
 
-                    if root.current-screen == 6: AboutScreen {
-                        width: 100%; height: 100%;
+                    if root.current-screen == 7: AboutScreen {
                         is-desktop: root.is-desktop;
                         app-info: root.app-info;
-                        back-clicked => { root.current-screen = 3; }
+                        back-clicked => { root.back(); }
                         open-url(url) => { root.open-url(url); }
                         copy-logs(logs) => { root.copy-to-clipboard(logs); }
                     }
 
-                    if root.current-screen == 7: EditNameScreen {
+                    if root.current-screen == 6: EditNameScreen {
                         is-desktop: root.is-desktop;
                         display-name: root.display-name;
-                        back-clicked => { root.current-screen = 3; }
-                        confirm-name(name) => { root.confirm-name-change(name); root.current-screen = 3; }
+                        back-clicked => { root.back(); }
+                        confirm-name(name) => { root.confirm-name-change(name); root.back(); }
                     }
 
                     if root.current-screen == 8: PasswordScreen {
                         is-desktop: root.is-desktop;
                         has-password: root.has-password;
                         app-info: root.app-info;
-                        back-clicked => { root.current-screen = 3; }
-                        confirm-password(cur, new) => { root.submit-password(cur, new); root.current-screen = 3; }
-                        remove-password(cur) => { root.submit-password(cur, ""); root.current-screen = 3; }
+                        back-clicked => { root.back(); }
+                        confirm-password(cur, new) => { root.submit-password(cur, new); root.back(); }
+                        remove-password(cur) => { root.submit-password(cur, ""); root.back(); }
                     }
 
                     if root.current-screen == 9: InfoScreen {
@@ -445,62 +462,52 @@ export component AppWindow inherits Window {
                             id: root.active-conversation.id,
                             name: root.active-conversation.title,
                             initials: root.active-conversation.initials,
-                            node-id: "node_" + root.active-conversation.id + "_p2p...",
+                            node-id: "node_" + root.active-conversation.id + "...",
                             is-online: root.active-conversation.is-online,
                             is-relay: root.active-conversation.is-relay,
                             is-verified: root.active-conversation.is-verified,
                         };
                         group: root.active-group;
-                        back-clicked => { root.current-screen = root.active-conversation.kind == "group" ? 2 : 1; }
-                        chat-clicked => { 
-                            root.load-conversation(root.active-conversation.id, root.active-conversation.kind == "group");
-                            root.current-screen = root.active-conversation.kind == "group" ? 2 : 1; 
-                        }
-                        copy-text(txt) => { root.copy-to-clipboard(txt); }
+                        back-clicked => { root.back(); }
+                        chat-clicked => { root.push-screen(1); }
+                        copy-text(t) => { root.copy-to-clipboard(t); }
                         request-clear-history => { 
-                             root.confirm-modal-title = "Clear History";
-                             root.confirm-modal-subtitle = "Delete all messages locally?";
-                             root.confirm-modal-slug = "clear-history";
+                             root.confirm-modal-title = "Clear Chat History";
+                             root.confirm-modal-subtitle = "Wipe messages for this peer locally.";
+                             root.confirm-modal-slug = "clear-chat";
                              root.confirm-modal-show = true;
                         }
                         request-delete => {
-                             root.confirm-modal-title = "Delete Conversation";
-                             root.confirm-modal-subtitle = "Remove this conversation permanently?";
+                             root.confirm-modal-title = "Remove Chat";
+                             root.confirm-modal-subtitle = "Disconnect from peer and delete history.";
                              root.confirm-modal-slug = "delete-chat";
                              root.confirm-modal-show = true;
                         }
-                        add-members => {
-                            root.temp-group-name = root.active-conversation.title;
-                            root.group-selection-return = 9;
-                            root.current-screen = 11;
-                        }
+                        add-members => { root.push-screen(11); }
                         toggle-verify(v) => { root.toggle-verify(root.active-conversation.id, v); }
                     }
 
                     if root.current-screen == 10: CreateGroupScreen {
-                        width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
                         app-info: root.app-info;
-                        back-clicked => { root.current-screen = 4; }
+                        back-clicked => { root.back(); }
                         create-group(name, desc) => {
                             root.temp-group-name = name;
                             root.temp-group-desc = desc;
-                            root.group-selection-return = 10;
-                            root.current-screen = 11; // Next: Select Members
+                            root.push-screen(11);
                         }
                     }
 
                     if root.current-screen == 11: SelectContactsScreen {
-                        width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
-                        group-name: root.temp-group-name;
-                        return-screen: root.group-selection-return;
                         contacts: root.group-candidates;
-                        back-clicked => { root.current-screen = root.group-selection-return; }
+                        group-name: root.temp-group-name;
+                        back-clicked => { root.back(); }
                         toggled(id) => { root.toggle-group-candidate(id); }
-                        create-clicked() => {
-                             root.create-group(root.temp-group-name, root.temp-group-desc);
+                        create-clicked => { 
+                             root.create-group(root.temp-group-name, root.temp-group-desc); 
                              root.current-screen = 0; 
+                             root.last-screen = 0;
                         }
                     }
                 }
@@ -518,9 +525,9 @@ export component AppWindow inherits Window {
                     active-screen: root.current-screen;
                     nav-to(id) => { root.current-screen = id; }
                 }
-            } // Ends VerticalLayout
-        } // Ends Rectangle
-    } // Ends HorizontalLayout
+            } // Ends Content Area
+        } // Ends Shell Rectangle
+    }
 
     // 3. GLOBAL MODALS
     if root.confirm-modal-show: ConfirmModal {

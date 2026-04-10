@@ -200,25 +200,27 @@ export component MessageBubble inherits Rectangle {
                         }
 
                         if data.is-outgoing && data.status == "sent" : Image {
-                            source: @image-url("../images/nav/check-check.svg");
+                            source: @image-url("../images/nav/check.svg");
                             width: 14px;
                             height: 14px;
                             colorize: rgba(255, 255, 255, 0.5);
                             y: (parent.height - self.height) / 2;
                         }
 
-                        if data.is-outgoing && data.status == "failed" : Text {
-                            text: "✗";
-                            font-size: AppTheme.typo.label.size;
-                            color: AppTheme.accent-danger;
-                            vertical-alignment: center;
+                        if data.is-outgoing && data.status == "failed" : Image {
+                            source: @image-url("../images/nav/failed.svg");
+                            width: 14px;
+                            height: 14px;
+                            colorize: AppTheme.accent-danger;
+                            y: (parent.height - self.height) / 2;
                         }
 
-                        if data.is-outgoing && data.status == "queued" : Text {
-                            text: "⏱";
-                            font-size: AppTheme.typo.label.size;
-                            color: rgba(255, 255, 255, 0.5);
-                            vertical-alignment: center;
+                        if data.is-outgoing && data.status == "queued" : Image {
+                            source: @image-url("../images/nav/clock.svg");
+                            width: 14px;
+                            height: 14px;
+                            colorize: rgba(255, 255, 255, 0.5);
+                            y: (parent.height - self.height) / 2;
                         }
                     }
                 }

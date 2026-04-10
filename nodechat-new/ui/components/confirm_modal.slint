@@ -49,9 +49,11 @@ export component ConfirmModal inherits Rectangle {
             // --- Icon/Header ---
             VerticalLayout {
                 spacing: AppTheme.sp-sm;
-                Text {
-                    text: "⚠️";
-                    font-size: 40px;
+                Image {
+                    source: @image-url("../images/nav/warning.svg");
+                    width: 48px;
+                    height: 48px;
+                    colorize: AppTheme.accent-danger;
                     horizontal-alignment: center;
                 }
                 Text {
@@ -86,11 +88,11 @@ export component ConfirmModal inherits Rectangle {
                         border-width: 1px;
                         animate background { duration: AppTheme.dur-short; }
 
-                        if root.is-checked : Text {
-                            text: "✓";
-                            font-size: 14px;
-                            font-weight: 900;
-                            color: #FFFFFF;
+                        if root.is-checked : Image {
+                            source: @image-url("../images/nav/check.svg");
+                            width: 16px;
+                            height: 16px;
+                            colorize: #FFFFFF;
                             horizontal-alignment: center;
                             vertical-alignment: center;
                         }
