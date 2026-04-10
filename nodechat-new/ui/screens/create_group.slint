@@ -1,0 +1,109 @@
+// NodeChat New — Create P2P Group Screen
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+import { Button } from "../components/button.slint";
+import { FormInput } from "../components/form_input.slint";
+
+export component CreateGroupScreen inherits Rectangle {
+    in property <bool> is-desktop: false;
+    
+    callback back-clicked();
+    callback create-group(string, string); // name, topic
+
+    background: AppTheme.surface-primary;
+
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: 0;
+
+        // 1. Header (Consistent with InfoScreen)
+        Rectangle {
+            height: is-desktop ? 90px : 74px;
+            background: AppTheme.surface-secondary;
+
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: AppTheme.divider;
+            }
+
+            HorizontalLayout {
+                padding-left: AppTheme.sp-md;
+                padding-right: AppTheme.sp-md;
+                spacing: AppTheme.sp-md;
+                alignment: start;
+
+                TouchArea {
+                    width: 32px;
+                    clicked => { root.back-clicked(); }
+                    Text { text: "←"; font-size: 24px; color: AppTheme.text-primary; vertical-alignment: center; }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: "New Group"; font-size: is-desktop ? 24px : 18px; font-weight: 700; color: AppTheme.text-primary; }
+                    Text { text: "Establish a new P2P swarm"; font-size: 13px; color: AppTheme.text-secondary; }
+                }
+            }
+        }
+
+        // 2. Body
+        VerticalLayout {
+            padding: AppTheme.sp-lg;
+            spacing: AppTheme.sp-lg;
+            alignment: start;
+
+            // Notice Box
+            Rectangle {
+                background: AppTheme.accent-soft;
+                border-radius: AppTheme.radius-md;
+                border-width: 1px;
+                border-color: AppTheme.accent;
+                
+                VerticalLayout {
+                    padding: AppTheme.sp-md;
+                    Text {
+                        text: "Groups in NodeChat are decentralized swarms. Once created, you can share the Join Ticket with others to invite them.";
+                        font-size: 13px;
+                        color: AppTheme.text-secondary;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Inputs
+            VerticalLayout {
+                spacing: AppTheme.sp-sm;
+                Text { text: "GROUP NAME"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1.5px; }
+                name-input := FormInput {
+                    placeholder: "e.g. Family Chat or Project Team";
+                }
+            }
+
+            VerticalLayout {
+                spacing: AppTheme.sp-sm;
+                Text { text: "GROUP DESCRIPTION"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1.5px; }
+                desc-input := FormInput {
+                    placeholder: "What is this group about?";
+                }
+                Text { 
+                    text: "This helps others identify the swarm purpose."; 
+                    font-size: 11px; 
+                    color: AppTheme.text-tertiary; 
+                }
+            }
+
+            // Next Button
+            Button {
+                text: "Next: Select Members";
+                kind: "primary";
+                enabled: name-input.text != "";
+                clicked => { root.create-group(name-input.text, desc-input.text); }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+        }
+    }
+}

@@ -2972,6 +2972,8 @@ version = "0.1.0"
 dependencies = [
  "android-activity 0.6.1",
  "anyhow",
+ "jni 0.21.1",
+ "ndk-context",
  "open",
  "slint",
  "slint-build",

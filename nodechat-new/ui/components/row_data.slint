@@ -25,6 +25,15 @@ export struct ContactData {
     is-verified: bool,
 }
 
+export struct GroupData {
+    id: string,
+    name: string,
+    initials: string,
+    topic: string,
+    secret-key: string,
+    member-count: int,
+}
+
 export struct AppInfo {
     name: string,
     version: string,

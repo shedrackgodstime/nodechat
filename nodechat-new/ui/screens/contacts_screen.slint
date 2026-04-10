@@ -3,16 +3,18 @@
 
 import { AppTheme, VertScroll } from "../theme.slint";
 import { ActionRow } from "../components/action_row.slint";
-import { ContactData } from "../components/row_data.slint";
+import { ContactData, GroupData } from "../components/row_data.slint";
 
 export component ContactsScreen inherits Rectangle {
     in property <[ContactData]> contacts: [];
+    in property <[GroupData]> groups: [];
     in property <bool> is-desktop: false;
 
     callback back-clicked();
     callback add-contact();
     callback new-group();
     callback open-contact(ContactData);
+    callback open-group(GroupData);
 
     background: AppTheme.surface-primary;
 
@@ -21,12 +23,11 @@ export component ContactsScreen inherits Rectangle {
         height: 100%;
         spacing: 0;
 
-        // 1. Header
+        // 1. Header (Mirrors Info/Password Screen depth)
         Rectangle {
-            height: is-desktop ? 80px : 64px;
+            height: is-desktop ? 90px : 74px;
             background: AppTheme.surface-secondary;
 
-            // Bottom border
             Rectangle {
                 y: parent.height - 1px;
                 height: 1px;
@@ -47,8 +48,8 @@ export component ContactsScreen inherits Rectangle {
 
                 VerticalLayout {
                     alignment: center;
-                    Text { text: "Contacts"; font-size: is-desktop ? 28px : 18px; font-weight: 700; color: AppTheme.text-primary; }
-                    Text { text: "Your P2P Network"; font-size: 13px; color: AppTheme.text-secondary; }
+                    Text { text: "Contacts"; font-size: is-desktop ? 24px : 18px; font-weight: 700; color: AppTheme.text-primary; }
+                    Text { text: "Your P2P Network directory"; font-size: 13px; color: AppTheme.text-secondary; }
                 }
             }
         }
@@ -64,9 +65,10 @@ export component ContactsScreen inherits Rectangle {
                 spacing: AppTheme.sp-lg;
                 alignment: start;
 
+                // --- 1. Quick Actions ---
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
-                    Text { text: "QUICK ACTIONS"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+                    Text { text: "QUICK ACTIONS"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1.5px; }
 
                     Rectangle {
                         background: AppTheme.surface-secondary;
@@ -79,32 +81,54 @@ export component ContactsScreen inherits Rectangle {
                             ActionRow {
                                 icon: "➕";
                                 title: "Add Peer by Ticket";
-                                subtitle: "Invite someone new";
+                                subtitle: "Paste a join code to connect";
                                 clicked => { root.add-contact(); }
                             }
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
                                 icon: "👥";
-                                title: "New Group Chat";
+                                title: "Create New Group Chat";
+                                subtitle: "Broadcast to multiple peers";
                                 clicked => { root.new-group(); }
                             }
                         }
                     }
                 }
 
+                // --- 2. Swarm Groups ---
+                if root.groups.length > 0 : VerticalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text { text: "P2P GROUPS"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1.5px; }
+
+                    VerticalLayout {
+                        spacing: 4px;
+                        for group in root.groups : ActionRow {
+                            title: group.name;
+                            subtitle: group.member-count + " members";
+                            initials: group.initials;
+                            is-online: true;
+                            accessory: "arrow";
+                            clicked => { root.open-group(group); }
+                        }
+                    }
+                }
+
+                // --- 3. Peer Directory ---
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
-                    Text { text: "PEER DIRECTORY"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
+                    Text { text: "DIRECT CONTACTS"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1.5px; }
 
                     if root.contacts.length == 0 : Rectangle {
-                        height: 120px;
+                        height: 100px;
                         background: AppTheme.surface-secondary;
                         border-radius: AppTheme.radius-lg;
-                        Text { text: "No contacts found."; color: AppTheme.text-tertiary; horizontal-alignment: center; vertical-alignment: center; }
+                        border-width: 1px;
+                        border-color: AppTheme.divider;
+                        Text { text: "No peers linked yet."; color: AppTheme.text-tertiary; horizontal-alignment: center; vertical-alignment: center; }
                     }
 
                     VerticalLayout {
-                        spacing: 2px;
+                        spacing: 4px;
                         for contact in root.contacts : ActionRow {
                             title: contact.name;
                             subtitle: contact.node-id;
@@ -117,6 +141,8 @@ export component ContactsScreen inherits Rectangle {
                         }
                     }
                 }
+
+                Rectangle { height: 40px; }
             }
         }
     }
