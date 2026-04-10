@@ -23,6 +23,9 @@ import { ConfirmModal } from "./components/confirm_modal.slint";
 import { NavBar } from "./components/nav_bar.slint";
 import { CreateGroupScreen } from "./screens/create_group.slint";
 import { SelectContactsScreen } from "./screens/select_contacts.slint";
+import { SplashScreen } from "./screens/splash.slint";
+import { WelcomeScreen } from "./screens/welcome.slint";
+import { SetupNameScreen } from "./screens/setup_name.slint";
 
 export { ChatPreview, MessageData }
 
@@ -85,6 +88,15 @@ export component AppWindow inherits Window {
     property <length> concrete-sidebar-width: (root.device == DeviceType.desktop) ? 320px : (root.device == DeviceType.tablet ? 170px : 0px);
     in-out property <int> current-screen: 0;
     property <int> last-screen: 0;
+
+    property <bool> show-splash: true;
+    property <bool> show-setup: false;
+
+    Timer {
+        interval: 1500ms;
+        running: root.show-splash;
+        triggered => { root.show-splash = false; }
+    }
 
     function push-screen(target: int) {
         root.last-screen = root.current-screen;
@@ -629,6 +641,39 @@ export component AppWindow inherits Window {
                 }
             } // Ends Content Area
         } // Ends Shell Rectangle
+    }
+
+    // --- ONBOARDING & LOCK OVERLAYS ---
+    if !root.show-splash && !root.has-identity && !root.show-setup: WelcomeScreen {
+        is-desktop: root.is-desktop;
+        safe-area-bottom: root.safe-area-bottom;
+        is-locked: false; // Get Started mode
+        get-started => { root.show-setup = true; }
+    }
+
+    if !root.show-splash && !root.has-identity && root.show-setup: SetupNameScreen {
+        is-desktop: root.is-desktop;
+        safe-area-top: root.safe-area-top;
+        safe-area-bottom: root.safe-area-bottom;
+        virtual-keyboard-height: root.kb-height;
+        go-back => { root.show-setup = false; }
+        confirm-name(name, pin) => { 
+            // The screen itself will flip to generating: true internally when clicked
+            root.create-identity(name, pin); 
+            // Notice: we DO NOT set show-setup to false here.
+            // The backend will populate `has-identity` = true when finished, which natively unmounts this.
+        }
+    }
+
+    if !root.show-splash && root.has-identity && root.is-locked: WelcomeScreen {
+        is-desktop: root.is-desktop;
+        safe-area-bottom: root.safe-area-bottom;
+        is-locked: true; // Unlock mode
+        unlock(pin) => { root.unlock-app(pin); }
+    }
+
+    if root.show-splash: SplashScreen {
+        finished => { root.show-splash = false; }
     }
 
     // 3. GLOBAL MODALS

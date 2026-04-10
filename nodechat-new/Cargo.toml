@@ -19,6 +19,21 @@ slint     = { version = "=1.15.1", features = ["backend-winit"] }
 open      = "5.3.2"
 directories = "6.0.0"
 
+# --- Networking & P2P ---
+iroh = "=0.97.0"
+iroh-gossip = "=0.97.0"
+iroh-tickets = "0.4.0"
+tokio = { version = "=1.50.0", features = ["rt", "rt-multi-thread", "sync", "time", "macros", "io-util"] }
+futures-lite = "=1.13.0"
+tracing = "=0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "ansi"] }
+hex = "0.4"
+serde_json = "1.0"
+x25519-dalek = { version = "=2.0.1", features = ["static_secrets"] }
+chacha20poly1305 = "=0.10.1"
+sha2 = "=0.10.8"
+rand = "0.8.5"
+
 [target.'cfg(not(target_os = "android"))'.dependencies]
 slint = { version = "=1.15.1", default-features = false, features = ["backend-winit", "renderer-software", "compat-1-2"] }
 
@@ -37,12 +52,26 @@ label = "NodeChat New"
 package = "com.nodechat.app.new"
 target_sdk_version = 33
 min_sdk_version = 24
+resources = "android/res"
 
 [[package.metadata.android.uses_permission]]
 name = "android.permission.INTERNET"
 
 [[package.metadata.android.uses_permission]]
 name = "android.permission.ACCESS_NETWORK_STATE"
+
+[[package.metadata.android.uses_permission]]
+name = "android.permission.FOREGROUND_SERVICE"
+
+[[package.metadata.android.uses_permission]]
+name = "android.permission.POST_NOTIFICATIONS"
+
+[package.metadata.android.application.activity]
+launch_mode = "singleTop"
+always_retain_task_state = true
+
+[package.metadata.android.application]
+icon = "@mipmap/ic_launcher"
 
 [package.metadata.android.signing.release]
 path = "../release.keystore"

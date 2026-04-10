@@ -1,0 +1,128 @@
+import { AppTheme } from "../theme.slint";
+
+export component WelcomeScreen inherits Rectangle {
+    background: AppTheme.surface-primary;
+    in property <bool> is-desktop: false;
+    in property <length> safe-area-bottom: 0px;
+
+    callback get-started();
+    callback unlock(string);
+
+    in property <bool> is-locked: false;
+    property <string> pin: "";
+
+    // --- Background Aesthetic ---
+    Rectangle {
+        background: @radial-gradient(circle, rgba(10, 132, 255, 0.08) 0%, transparent 70%);
+        width: 100%; height: 100%;
+    }
+
+    VerticalLayout {
+        alignment: center;
+        padding-bottom: Math.max(root.safe-area-bottom, AppTheme.sp-xl);
+
+        // Standardized Content Width Constraint
+        HorizontalLayout {
+            alignment: center;
+            VerticalLayout {
+                width: root.is-desktop ? 420px : parent.width;
+                spacing: AppTheme.sp-xl;
+                padding: AppTheme.sp-xl;
+
+                // --- App Branding ---
+                VerticalLayout {
+                    spacing: AppTheme.sp-md;
+                    HorizontalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../assets/icons/app_logo_with_name_transparent_bg.png");
+                            height: 120px;
+                            image-fit: contain;
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: AppTheme.sp-sm;
+                    Text {
+                        text: is-locked ? "Vault Locked" : "Privacy by Design";
+                        font-size: 20px; font-weight: 700; color: AppTheme.text-primary;
+                        horizontal-alignment: center;
+                    }
+                    Text {
+                        text: is-locked ? "Enter your PIN to resume chats" : "Decentralized. Peer-to-Peer. Encrypted.";
+                        font-size: 15px; color: AppTheme.text-tertiary;
+                        horizontal-alignment: center;
+                    }
+                }
+
+                // ── Main Action ──────────────────────────────────────────────────────
+                VerticalLayout {
+                    spacing: AppTheme.sp-md;
+                    alignment: center;
+
+                    if is-locked: VerticalLayout {
+                        spacing: AppTheme.sp-md;
+                        
+                        Rectangle {
+                            height: 60px;
+                            width: root.is-desktop ? 400px : parent.width;
+                            background: AppTheme.surface-secondary;
+                            border-radius: AppTheme.radius-lg;
+                            pin-input := TextInput {
+                                text <=> root.pin;
+                                font-size: 24px; font-weight: 800; color: #FFFFFF;
+                                vertical-alignment: center; horizontal-alignment: center;
+                                input-type: password;
+                                accepted => { if (root.pin != "") { root.unlock(root.pin); } }
+                            }
+                            if pin-input.text == "": Text {
+                                text: "••••"; font-size: 24px; color: AppTheme.text-tertiary;
+                                vertical-alignment: center; horizontal-alignment: center; opacity: 0.3;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 60px;
+                        width: root.is-desktop ? 400px : parent.width;
+                        background: @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%);
+                        border-radius: 30px;
+                        
+                        // Background and Hover effect
+                        Rectangle {
+                            width: 100%; height: 100%;
+                            background: touch.has-hover ? rgba(255, 255, 255, 0.1) : transparent;
+                            border-radius: 30px;
+                            animate background { duration: AppTheme.dur-short; }
+                        }
+
+                        Text {
+                            text: is-locked ? "Unlock Vault" : "Get Started";
+                            font-size: 18px; font-weight: 800; color: #FFFFFF;
+                            horizontal-alignment: center; vertical-alignment: center;
+                        }
+
+                        // TouchArea MUST be at the top level to intercept events
+                        touch := TouchArea {
+                            width: 100%; height: 100%;
+                            clicked => {
+                                if (is-locked) {
+                                    if (root.pin != "") { root.unlock(root.pin); }
+                                } else {
+                                    root.get-started();
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "No central servers. Ever.";
+                        font-size: 12px; color: AppTheme.text-tertiary; horizontal-alignment: center;
+                        opacity: 0.6;
+                    }
+                }
+            }
+        }
+    }
+}

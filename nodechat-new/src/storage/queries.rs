@@ -107,7 +107,7 @@ pub struct ChatPreviewRecord {
 /// Insert the local identity. Only one row can ever exist (id = 1).
 pub fn insert_local_identity(conn: &Connection, r: &LocalIdentityRecord) -> Result<()> {
     conn.execute(
-        "INSERT INTO local_identity
+        "INSERT OR REPLACE INTO local_identity
              (id, display_name, node_id_hex, x25519_secret, endpoint_ticket, pin_hash)
          VALUES (1, ?1, ?2, ?3, ?4, ?5)",
         params![r.display_name, r.node_id_hex, r.x25519_secret, r.endpoint_ticket, r.pin_hash],
