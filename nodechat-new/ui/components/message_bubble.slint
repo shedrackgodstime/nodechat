@@ -19,6 +19,8 @@ export struct MessageData {
     is-outgoing: bool,
     is-system: bool,
     is-invite: bool,
+    is-ephemeral: bool,
+    ttl-seconds: int,
     invite-topic: string,
     invite-name: string,
     invite-key: string,
@@ -185,9 +187,27 @@ export component MessageBubble inherits Rectangle {
                             font-size: AppTheme.typo.label.size;
                             font-weight: AppTheme.typo.label.weight;
                             color: data.is-outgoing
-                                ? rgba(255, 255, 255, 0.6)
+                                ? rgba(255, 255, 255, 0.7)
                                 : AppTheme.text-tertiary;
                             vertical-alignment: center;
+                        }
+
+                        // Ephemeral indicator
+                        if data.is-ephemeral : HorizontalLayout {
+                            spacing: 4px;
+                            Image {
+                                source: @image-url("../images/nav/clock.svg");
+                                width: 12px; height: 12px;
+                                colorize: data.is-outgoing ? rgba(255, 255, 255, 0.8) : AppTheme.accent;
+                                y: (parent.height - self.height) / 2;
+                            }
+                            if data.ttl-seconds > 0 : Text {
+                                text: data.ttl-seconds + "s";
+                                font-size: 10px;
+                                font-weight: 800;
+                                color: data.is-outgoing ? rgba(255, 255, 255, 0.8) : AppTheme.accent;
+                                vertical-alignment: center;
+                            }
                         }
 
                         // SVG status indicator (outgoing only) — cross-platform safe

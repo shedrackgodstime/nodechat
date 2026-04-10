@@ -58,6 +58,29 @@ pub fn run_app() -> anyhow::Result<()> {
         });
     });
 
+    let cmd = ui_bridge.clone();
+    app.on_create_identity(move |name: slint::SharedString, pin: slint::SharedString| {
+        let _ = cmd.send(Command::CreateIdentity { 
+            display_name: name.to_string(), 
+            pin: pin.to_string() 
+        });
+    });
+
+    let cmd = ui_bridge.clone();
+    app.on_finalize_identity(move || {
+        let _ = cmd.send(Command::FinalizeIdentity);
+    });
+
+    let cmd = ui_bridge.clone();
+    app.on_unlock_app(move |pin: slint::SharedString| {
+        let _ = cmd.send(Command::UnlockApp { pin: pin.to_string() });
+    });
+
+    let cmd = ui_bridge.clone();
+    app.on_refresh(move || {
+        let _ = cmd.send(Command::Refresh);
+    });
+
     // Navigation and Context Loading
     let cmd = ui_bridge.clone();
     app.on_load_conversation(move |id, _is_group| {
@@ -104,13 +127,28 @@ pub fn run_app() -> anyhow::Result<()> {
     });
 
     let cmd = ui_bridge.clone();
+    let ui_handle = app.as_weak();
     app.on_confirm_modal_confirmed(move |slug, pin| {
-        match slug.as_str() {
-            "clear-history" => { let _ = cmd.send(Command::ClearMessageHistory { scope: crate::contract::HistoryScope::AllConversations, confirmation_pin: Some(pin.to_string()) }); }
-            "delete-chat" => { let _ = cmd.send(Command::DeleteConversation { conversation_id: String::new(), confirmation_pin: Some(pin.to_string()) }); } 
-            "reset-identity" | "delete-identity" => { let _ = cmd.send(Command::ResetIdentity { confirmation_pin: pin.to_string() }); }
-            _ => {}
+        if let Some(ui) = ui_handle.upgrade() {
+            let pending_id = ui.get_pending_action_id().to_string();
+            match slug.as_str() {
+                "clear-history" => { let _ = cmd.send(Command::ClearMessageHistory { scope: crate::contract::HistoryScope::AllConversations, confirmation_pin: Some(pin.to_string()) }); }
+                "clear-chat" => { let _ = cmd.send(Command::ClearMessageHistory { scope: crate::contract::HistoryScope::ActiveConversation, confirmation_pin: Some(pin.to_string()) }); }
+                "delete-chat" => { let _ = cmd.send(Command::DeleteConversation { conversation_id: pending_id, confirmation_pin: Some(pin.to_string()) }); } 
+                "leave-group" => { let _ = cmd.send(Command::DeleteConversation { conversation_id: pending_id, confirmation_pin: Some(pin.to_string()) }); }
+                "reset-identity" | "delete-identity" => { let _ = cmd.send(Command::ResetIdentity { confirmation_pin: pin.to_string() }); }
+                _ => {}
+            }
         }
+    });
+
+    let cmd = ui_bridge.clone();
+    app.on_accept_group_invite(move |id: slint::SharedString, topic: slint::SharedString, key: slint::SharedString| {
+        let _ = cmd.send(Command::AcceptGroupInvite { 
+            conversation_id: id.to_string(), 
+            topic_id: topic.to_string(), 
+            invite_key: key.to_string() 
+        });
     });
 
     let cmd = ui_bridge.clone();

@@ -21,6 +21,8 @@ export component ActionRow inherits Rectangle {
     
     // --- State Properties ---
     in property <bool> is-online: false;
+    in property <bool> is-session-ready: true;
+    in property <bool> has-queued-messages: false;
     in property <bool> is-relay: false;
     in property <bool> is-verified: false;
     in property <bool> is-selected: false;
@@ -88,7 +90,7 @@ export component ActionRow inherits Rectangle {
                 }
                 if (root.is-online || root.is-relay) && !root.compact : Rectangle {
                     width: 12px; height: 12px; border-radius: 6px;
-                    background: root.is-relay ? AppTheme.accent-warning : AppTheme.accent-success;
+                    background: !root.is-session-ready ? AppTheme.accent : (root.is-relay ? AppTheme.accent-warning : AppTheme.accent-success);
                     border-color: AppTheme.surface-primary; border-width: 2px;
                     x: parent.width - self.width - 1px; y: parent.height - self.height - 1px;
                 }
@@ -125,9 +127,17 @@ export component ActionRow inherits Rectangle {
                     colorize: AppTheme.accent-success;
                     y: (parent.height - self.height) / 2;
                 }
-                if root.timestamp != "" : Text {
-                    text: root.timestamp; font-size: 12px;
-                    color: root.badge-count > 0 ? AppTheme.accent : AppTheme.text-tertiary;
+                if root.timestamp != "" : HorizontalLayout {
+                    spacing: 4px;
+                    if root.has-queued-messages : Image {
+                        source: @image-url("../images/nav/clock.svg");
+                        width: 12px; height: 12px; colorize: AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                    }
+                    Text {
+                        text: root.timestamp; font-size: 12px;
+                        color: (root.badge-count > 0 || root.has-queued-messages) ? AppTheme.accent : AppTheme.text-tertiary;
+                    }
                 }
             }
 

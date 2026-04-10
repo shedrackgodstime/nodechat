@@ -12,8 +12,11 @@ export struct ChatPreview {
     is-online: bool,
     is-relay: bool,
     is-verified: bool,
+    is-session-ready: bool,
+    has-queued-messages: bool,
     last-message-status: string,
     is-last-message-outgoing: bool,
+    member-count: int,
 }
 
 export struct ContactData {
@@ -26,6 +29,7 @@ export struct ContactData {
     is-session-ready: bool,
     is-relay: bool,
     is-verified: bool,
+    direct-conversation-id: string,
 }
 
 export struct GroupData {

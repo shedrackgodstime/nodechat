@@ -79,8 +79,11 @@ fn apply_chats(ui: &AppWindow, chats: Vec<ChatListItem>) {
         is_online: c.is_online,
         is_relay: c.is_relay,
         is_verified: c.is_verified,
+        is_session_ready: c.is_session_ready,
+        has_queued_messages: c.has_queued_messages,
         last_message_status: c.last_message_status.to_string().into(),
         is_last_message_outgoing: c.is_last_message_outgoing,
+        member_count: c.member_count,
     }).collect();
     ui.set_chats(VecModel::from_slice(&rows).into());
 
@@ -110,6 +113,7 @@ fn apply_contacts(ui: &AppWindow, contacts: Vec<ContactListItem>) {
         is_session_ready: c.is_session_ready,
         is_relay: c.is_relay,
         is_verified: c.is_verified,
+        direct_conversation_id: c.direct_conversation_id.into(),
     }).collect();
     ui.set_contacts(VecModel::from_slice(&rows).into());
 }
@@ -183,6 +187,8 @@ fn map_message(m: MessageItem) -> MessageData {
         invite_name: m.invite_group_name.into(),
         invite_key: m.invite_key.into(),
         is_invite_joined: m.invite_is_joined,
+        is_ephemeral: m.is_ephemeral,
+        ttl_seconds: m.ttl_seconds,
         status: m.status.to_string().into(),
     }
 }
