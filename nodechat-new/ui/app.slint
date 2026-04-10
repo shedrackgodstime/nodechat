@@ -139,6 +139,7 @@ export component AppWindow inherits Window {
     property <string> temp-group-desc: "";
     property <int> group-selection-return: 10;
     property <string> sharing-contact-id: "";
+    out property <string> pending-action-id: "";
 
     in property <AppInfo> app-info: {
         name: "",
@@ -181,6 +182,7 @@ export component AppWindow inherits Window {
     callback add-contact;
     callback open-chat(ChatPreview);
     callback add-peer(string);
+    callback refresh();
 
     open-settings => {
         root.push-screen(3);
@@ -220,6 +222,11 @@ export component AppWindow inherits Window {
     callback request-reset-identity();
     callback open-url(string);
     callback copy-to-clipboard(string);
+    
+    // Missing P2P Callbacks
+    callback unlock-app(string);
+    callback create-identity(string, string);
+    callback finalize-identity();
 
     // --- Clipboard Integration ---
     in-out property <string> clipboard-buffer: "";
@@ -400,7 +407,10 @@ export component AppWindow inherits Window {
                              root.push-screen(9);
                         }
                         retry-queued => { root.retry-queued(); }
-                        request-delete-conversation => { root.request-delete-conversation(); }
+                        request-delete-conversation => { 
+                             root.pending-action-id = root.active-conversation.id;
+                             root.request-delete-conversation(); 
+                        }
                     }
 
                     if root.current-screen == 3: SettingsScreen {
@@ -448,6 +458,8 @@ export component AppWindow inherits Window {
                                 id: contact.id,
                                 title: contact.name,
                                 initials: contact.initials,
+                                node-id: contact.node-id,
+                                ticket: contact.ticket,
                                 is-online: contact.is-online,
                                 is-relay: contact.is-relay,
                                 is-verified: contact.is-verified,
@@ -455,7 +467,7 @@ export component AppWindow inherits Window {
                                 connection-stage: "Direct connection ready",
                                 return-screen: 4,
                             };
-                            root.push-screen(1);
+                            root.push-screen(9);
                         }
                         open-group(group) => {
                             root.active-group = group;
@@ -464,6 +476,8 @@ export component AppWindow inherits Window {
                                 id: group.id,
                                 title: group.name,
                                 initials: group.initials,
+                                node-id: group.topic,
+                                ticket: group.id,
                                 is-online: true,
                                 is-relay: false,
                                 is-verified: true,
@@ -546,9 +560,10 @@ export component AppWindow inherits Window {
                              root.confirm-modal-show = true;
                         }
                         request-delete => {
-                             root.confirm-modal-title = "Remove Chat";
-                             root.confirm-modal-subtitle = "Disconnect from peer and delete history.";
-                             root.confirm-modal-slug = "delete-chat";
+                             root.pending-action-id = root.active-conversation.id;
+                             root.confirm-modal-title = root.active-conversation.kind == "group" ? "Leave Swarm" : "Remove Contact";
+                             root.confirm-modal-subtitle = root.active-conversation.kind == "group" ? "Exit this P2P conversation topic." : "Disconnect from peer and delete history.";
+                             root.confirm-modal-slug = root.active-conversation.kind == "group" ? "leave-group" : "delete-chat";
                              root.confirm-modal-show = true;
                         }
                         add-members => { 
@@ -629,5 +644,26 @@ export component AppWindow inherits Window {
         confirm(pin) => {
             root.confirm-modal-confirmed(root.confirm-modal-slug, pin);
         }
+    }
+
+    request-delete-conversation => {
+        root.confirm-modal-title = "Delete Chat";
+        root.confirm-modal-subtitle = "All messages will be removed. Peer will remain in contacts.";
+        root.confirm-modal-slug = "delete-chat";
+        root.confirm-modal-show = true;
+    }
+    
+    request-clear-history => {
+        root.confirm-modal-title = "Clear All History";
+        root.confirm-modal-subtitle = "Irreversibly delete all local messages from ALL conversations.";
+        root.confirm-modal-slug = "clear-history";
+        root.confirm-modal-show = true;
+    }
+    
+    request-reset-identity => {
+        root.confirm-modal-title = "Nuke Identity";
+        root.confirm-modal-subtitle = "This will destroy your Peer keys and all contact links permanently.";
+        root.confirm-modal-slug = "reset-identity";
+        root.confirm-modal-show = true;
     }
 }
