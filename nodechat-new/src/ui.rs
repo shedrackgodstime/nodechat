@@ -1,6 +1,6 @@
 use anyhow::Context;
 use slint::ComponentHandle;
-use crate::{AppWindow, MockRuntime, Command, ui_models};
+use crate::{AppWindow, RealRuntime, Command, ui_models};
 use std::thread;
 
 pub fn run_app() -> anyhow::Result<()> {
@@ -20,7 +20,7 @@ pub fn run_app() -> anyhow::Result<()> {
         });
     }
 
-    let runtime = MockRuntime::start();
+    let runtime = RealRuntime::start().context("failed to open local database")?;
     let ui_bridge = runtime.ui.clone();
 
     // --- 1. Event Listener (Backend -> UI) ---

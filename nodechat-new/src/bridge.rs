@@ -2,6 +2,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use crate::backend::RealBackend;
 use crate::contract::{AppEvent, Command};
 use crate::MockBackend;
 
@@ -72,6 +73,78 @@ impl MockRuntime {
                 event_rx: Arc::new(Mutex::new(event_rx)),
             },
         }
+    }
+}  // end impl MockRuntime
+
+/// Production runtime — uses the real SQLite database and Tokio for P2P.
+pub struct RealRuntime {
+    pub ui: UiBridge,
+    _runtime: tokio::runtime::Runtime,
+}
+
+impl RealRuntime {
+    pub fn start() -> anyhow::Result<Self> {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()?;
+            
+        // We still use std threads/channels for UI boundary since Slint is sync on one end
+        let (command_tx, command_rx) = mpsc::channel::<Command>();
+        let (event_tx, event_rx) = mpsc::channel::<AppEvent>();
+
+        // Bridge the std sync channel -> tokio async channel
+        let (async_cmd_tx, mut async_cmd_rx) = tokio::sync::mpsc::channel::<Command>(100);
+        thread::spawn(move || {
+            while let Ok(cmd) = command_rx.recv() {
+                if async_cmd_tx.blocking_send(cmd).is_err() {
+                    break;
+                }
+            }
+        });
+
+        runtime.spawn(async move {
+            let (net_tx, mut net_rx) = tokio::sync::mpsc::channel::<crate::p2p::NetworkEvent>(100);
+            let mut backend = RealBackend::open(net_tx).expect("failed to open local database");
+            let _ = event_tx.send(AppEvent::SnapshotReady(backend.snapshot()));
+            let ext = event_tx.clone();
+            
+            loop {
+                tokio::select! {
+                    cmd_opt = async_cmd_rx.recv() => {
+                        match cmd_opt {
+                            Some(command) => {
+                                for event in backend.handle_command(command).await {
+                                    if ext.send(event).is_err() {
+                                        return;
+                                    }
+                                }
+                            }
+                            None => break, // UI Closed
+                        }
+                    }
+                    net_opt = net_rx.recv() => {
+                        match net_opt {
+                            Some(net_event) => {
+                                for event in backend.handle_network_event(net_event).await {
+                                    if ext.send(event).is_err() {
+                                        return;
+                                    }
+                                }
+                            }
+                            None => break, // Network Closed
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(Self {
+            ui: UiBridge {
+                command_tx,
+                event_rx: Arc::new(Mutex::new(event_rx)),
+            },
+            _runtime: runtime,
+        })
     }
 }
 

@@ -1,5 +1,7 @@
 pub mod contract;
 pub mod storage;
+pub mod p2p;
+pub mod backend;
 pub mod bridge;
 pub mod mock_backend;
 pub mod ui;
@@ -7,13 +9,19 @@ pub mod ui_models;
 
 slint::include_modules!();
 
-pub use bridge::{MockRuntime, UiBridge};
+pub use bridge::{MockRuntime, RealRuntime, UiBridge};
 pub use contract::*;
 pub use mock_backend::MockBackend;
+
+pub static ANDROID_DATA_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
 fn android_main(app: slint::android::AndroidApp) {
+    if let Some(path) = app.internal_data_path() {
+        let _ = ANDROID_DATA_DIR.set(path);
+    }
+
     if let Err(e) = slint::android::init(app) {
         eprintln!("failed to initialize Android backend: {e}");
         return;
