@@ -12,6 +12,7 @@ export component AboutScreen inherits Rectangle {
     
     // State to toggle debug view
     property <bool> show-debug: false;
+    in property <bool> show-copied: false;
 
     callback back-clicked();
     callback open-url(string);
@@ -352,6 +353,7 @@ export component AboutScreen inherits Rectangle {
                         }
 
                         if root.show-debug: DebugView {
+                            show-copied: root.show-copied;
                             // Logs populated via backend
                             copy-clicked(logs) => {
                                 root.copy-logs(logs);

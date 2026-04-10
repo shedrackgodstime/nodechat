@@ -33,6 +33,8 @@ export struct ConversationContext {
     id: string,
     title: string,
     initials: string,
+    node-id: string,
+    ticket: string,
     is-online: bool,
     is-relay: bool,
     is-verified: bool,
@@ -44,6 +46,16 @@ export struct ConversationContext {
 export component AppWindow inherits Window {
     title: root.app-info.name;
     init => { focus-scope.focus(); }
+
+    property <bool> global-copied-active: false;
+    
+    Timer {
+        interval: 2000ms;
+        running: root.global-copied-active;
+        triggered => { 
+            root.global-copied-active = false; 
+        }
+    }
 
     forward-focus: focus-scope;
     focus-scope := FocusScope {
@@ -84,13 +96,23 @@ export component AppWindow inherits Window {
         root.last-screen = 0; // Default fallback to Chat List
     }
 
-    // This is the bridge for the Android Hardware Back Button
+    // This is the bridge for the Android Hardware Back Button + Desktop Escape key
     public function request-back() -> bool {
-        if (root.current-screen != 0) {
-            root.back();
-            return true; // Handled
+        // 1. Close Modals First
+        if (root.confirm-modal-show) {
+            root.confirm-modal-show = false;
+            return true;
         }
-        return false; // Not handled (system will minimize/close)
+
+        // 2. Tab Navigation - Allow system to exit from primary tabs
+        // Screen 0 (Chats), 3 (Settings), 4 (Contacts) are the root tabs.
+        if (root.current-screen == 0 || root.current-screen == 3 || root.current-screen == 4) {
+            return false; // Let OS minimize the app
+        }
+
+        // 3. Sub-Screen Navigation
+        root.back();
+        return true; // Successfully navigated back
     }
     in property <bool> has-password: false;
     in property <bool> has-identity: false;
@@ -202,12 +224,14 @@ export component AppWindow inherits Window {
     // --- Clipboard Integration ---
     in-out property <string> clipboard-buffer: "";
     public function do-copy() {
+        clipboard-input.focus();
         clipboard-input.select-all();
         clipboard-input.copy();
     }
     clipboard-input := TextInput {
         text: root.clipboard-buffer;
-        visible: false;
+        x: -1000px; y: -1000px;
+        width: 1px; height: 1px;
     }
 
     // --- Safe Areas ---
@@ -387,8 +411,13 @@ export component AppWindow inherits Window {
                         endpoint-ticket: root.endpoint-ticket;
                         has-password: root.has-password;
                         app-info: root.app-info;
+                        show-copied: root.global-copied-active;
                         back-clicked => { root.back(); }
                         edit-display-name => { root.push-screen(6); }
+                        copy-node-id => { 
+                            root.copy-to-clipboard(root.endpoint-ticket); 
+                            root.global-copied-active = true;
+                        }
                         change-password => { root.push-screen(8); }
                         open-about => { root.push-screen(7); }
                         request-clear-history => {
@@ -448,19 +477,29 @@ export component AppWindow inherits Window {
 
                     if root.current-screen == 5: AddScreen {
                         is-desktop: root.is-desktop;
+                        endpoint-ticket: root.endpoint-ticket;
+                        show-copied: root.global-copied-active;
                         back-clicked => { root.back(); }
-                        add-ticket(ticket) => { 
-                             root.add-peer(ticket);
-                             root.back();
+                        add-ticket(t) => { 
+                            root.add-peer(t); 
+                            root.back();
+                        }
+                        copy-ticket(t) => { 
+                             root.copy-to-clipboard(t); 
+                             root.global-copied-active = true;
                         }
                     }
 
                     if root.current-screen == 7: AboutScreen {
                         is-desktop: root.is-desktop;
                         app-info: root.app-info;
+                        show-copied: root.global-copied-active;
                         back-clicked => { root.back(); }
                         open-url(url) => { root.open-url(url); }
-                        copy-logs(logs) => { root.copy-to-clipboard(logs); }
+                        copy-logs(logs) => { 
+                             root.copy-to-clipboard(logs); 
+                             root.global-copied-active = true;
+                        }
                     }
 
                     if root.current-screen == 6: EditNameScreen {
@@ -486,15 +525,20 @@ export component AppWindow inherits Window {
                             id: root.active-conversation.id,
                             name: root.active-conversation.title,
                             initials: root.active-conversation.initials,
-                            node-id: "node_" + root.active-conversation.id + "...",
+                            node-id: root.active-conversation.node-id,
+                            ticket: root.active-conversation.ticket,
                             is-online: root.active-conversation.is-online,
                             is-relay: root.active-conversation.is-relay,
                             is-verified: root.active-conversation.is-verified,
                         };
                         group: root.active-group;
+                        show-copied: root.global-copied-active;
                         back-clicked => { root.back(); }
                         chat-clicked => { root.push-screen(1); }
-                        copy-text(t) => { root.copy-to-clipboard(t); }
+                        copy-text(t) => { 
+                             root.copy-to-clipboard(t); 
+                             root.global-copied-active = true;
+                        }
                         request-clear-history => { 
                              root.confirm-modal-title = "Clear Chat History";
                              root.confirm-modal-subtitle = "Wipe messages for this peer locally.";

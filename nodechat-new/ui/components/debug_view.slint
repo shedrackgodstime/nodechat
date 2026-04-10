@@ -8,10 +8,12 @@ export component DebugView inherits Rectangle {
     
     callback copy-clicked(string);
 
+    in property <bool> show-copied: false;
+
     background: #000000;
     border-radius: AppTheme.radius-md;
     border-width: 1px;
-    border-color: AppTheme.accent;
+    border-color: root.show-copied ? AppTheme.accent-success : AppTheme.accent;
 
     VerticalLayout {
         padding: AppTheme.sp-md;
@@ -22,21 +24,23 @@ export component DebugView inherits Rectangle {
             Rectangle { horizontal-stretch: 1; }
             
             copy-touch := TouchArea {
-                clicked => { root.copy-clicked(root.debug-logs); }
-                width: 60px;
+                clicked => { 
+                    root.copy-clicked(root.debug-logs); 
+                }
+                width: 72px;
                 height: 24px;
                 
                 Rectangle {
-                    background: copy-touch.pressed ? AppTheme.accent : AppTheme.surface-tertiary;
+                    background: root.show-copied ? AppTheme.accent-success : (copy-touch.pressed ? AppTheme.accent : AppTheme.surface-tertiary);
                     border-radius: 4px;
                     border-width: 1px;
-                    border-color: AppTheme.accent;
+                    border-color: root.show-copied ? AppTheme.accent-success : AppTheme.accent;
                     
                     Text {
-                        text: "COPY";
+                        text: root.show-copied ? "COPIED ✅" : "COPY";
                         font-size: 10px;
                         font-weight: 800;
-                        color: copy-touch.pressed ? #000000 : AppTheme.accent;
+                        color: root.show-copied ? #FFFFFF : (copy-touch.pressed ? #000000 : AppTheme.accent);
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }

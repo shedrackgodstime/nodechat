@@ -32,8 +32,9 @@ export component ActionRow inherits Rectangle {
     in property <string> last-message-status: ""; // "sent", "delivered", "failed", "queued"
     
     // --- Appearance ---
-    in property <string> accessory: "none"; // "arrow", "toggle", "checkbox", "none"
+    in property <string> accessory: "none"; // "arrow", "toggle", "checkbox", "copy", "none"
     in property <bool> is-toggle-on: false;
+    in property <bool> show-copied: false;
     in property <color> icon-color: root.is-danger ? AppTheme.accent-danger : AppTheme.accent;
     
     // --- Callbacks ---
@@ -204,6 +205,25 @@ export component ActionRow inherits Rectangle {
                     source: @image-url("../images/nav/check.svg");
                     width: 14px; height: 14px; colorize: #FFFFFF;
                     horizontal-alignment: center; vertical-alignment: center;
+                }
+            }
+
+            if root.accessory == "copy" : HorizontalLayout {
+                spacing: AppTheme.sp-sm;
+                alignment: end;
+                if root.show-copied : Text {
+                    text: "COPIED";
+                    font-size: 10px;
+                    font-weight: 800;
+                    color: AppTheme.accent-success;
+                    vertical-alignment: center;
+                }
+                Image {
+                    source: root.show-copied ? @image-url("../images/nav/clipboard-checked.svg") : @image-url("../images/nav/clipboard.svg");
+                    width: 18px;
+                    height: 18px;
+                    colorize: root.show-copied ? AppTheme.accent-success : AppTheme.text-tertiary;
+                    animate colorize { duration: 150ms; }
                 }
             }
         }

@@ -105,6 +105,7 @@ fn apply_contacts(ui: &AppWindow, contacts: Vec<ContactListItem>) {
         name: c.display_name.into(),
         initials: c.initials.into(),
         node_id: c.peer_id.into(),
+        ticket: "".into(), // Summary list doesn't include ticket
         is_online: c.is_online,
         is_session_ready: c.is_session_ready,
         is_relay: c.is_relay,
@@ -119,6 +120,8 @@ fn apply_conversation(ui: &AppWindow, convo: ConversationView) {
     ctx.kind = convo.kind.to_string().into();
     ctx.title = convo.title.clone().into();
     ctx.initials = convo.initials.clone().into();
+    ctx.node_id = convo.peer_id.clone().into();
+    ctx.ticket = convo.ticket.clone().into();
     ctx.is_online = convo.is_online;
     ctx.is_relay = convo.is_relay;
     ctx.is_verified = convo.is_verified;
