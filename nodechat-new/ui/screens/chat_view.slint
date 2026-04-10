@@ -174,13 +174,13 @@ export component ChatViewScreen inherits Rectangle {
                     padding: AppTheme.sp-xl;
 
                     Text {
-                        text: "🔒";
+                        text: (connection-mode == "group") ? "👥" : "🔒";
                         font-size: 40px;
                         horizontal-alignment: center;
                     }
 
                     Text {
-                        text: "End-to-end encrypted";
+                        text: (connection-mode == "group") ? "Swarm Established" : "End-to-end encrypted";
                         font-size: 15px;
                         font-weight: 600;
                         color: AppTheme.text-primary;
@@ -188,7 +188,9 @@ export component ChatViewScreen inherits Rectangle {
                     }
 
                     Text {
-                        text: "Messages are encrypted in transit.\nSay hello!";
+                        text: (connection-mode == "group") 
+                            ? "This p2p group is ready. Tap the header to share the invite ticket with others!"
+                            : "Messages are encrypted in transit.\nSay hello!";
                         font-size: 13px;
                         color: AppTheme.text-secondary;
                         horizontal-alignment: center;

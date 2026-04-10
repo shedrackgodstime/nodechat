@@ -9,17 +9,20 @@
 // ---------------------------------------------------------
 
 import { AppTheme } from "./theme.slint";
-import { ChatPreview, ContactData } from "./components/row_data.slint";
-import { EditNameScreen }    from "./screens/edit_name.slint";
-import { PasswordScreen }    from "./screens/password_screen.slint";
+import { ChatPreview, ContactData, GroupData } from "./components/row_data.slint";
 import { ChatListScreen } from "./screens/chat_list.slint";
 import { ChatViewScreen, MessageData } from "./screens/chat_view.slint";
-import { SettingsScreen } from "./screens/settings_screen.slint";
-import { ConfirmModal } from "./components/confirm_modal.slint";
 import { ContactsScreen } from "./screens/contacts_screen.slint";
-import { NavBar } from "./components/nav_bar.slint";
+import { SettingsScreen } from "./screens/settings_screen.slint";
 import { AddScreen } from "./screens/add_screen.slint";
 import { AboutScreen } from "./screens/about_screen.slint";
+import { InfoScreen } from "./screens/info_screen.slint";
+import { EditNameScreen } from "./screens/edit_name.slint";
+import { PasswordScreen } from "./screens/password_screen.slint";
+import { ConfirmModal } from "./components/confirm_modal.slint";
+import { NavBar } from "./components/nav_bar.slint";
+import { CreateGroupScreen } from "./screens/create_group.slint";
+import { SelectContactsScreen } from "./screens/select_contacts.slint";
 
 export { ChatPreview, MessageData }
 
@@ -168,6 +171,25 @@ export component AppWindow inherits Window {
             is-verified: true
         }
     ];
+
+    in-out property <[GroupData]> groups: [
+        {
+            id: "g1",
+            name: "Iroh Developers",
+            initials: "ID",
+            topic: "iroh_protocol_discussion_v1_0",
+            secret-key: "sk_abc123xyz_p2p_secure",
+            member-count: 42
+        }
+    ];
+
+    in-out property <GroupData> active-group: root.groups[0];
+
+    // --- Temporary State for Flows ---
+    property <string> temp-group-name: "";
+    property <string> temp-group-desc: "";
+    property <int> group-selection-return: 10;
+
     in-out property <[MessageData]> active-messages: [
         {
             id: "m1",
@@ -414,7 +436,7 @@ export component AppWindow inherits Window {
                         is-offline: root.is-offline;
                         active-id: root.active-conversation.id;
                         open-chat(chat) => { root.open-chat(chat); }
-                        add-contact => { root.add-contact(); }
+                        add-contact => { root.open-contacts(); }
                         open-contacts => { root.open-contacts(); }
                         open-settings => { root.open-settings(); }
                     }
@@ -497,7 +519,7 @@ export component AppWindow inherits Window {
                         is-offline: root.is-offline;
                         active-id: root.active-conversation.id;
                         open-chat(chat) => { root.open-chat(chat); }
-                        add-contact => { root.add-contact(); }
+                        add-contact => { root.open-contacts(); }
                         open-contacts => { root.open-contacts(); }
                         open-settings => { root.open-settings(); }
                     }
@@ -531,8 +553,7 @@ export component AppWindow inherits Window {
                             else { root.send-message(msg); }
                         }
                         open-contact-info => {
-                            if root.active-conversation.kind == "group" { root.open-group-info(); }
-                            else { root.open-contact-info(); }
+                             root.current-screen = 9;
                         }
                         retry-queued => { root.retry-queued(); }
                         request-delete-conversation => { root.request-delete-conversation(); }
@@ -577,11 +598,11 @@ export component AppWindow inherits Window {
                         width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
                         contacts: root.contacts;
+                        groups: root.groups;
                         back-clicked => { root.current-screen = 0; }
-                        add-contact => { root.add-contact(); }
-                        new-group => { root.open-settings(); }
+                        add-contact => { root.current-screen = 5; }
+                        new-group => { root.current-screen = 10; }
                         open-contact(contact) => {
-                            root.load-conversation(contact.id, false);
                             root.active-conversation = {
                                 kind: "direct",
                                 id: contact.id,
@@ -590,19 +611,35 @@ export component AppWindow inherits Window {
                                 is-online: contact.is-online,
                                 is-relay: contact.is-relay,
                                 is-verified: contact.is-verified,
-                                is-session-ready: false,
+                                is-session-ready: contact.is-session-ready,
                                 connection-stage: "",
                                 return-screen: 4,
                             };
-                            root.current-screen = 1;
+                            root.current-screen = 9;
+                        }
+                        open-group(group) => {
+                            root.active-group = group;
+                            root.active-conversation = {
+                                kind: "group",
+                                id: group.id,
+                                title: group.name,
+                                initials: group.initials,
+                                is-online: true,
+                                is-relay: false,
+                                is-verified: true,
+                                is-session-ready: true,
+                                connection-stage: "",
+                                return-screen: 4,
+                            };
+                            root.current-screen = 9;
                         }
                     }
 
                     if root.current-screen == 5: AddScreen {
                         width: 100%; height: 100%;
                         is-desktop: root.is-desktop;
-                        back-clicked => { root.current-screen = 0; }
-                        add-ticket(t) => { root.current-screen = 0; }
+                        back-clicked => { root.current-screen = 4; }
+                        add-ticket(t) => { root.current-screen = 4; }
                     }
 
                     if root.current-screen == 6: AboutScreen {
@@ -634,6 +671,84 @@ export component AppWindow inherits Window {
                         back-clicked => { root.current-screen = 3; }
                         confirm-password(cur, new) => { root.submit-password(cur, new); root.current-screen = 3; }
                         remove-password(cur) => { root.submit-password(cur, ""); root.current-screen = 3; }
+                    }
+
+                    if root.current-screen == 9: InfoScreen {
+                        is-desktop: root.is-desktop;
+                        is-group: root.active-conversation.kind == "group";
+                        contact: {
+                            id: root.active-conversation.id,
+                            name: root.active-conversation.title,
+                            initials: root.active-conversation.initials,
+                            node-id: "node_" + root.active-conversation.id + "_p2p...",
+                            is-online: root.active-conversation.is-online,
+                            is-relay: root.active-conversation.is-relay,
+                            is-verified: root.active-conversation.is-verified,
+                        };
+                        group: root.active-group;
+                        back-clicked => { root.current-screen = root.active-conversation.kind == "group" ? 2 : 1; }
+                        chat-clicked => { 
+                            root.load-conversation(root.active-conversation.id, root.active-conversation.kind == "group");
+                            root.current-screen = root.active-conversation.kind == "group" ? 2 : 1; 
+                        }
+                        copy-text(txt) => { root.copy-to-clipboard(txt); }
+                        request-clear-history => { 
+                             root.confirm-modal-title = "Clear History";
+                             root.confirm-modal-subtitle = "Delete all messages locally?";
+                             root.confirm-modal-slug = "clear-history";
+                             root.confirm-modal-show = true;
+                        }
+                        request-delete => {
+                             root.confirm-modal-title = "Delete Conversation";
+                             root.confirm-modal-subtitle = "Remove this conversation permanently?";
+                             root.confirm-modal-slug = "delete-chat";
+                             root.confirm-modal-show = true;
+                        }
+                        add-members => {
+                            root.temp-group-name = root.active-conversation.title;
+                            root.group-selection-return = 9;
+                            root.current-screen = 11;
+                        }
+                    }
+
+                    if root.current-screen == 10: CreateGroupScreen {
+                        width: 100%; height: 100%;
+                        is-desktop: root.is-desktop;
+                        back-clicked => { root.current-screen = 4; }
+                        create-group(name, desc) => {
+                            root.temp-group-name = name;
+                            root.temp-group-desc = desc;
+                            root.group-selection-return = 10;
+                            root.current-screen = 11; // Next: Select Members
+                        }
+                    }
+
+                    if root.current-screen == 11: SelectContactsScreen {
+                        width: 100%; height: 100%;
+                        is-desktop: root.is-desktop;
+                        group-name: root.temp-group-name;
+                        return-screen: root.group-selection-return;
+                        contacts: root.contacts;
+                        back-clicked => { root.current-screen = root.group-selection-return; }
+                        create-clicked(ids) => {
+                            if root.group-selection-return == 10 {
+                                root.active-conversation = {
+                                    kind: "group",
+                                    id: "new-p2p-swarm",
+                                    title: root.temp-group-name,
+                                    initials: "G",
+                                    is-online: true,
+                                    is-relay: false,
+                                    is-verified: true,
+                                    is-session-ready: true,
+                                    connection-stage: "",
+                                    return-screen: 0,
+                                };
+                                root.current-screen = 2; // Jump to Group Chat
+                            } else {
+                                root.current-screen = 9; // Return to Info
+                            }
+                        }
                     }
                 }
 

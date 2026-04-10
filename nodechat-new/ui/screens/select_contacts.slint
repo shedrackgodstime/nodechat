@@ -1,0 +1,141 @@
+// NodeChat New — Select Contacts Screen (PRO Flow)
+// ---------------------------------------------------------
+
+import { AppTheme, VertScroll } from "../theme.slint";
+import { ActionRow } from "../components/action_row.slint";
+import { ContactData } from "../components/row_data.slint";
+
+export component SelectContactsScreen inherits Rectangle {
+    in property <[ContactData]> contacts: [];
+    in property <bool> is-desktop: false;
+    in property <string> group-name: "";
+    in property <int> return-screen: 10;
+    
+    // Tracking selection count for FAB visibility
+    property <int> selected-count: 0;
+
+    callback back-clicked();
+    callback create-clicked(string); // IDs summary
+
+    background: AppTheme.surface-primary;
+
+    // 1. Main UI
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: 0;
+
+        // Header
+        Rectangle {
+            height: is-desktop ? 90px : 74px;
+            background: AppTheme.surface-secondary;
+            
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: AppTheme.divider;
+            }
+
+            HorizontalLayout {
+                padding-left: AppTheme.sp-md;
+                padding-right: AppTheme.sp-md;
+                spacing: AppTheme.sp-md;
+                alignment: start;
+
+                TouchArea {
+                    width: 32px;
+                    clicked => { root.back-clicked(); }
+                    Text { text: "←"; font-size: 24px; color: AppTheme.text-primary; vertical-alignment: center; }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Text { 
+                        text: root.selected-count > 0 ? root.selected-count + " Selected" : "Select Members"; 
+                        font-size: is-desktop ? 24px : 18px; 
+                        font-weight: 700; 
+                        color: AppTheme.text-primary; 
+                    }
+                    Text { text: "Adding to " + group-name; font-size: 13px; color: AppTheme.text-secondary; }
+                }
+            }
+        }
+
+        // List
+        VertScroll {
+            vertical-stretch: 1;
+            viewport-height: list.preferred-height;
+
+            list := VerticalLayout {
+                width: parent.width;
+                padding: AppTheme.sp-md;
+                spacing: AppTheme.sp-sm;
+                alignment: start;
+
+                Text { text: "CONTACTS"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1.5px; }
+
+                VerticalLayout {
+                    spacing: 4px;
+                    for contact in root.contacts : ActionRow {
+                        property <bool> selected: false;
+                        
+                        title: contact.name;
+                        subtitle: contact.node-id;
+                        initials: contact.initials;
+                        is-online: contact.is-online;
+                        is-verified: contact.is-verified;
+                        
+                        accessory: "checkbox";
+                        is-toggle-on: self.selected;
+                        
+                        toggled(on) => {
+                            self.selected = on;
+                            if on { root.selected-count += 1; }
+                            else { root.selected-count -= 1; }
+                        }
+                    }
+                }
+                
+                // Bottom spacing for FAB
+                Rectangle { height: 100px; }
+            }
+        }
+    }
+
+    // 2. Floating Action Button (FAB)
+    // Only visible when at least one member is selected
+    if root.selected-count > 0 : Rectangle {
+        x: parent.width - self.width - 24px;
+        y: parent.height - self.height - 24px;
+        width: 64px;
+        height: 64px;
+        border-radius: 32px;
+        background: AppTheme.accent;
+        
+        // Shadow (Simulated)
+        Rectangle {
+            z: -1;
+            x: 4px; y: 4px;
+            width: 100%; height: 100%;
+            border-radius: 32px;
+            background: rgba(0, 122, 255, 0.3);
+        }
+
+        Text {
+            text: "✓";
+            font-size: 28px;
+            font-weight: 800;
+            color: #FFFFFF;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        TouchArea {
+            clicked => { root.create-clicked("demo_selection"); }
+        }
+
+        // Animating entrance
+        animate opacity { duration: 150ms; }
+        animate y { duration: 250ms; easing: ease-out; }
+    }
+}
