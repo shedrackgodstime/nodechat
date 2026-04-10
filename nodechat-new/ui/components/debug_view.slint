@@ -51,16 +51,17 @@ export component DebugView inherits Rectangle {
             
             VertScroll {
                 vertical-stretch: 1;
-                viewport-height: logs-txt.preferred-height;
+                viewport-height: logs-layout.preferred-height;
                 
-                logs-txt := Text {
-                    width: parent.width;
+                logs-layout := VerticalLayout {
                     padding: 8px;
-                    text: root.debug-logs;
-                    font-size: 12px;
-                    font-family: "monospace";
-                    color: #A1A1AA;
-                    wrap: word-wrap;
+                    logs-txt := Text {
+                        text: root.debug-logs;
+                        font-size: 12px;
+                        font-family: "monospace";
+                        color: #A1A1AA;
+                        wrap: word-wrap;
+                    }
                 }
             }
         }

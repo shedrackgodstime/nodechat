@@ -70,10 +70,7 @@ pub fn run_app() -> anyhow::Result<()> {
     let cmd = ui_bridge.clone();
     let ui_handle = app.as_weak();
     app.on_retry_queued(move || {
-        if let Some(ui) = ui_handle.upgrade() {
-            let convo_id = ui.get_active_conversation().id.to_string();
-            // Note: contract.rs wants a message_id too, but for simplicity we'll need to adapt
-            // or fetch the first queued one. For now, we'll just send a refresh or similar.
+        if ui_handle.upgrade().is_some() {
             let _ = cmd.send(Command::Refresh); 
         }
     });
