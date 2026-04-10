@@ -1,4 +1,5 @@
 pub mod contract;
+pub mod storage;
 pub mod bridge;
 pub mod mock_backend;
 pub mod ui;
