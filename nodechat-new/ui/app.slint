@@ -656,17 +656,14 @@ export component AppWindow inherits Window {
                     if root.current-screen == 8: PasswordScreen {
                         is-desktop: root.is-desktop;
                         has-password: root.has-password;
-                        app-info: root.app-info;
                         back-clicked => {
                             root.back();
                         }
                         confirm-password(cur, new) => {
                             root.submit-password(cur, new);
-                            root.back();
                         }
                         remove-password(cur) => {
                             root.submit-password(cur, "");
-                            root.back();
                         }
                     }
 
