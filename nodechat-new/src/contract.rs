@@ -202,6 +202,8 @@ pub struct MessageItem {
     pub invite_is_joined: bool,
     pub is_ephemeral: bool,
     pub ttl_seconds: i32,
+    pub received_timestamp: String,
+    pub is_delayed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

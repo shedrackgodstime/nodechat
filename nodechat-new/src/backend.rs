@@ -3,7 +3,7 @@
 //! Runtime-only state (is_online, is_relay, member_count) is always returned
 //! as false/0 until the iroh P2P engine is wired in.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use uuid::Uuid;
@@ -70,43 +70,62 @@ impl RealBackend {
 
         if let Some(sk) = secret_key {
             let net = network.clone();
-            let b_clone = backend.clone_for_sweep();
+            let dp = db_path();
             tokio::spawn(async move {
                 if let Err(e) = net.initialize(Some(sk)).await {
                     tracing::error!("Failed to initialize P2P network: {}", e);
                 } else {
                     tracing::info!("P2P network initialized successfully — social watchdog active");
                     loop {
-                        if let Err(e) = b_clone.sweep_peers() {
-                            tracing::warn!("Social watchdog sweep failed: {}", e);
+                        // 1. Proactive sweep
+                        if let Ok(conn) = crate::storage::initialize(&dp) {
+                            if let Ok(peers) = queries::list_peers(&conn) {
+                                for peer in peers {
+                                    // Dial peer in background
+                                    let n = net.clone();
+                                    let pid = peer.node_id.clone();
+                                    let ticket = peer.endpoint_ticket;
+                                    tokio::spawn(async move {
+                                        let _ = n.dial_peer(&pid, Some(&ticket)).await;
+                                    });
+                                }
+                            }
+
+                            // 2. Group reconciliation
+                            if let Ok(peers) = queries::list_peers(&conn) {
+                                let bootstrap_pids: Vec<String> = peers.into_iter().map(|p| p.node_id).collect();
+                                if let Ok(groups) = queries::list_groups(&conn) {
+                                    for g in groups {
+                                        let _ = net.subscribe_group(&g.topic_id, bootstrap_pids.clone()).await;
+                                        let _ = request_sync_internal(&dp, &net, &g.topic_id).await;
+                                    }
+                                }
+                            }
                         }
+
                         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
                     }
                 }
             });
         }
-
         tracing::info!(
             node_id = %backend.local_node_id,
             display_name = %backend.local_display_name,
             "RealBackend started"
         );
-
         Ok(backend)
     }
 
-    /// Internal helper to allow spawning background tasks during 'open'
-    fn clone_for_sweep(&self) -> Self {
-        Self {
-            conn:                   crate::storage::initialize(&self.db_path).expect("db clone"),
-            db_path:                self.db_path.clone(),
-            network:                self.network.clone(),
-            local_node_id:          self.local_node_id.clone(),
-            local_display_name:     self.local_display_name.clone(),
-            selected_candidates:    Vec::new(),
-            active_conversation_id: String::new(),
-            event_tx:               self.event_tx.clone(),
-        }
+
+    fn request_sync(&self, topic_id: &str) -> Result<()> {
+        let network = self.network.clone();
+        let db_path = self.db_path.clone();
+        let tid = topic_id.to_string();
+        
+        tokio::spawn(async move {
+            let _ = request_sync_internal(&db_path, &network, &tid).await;
+        });
+        Ok(())
     }
 
     /// Build the full application snapshot for the initial UI load.
@@ -172,6 +191,7 @@ impl RealBackend {
                     sender_id:         self.local_node_id.clone(),
                     content:           plaintext.clone(),
                     timestamp:         unix_now(),
+                    received_at:       unix_now(),
                     status:            MessageStatus::Queued,
                     invite_topic_id:   String::new(),
                     invite_group_name: String::new(),
@@ -301,6 +321,7 @@ impl RealBackend {
                         sender_id:         self.local_node_id.clone(),
                         content:           invite,
                         timestamp:         unix_now(),
+                        received_at:       unix_now(),
                         status:            MessageStatus::Queued,
                         // Embedded metadata used by UI rendering
                         invite_topic_id:   topic_id.clone(),
@@ -356,6 +377,7 @@ impl RealBackend {
                         sender_id:         self.local_node_id.clone(),
                         content:           invite,
                         timestamp:         unix_now(),
+                        received_at:       unix_now(),
                         status:            MessageStatus::Queued,
                         invite_topic_id:   topic_id.clone(),
                         invite_group_name: group_name.clone(),
@@ -521,6 +543,7 @@ impl RealBackend {
                         sender_id:         self.local_node_id.clone(),
                         content:           share_payload.clone(),
                         timestamp:         unix_now(),
+                        received_at:       unix_now(),
                         status:            MessageStatus::Queued,
                         invite_topic_id:   String::new(),
                         invite_group_name: String::new(),
@@ -689,6 +712,17 @@ impl RealBackend {
                 // Refresh Lists
                 events.push(AppEvent::ContactListUpdated(self.build_contact_list().unwrap_or_default()));
                 events.push(AppEvent::ChatListUpdated(self.build_chat_list().unwrap_or_default()));
+
+                // Proactive Group Join: use this new connection to bootstrap all our groups
+                if let Ok(groups) = queries::list_groups(&self.conn) {
+                    let net = self.network.clone();
+                    let nid = node_id.clone();
+                    tokio::spawn(async move {
+                        for g in groups {
+                            let _ = net.subscribe_group(&g.topic_id, vec![nid.clone()]).await;
+                        }
+                    });
+                }
                 
                 // Refresh Header if active
                 if self.active_conversation_id == node_id {
@@ -793,6 +827,7 @@ impl RealBackend {
                                     sender_id: from.clone(),
                                     content: text,
                                     timestamp: unix_now(),
+                                    received_at: unix_now(),
                                     status: MessageStatus::Delivered,
                                     invite_topic_id,
                                     invite_group_name,
@@ -857,6 +892,7 @@ impl RealBackend {
                         sender_id: from.clone(),
                         content: text,
                         timestamp: unix_now(),
+                        received_at: unix_now(),
                         status: MessageStatus::Delivered,
                         invite_topic_id,
                         invite_group_name,
@@ -876,38 +912,114 @@ impl RealBackend {
                 }
             }
             NetworkEvent::GroupMessage { topic, payload, .. } => {
-                // 1. Decode GroupFrame
-                if let Ok(frame) = crate::p2p::protocol::GroupFrame::decode(&payload) {
-                    // 2. Get group key
-                    if let Ok(Some(group)) = queries::get_group(&self.conn, &topic) {
-                        // 3. Decrypt
-                        if let Ok(plaintext_bytes) = crate::crypto::decrypt(&frame.content, &group.symmetric_key) {
-                            if let Ok(text) = String::from_utf8(plaintext_bytes) {
-                                let record = MessageRecord {
-                                    id:                Uuid::new_v4(),
-                                    kind:              "standard".to_string(),
-                                    target_id:         topic.clone(),
-                                    sender_id:         frame.sender_id.clone(),
-                                    content:           text,
-                                    timestamp:         unix_now(),
-                                    status:            MessageStatus::Delivered,
-                                    invite_topic_id:   String::new(),
-                                    invite_group_name: String::new(),
-                                    invite_key:        String::new(),
-                                };
-                                let _ = queries::insert_message(&self.conn, &record);
+                // 1. Get group key
+                if let Ok(Some(group)) = queries::get_group(&self.conn, &topic) {
+                    // 2. Decrypt the entire gossip payload
+                    if let Ok(plaintext) = crate::crypto::decrypt(&payload, &group.symmetric_key) {
+                        // 3. Dispatch by Magic
+                        if plaintext.starts_with(&crate::p2p::protocol::GROUP_MAGIC) {
+                            if let Ok(frame) = crate::p2p::protocol::GroupFrame::decode(&plaintext) {
+                                if let Ok(text) = String::from_utf8(frame.content) {
+                                    let record = MessageRecord {
+                                        id:                frame.id,
+                                        kind:              "standard".to_string(),
+                                        target_id:         topic.clone(),
+                                        sender_id:         frame.sender_id.clone(),
+                                        content:           text,
+                                        timestamp:         frame.timestamp,
+                                        received_at:       unix_now(),
+                                        status:            MessageStatus::Delivered,
+                                        invite_topic_id:   String::new(),
+                                        invite_group_name: String::new(),
+                                        invite_key:        String::new(),
+                                    };
+                                    let _ = queries::insert_message(&self.conn, &record);
 
-                                if let Ok(msg) = self.to_message_item(&record) {
-                                    events.push(AppEvent::MessageAppended {
-                                        conversation_id: topic.clone(),
-                                        message: msg,
-                                    });
-                                    if let Ok(chat_list) = self.build_chat_list() {
-                                        events.push(AppEvent::ChatListUpdated(chat_list));
+                                    if let Ok(msg) = self.to_message_item(&record) {
+                                        events.push(AppEvent::MessageAppended {
+                                            conversation_id: topic.clone(),
+                                            message: msg,
+                                        });
+                                        if let Ok(chat_list) = self.build_chat_list() {
+                                            events.push(AppEvent::ChatListUpdated(chat_list));
+                                        }
+                                    }
+                                }
+                            }
+                        } else if plaintext.starts_with(&crate::p2p::protocol::SYNC_MAGIC) {
+                            if let Ok(sync) = crate::p2p::protocol::SyncFrame::decode(&plaintext) {
+                                match sync {
+                                    crate::p2p::protocol::SyncFrame::Query { topic, after_timestamp } => {
+                                        // Someone is asking for history.
+                                        if let Ok(messages) = queries::list_messages_after(&self.conn, &topic, after_timestamp) {
+                                            if !messages.is_empty() {
+                                                // Send a Reply with missing ones
+                                                let frames: Vec<_> = messages.into_iter().map(|m| crate::p2p::protocol::GroupFrame {
+                                                    id: m.id,
+                                                    sender_id: m.sender_id,
+                                                    timestamp: m.timestamp,
+                                                    content: m.content.into_bytes(),
+                                                }).collect();
+                                                let reply = crate::p2p::protocol::SyncFrame::Reply { topic: topic.clone(), messages: frames }.encode();
+                                                if let Ok(ciphertext) = crate::crypto::encrypt(&reply, &group.symmetric_key) {
+                                                    let net = self.network.clone();
+                                                    let t = topic.clone();
+                                                    tokio::spawn(async move {
+                                                        let _ = net.broadcast_group(&t, ciphertext).await;
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                    crate::p2p::protocol::SyncFrame::Reply { topic, messages } => {
+                                        // Missing messages received!
+                                        for frame in messages {
+                                            if let Ok(text) = String::from_utf8(frame.content) {
+                                                let record = MessageRecord {
+                                                    id:                frame.id,
+                                                    kind:              "standard".to_string(),
+                                                    target_id:         topic.clone(),
+                                                    sender_id:         frame.sender_id.clone(),
+                                                    content:           text,
+                                                    timestamp:         frame.timestamp,
+                                                    received_at:       unix_now(),
+                                                    status:            MessageStatus::Delivered,
+                                                    invite_topic_id:   String::new(),
+                                                    invite_group_name: String::new(),
+                                                    invite_key:        String::new(),
+                                                };
+                                                let _ = queries::insert_message(&self.conn, &record);
+                                            }
+                                        }
+                                        // Refresh UI
+                                        if self.active_conversation_id == topic {
+                                            if let Ok(msgs) = self.build_message_items(&topic) {
+                                                events.push(AppEvent::MessageListReplaced { conversation_id: topic.clone(), messages: msgs });
+                                            }
+                                        }
+                                        if let Ok(chats) = self.build_chat_list() {
+                                            events.push(AppEvent::ChatListUpdated(chats));
+                                        }
                                     }
                                 }
                             }
                         }
+                    }
+                }
+            }
+            NetworkEvent::GroupNeighborUp { topic, .. } | NetworkEvent::GroupNeighborDown { topic, .. } => {
+                // Proactively ask for missed history when a connection is established
+                let _ = self.request_sync(&topic);
+                
+                // Trigger pump to flush any queued messages for this topic
+                self.spawn_message_pump(topic.clone());
+
+                if let Ok(chats) = self.build_chat_list() {
+                    events.push(AppEvent::ChatListUpdated(chats));
+                }
+                if self.active_conversation_id == topic {
+                    if let Ok(conv) = self.build_conversation_view(&topic) {
+                        events.push(AppEvent::ConversationUpdated(conv));
                     }
                 }
             }
@@ -984,7 +1096,8 @@ impl RealBackend {
     ) -> Result<Vec<ChatListItem>> {
         let previews = queries::list_chat_previews(conn, local_node_id)?;
         Ok(previews.into_iter().map(|p| {
-            let is_online = if p.is_group { false } else { network.has_connection(&p.id) };
+            let neighbor_count = if p.is_group { network.group_neighbor_count(&p.id) } else { 0 };
+            let is_online = if p.is_group { neighbor_count > 0 } else { network.has_connection(&p.id) };
             ChatListItem {
                 conversation_id:          p.id,
                 kind:                     if p.is_group { ConversationKind::Group } else { ConversationKind::Direct },
@@ -994,12 +1107,12 @@ impl RealBackend {
                 last_message_status:      p.last_message_status,
                 is_last_message_outgoing: p.is_outgoing,
                 timestamp:                format_timestamp(p.timestamp),
-                member_count:             0,     
+                member_count:             if p.is_group { (neighbor_count + 1) as i32 } else { 0 },     
                 unread_count:             0,     
                 is_online,
                 is_relay:                 false, 
                 is_verified:              p.is_verified,
-                is_session_ready:         p.is_session_ready,
+                is_session_ready:         if p.is_group { neighbor_count > 0 } else { p.is_session_ready },
                 has_queued_messages:      p.has_queued,
             }
         }).collect())
@@ -1040,6 +1153,7 @@ impl RealBackend {
     fn build_conversation_view(&self, id: &str) -> Result<ConversationView> {
         // Group check first
         if let Some(g) = queries::get_group(&self.conn, id)? {
+            let neighbor_count = self.network.group_neighbor_count(id);
             return Ok(ConversationView {
                 conversation_id:  g.topic_id.clone(),
                 kind:             ConversationKind::Group,
@@ -1047,12 +1161,12 @@ impl RealBackend {
                 initials:         derive_initials(&g.group_name),
                 peer_id:          String::new(),
                 ticket:           String::new(),
-                is_online:        false,
+                is_online:        neighbor_count > 0,
                 is_relay:         false,
                 is_verified:      true,
-                is_session_ready: false,
-                connection_stage: String::new(),
-                member_count:     0,
+                is_session_ready: neighbor_count > 0,
+                connection_stage: if neighbor_count > 0 { "Swarm Active".to_string() } else { "Connecting to Swarm...".to_string() },
+                member_count:     (neighbor_count + 1) as i32,
                 return_screen:    0,
             });
         }
@@ -1102,6 +1216,8 @@ impl RealBackend {
                     sender_name:       String::new(),
                     text:              format_date_label(r.timestamp),
                     timestamp:         String::new(),
+                    received_timestamp: String::new(),
+                    is_delayed:        false,
                     is_outgoing:       false,
                     is_system:         true,
                     status:            MessageStatus::Delivered,
@@ -1148,6 +1264,8 @@ impl RealBackend {
             sender_name,
             text:             r.content.clone(),
             timestamp:        format_timestamp(r.timestamp),
+            received_timestamp: format_timestamp(r.received_at),
+            is_delayed:       r.received_at > 0 && (r.received_at > r.timestamp + 300),
             is_outgoing,
             is_system:        r.kind == "system",
             status:           r.status,
@@ -1281,27 +1399,35 @@ impl RealBackend {
             }.encode();
             
             let result = if is_group {
-                // 1. Get group symmetric key
-                let group = queries::get_group(&conn, conversation_id)?;
-                let key = group.map(|g| g.symmetric_key).unwrap_or_default();
-                
-                if key.len() == crate::crypto::KEY_SIZE {
-                    // 2. Encrypt plaintext
-                    match crate::crypto::encrypt(msg.content.as_bytes(), &key) {
-                        Ok(ciphertext) => {
-                            // 3. Wrap in GroupFrame
-                            let frame = crate::p2p::protocol::GroupFrame {
-                                sender_id: local_node_id.clone(),
-                                content: ciphertext,
-                            }.encode();
-                            
-                            // 4. Broadcast
-                            network.broadcast_group(conversation_id, frame).await
-                        }
-                        Err(e) => Err(e),
-                    }
+                // 1. Check if we have anyone to talk to in the swarm
+                let neighbors = network.group_neighbor_count(conversation_id);
+                if neighbors == 0 {
+                    tracing::info!(topic = %conversation_id, "Flush: no gossip neighbors detected. Keeping message in queue.");
+                    Err(anyhow::anyhow!("no neighbors"))
                 } else {
-                    Err(anyhow::anyhow!("Group key missing or invalid size"))
+                    // 2. Get group symmetric key
+                    let group = queries::get_group(&conn, conversation_id)?;
+                    let key = group.map(|g| g.symmetric_key).unwrap_or_default();
+                    
+                    if key.len() == crate::crypto::KEY_SIZE {
+                        // 3. Wrap in GroupFrame
+                        let frame = crate::p2p::protocol::GroupFrame {
+                            id: msg.id,
+                            sender_id: local_node_id.clone(),
+                            timestamp: msg.timestamp,
+                            content: msg.content.clone().into_bytes(),
+                        }.encode();
+
+                        // 4. Encrypt and Broadcast
+                        match crate::crypto::encrypt(&frame, &key) {
+                            Ok(ciphertext) => {
+                                network.broadcast_group(conversation_id, ciphertext).await
+                            }
+                            Err(e) => Err(e),
+                        }
+                    } else {
+                        Err(anyhow::anyhow!("Group key missing or invalid size"))
+                    }
                 }
             } else {
                 network.send_direct(conversation_id, ticket_hint.as_deref(), frame).await
@@ -1477,5 +1603,21 @@ async fn perform_handshake_internal(
     
     tracing::info!(peer = %target_id, kind = %kind, "background handshake: stage sent successfully");
     
+    Ok(())
+}
+
+async fn request_sync_internal(db_path: &Path, network: &NetworkManager, topic_id: &str) -> Result<()> {
+    let conn = crate::storage::initialize(db_path)?;
+    let ts = queries::get_latest_received_timestamp(&conn, topic_id)?;
+    let frame = crate::p2p::protocol::SyncFrame::Query {
+        topic: topic_id.to_owned(),
+        after_timestamp: ts,
+    }.encode();
+
+    if let Ok(Some(group)) = queries::get_group(&conn, topic_id) {
+        if let Ok(ciphertext) = crate::crypto::encrypt(&frame, &group.symmetric_key) {
+            network.broadcast_group(topic_id, ciphertext).await?;
+        }
+    }
     Ok(())
 }

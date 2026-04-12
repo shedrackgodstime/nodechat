@@ -86,6 +86,7 @@ fn apply_schema(conn: &Connection) -> Result<()> {
             sender_id         TEXT NOT NULL,
             content           TEXT NOT NULL,
             timestamp         INTEGER NOT NULL,
+            received_at       INTEGER NOT NULL DEFAULT 0,
             status            TEXT NOT NULL DEFAULT 'queued',
             invite_topic_id   TEXT NOT NULL DEFAULT '',
             invite_group_name TEXT NOT NULL DEFAULT '',
@@ -98,6 +99,7 @@ fn apply_schema(conn: &Connection) -> Result<()> {
     // --- 🚀 Lazy Migrations ---
     // If table existed before we added 'description', SQLITE won't update it automatically.
     let _ = conn.execute("ALTER TABLE groups ADD COLUMN description TEXT NOT NULL DEFAULT ''", []);
+    let _ = conn.execute("ALTER TABLE messages ADD COLUMN received_at INTEGER NOT NULL DEFAULT 0", []);
 
     Ok(())
 }
