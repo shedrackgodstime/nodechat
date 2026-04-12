@@ -197,7 +197,6 @@ impl RealBackend {
                 Ok(vec![AppEvent::MessageListReplaced { conversation_id, messages }])
             }
 
-            // ── Delete Conversation ───────────────────────────────────────
             Command::DeleteConversation { conversation_id, .. } => {
                 let is_group = queries::get_group(&self.conn, &conversation_id)?.is_some();
                 queries::delete_conversation(&self.conn, &conversation_id, is_group)?;
@@ -205,8 +204,10 @@ impl RealBackend {
                     self.active_conversation_id.clear();
                 }
                 let chat_list = self.build_chat_list()?;
+                let contact_list = self.build_contact_list()?;
                 Ok(vec![
                     AppEvent::ChatListUpdated(chat_list),
+                    AppEvent::ContactListUpdated(contact_list),
                     AppEvent::ConversationUpdated(ConversationView::empty(ConversationKind::Direct)),
                     AppEvent::StatusNotice("conversation deleted".to_string()),
                 ])
@@ -832,10 +833,38 @@ impl RealBackend {
     }
 
     fn build_message_items(&self, target_id: &str) -> Result<Vec<MessageItem>> {
-        queries::list_messages(&self.conn, target_id)?
-            .into_iter()
-            .map(|m| self.to_message_item(&m))
-            .collect()
+        use chrono::{TimeZone, Utc, Datelike};
+        let messages = queries::list_messages(&self.conn, target_id)?;
+        let mut items = Vec::new();
+        let mut last_date = None;
+
+        for r in messages {
+            let dt = Utc.timestamp_opt(r.timestamp, 0).single().unwrap_or_else(|| Utc.timestamp_opt(0,0).unwrap());
+            let date = dt.date_naive();
+            
+            if Some(date) != last_date {
+                items.push(MessageItem {
+                    message_id:        format!("date-{}", r.timestamp),
+                    conversation_id:   target_id.to_string(),
+                    sender_name:       String::new(),
+                    text:              format_date_label(r.timestamp),
+                    timestamp:         String::new(),
+                    is_outgoing:       false,
+                    is_system:         true,
+                    status:            MessageStatus::Delivered,
+                    kind:              MessageKind::System,
+                    invite_group_name: String::new(),
+                    invite_topic_id:   String::new(),
+                    invite_key:        String::new(),
+                    invite_is_joined:  false,
+                    is_ephemeral:      false,
+                    ttl_seconds:       0,
+                });
+                last_date = Some(date);
+            }
+            items.push(self.to_message_item(&r)?);
+        }
+        Ok(items)
     }
 
     fn to_message_item(&self, r: &MessageRecord) -> Result<MessageItem> {
@@ -1043,12 +1072,29 @@ fn unix_now() -> i64 {
 /// Format a Unix timestamp (seconds) as "HH:MM".
 /// Returns an empty string for timestamp 0.
 fn format_timestamp(secs: i64) -> String {
-    if secs == 0 {
-        return String::new();
+    if secs == 0 { return String::new(); }
+    use chrono::{TimeZone, Local};
+    let dt = Local.timestamp_opt(secs, 0).single().unwrap_or_else(|| Local.timestamp_opt(0,0).unwrap());
+    dt.format("%H:%M").to_string()
+}
+
+fn format_date_label(secs: i64) -> String {
+    use chrono::{TimeZone, Local, Datelike};
+    let dt = Local.timestamp_opt(secs, 0).single().unwrap_or_else(|| Local.timestamp_opt(0,0).unwrap());
+    let now = Local::now();
+    
+    let dt_date = dt.date_naive();
+    let now_date = now.date_naive();
+    
+    if dt_date == now_date {
+        "Today".to_string()
+    } else if dt_date == now_date.pred_opt().unwrap_or(now_date) {
+        "Yesterday".to_string()
+    } else if dt_date.year() == now_date.year() {
+        dt.format("%B %e").to_string() // e.g. "October 24"
+    } else {
+        dt.format("%B %e, %Y").to_string() // e.g. "October 24, 2023"
     }
-    let h = (secs / 3600) % 24;
-    let m = (secs / 60) % 60;
-    format!("{:02}:{:02}", h, m)
 }
 
 /// Derive a short human-readable name from a raw ticket/peer_id string.
