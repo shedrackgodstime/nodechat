@@ -1,5 +1,5 @@
 [package]
-name = "nodechat-new"
+name = "nodechat"
 version = "0.1.0"
 authors = ["Shedrack Godstime"]
 description = "Privacy Focused. Peer-to-Peer."
@@ -50,9 +50,9 @@ ndk-context = "0.1.1"
 slint-build = "=1.15.1"
 
 [package.metadata.android]
-apk_name = "NodeChatNew"
-label = "NodeChat New"
-package = "com.nodechat.app.new"
+apk_name = "NodeChat"
+label = "NodeChat"
+package = "com.nodechat.app"
 target_sdk_version = 33
 min_sdk_version = 24
 resources = "android/res"

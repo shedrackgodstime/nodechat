@@ -4409,7 +4409,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nodechat-new"
+name = "nodechat"
 version = "0.1.0"
 dependencies = [
  "android-activity 0.6.1",
