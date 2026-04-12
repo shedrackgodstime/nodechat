@@ -269,7 +269,7 @@ impl RealBackend {
             // ── Create Group ──────────────────────────────────────────────
             Command::CreateGroup { name, description, .. } => {
                 let topic_id = format!("topic-{}", Uuid::new_v4());
-                let symmetric_key = vec![0u8; 32]; // placeholder until crypto engine is fully re-integrated
+                let symmetric_key = crate::crypto::generate_group_key();
 
                 queries::insert_group(&self.conn, &GroupRecord {
                     topic_id:      topic_id.clone(),
@@ -875,8 +875,41 @@ impl RealBackend {
                     }
                 }
             }
-            NetworkEvent::GroupMessage { .. } => {
-                // Group receive to follow
+            NetworkEvent::GroupMessage { topic, payload, .. } => {
+                // 1. Decode GroupFrame
+                if let Ok(frame) = crate::p2p::protocol::GroupFrame::decode(&payload) {
+                    // 2. Get group key
+                    if let Ok(Some(group)) = queries::get_group(&self.conn, &topic) {
+                        // 3. Decrypt
+                        if let Ok(plaintext_bytes) = crate::crypto::decrypt(&frame.content, &group.symmetric_key) {
+                            if let Ok(text) = String::from_utf8(plaintext_bytes) {
+                                let record = MessageRecord {
+                                    id:                Uuid::new_v4(),
+                                    kind:              "standard".to_string(),
+                                    target_id:         topic.clone(),
+                                    sender_id:         frame.sender_id.clone(),
+                                    content:           text,
+                                    timestamp:         unix_now(),
+                                    status:            MessageStatus::Delivered,
+                                    invite_topic_id:   String::new(),
+                                    invite_group_name: String::new(),
+                                    invite_key:        String::new(),
+                                };
+                                let _ = queries::insert_message(&self.conn, &record);
+
+                                if let Ok(msg) = self.to_message_item(&record) {
+                                    events.push(AppEvent::MessageAppended {
+                                        conversation_id: topic.clone(),
+                                        message: msg,
+                                    });
+                                    if let Ok(chat_list) = self.build_chat_list() {
+                                        events.push(AppEvent::ChatListUpdated(chat_list));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         events
@@ -1248,7 +1281,28 @@ impl RealBackend {
             }.encode();
             
             let result = if is_group {
-                network.broadcast_group(conversation_id, msg.content.clone().into_bytes()).await
+                // 1. Get group symmetric key
+                let group = queries::get_group(&conn, conversation_id)?;
+                let key = group.map(|g| g.symmetric_key).unwrap_or_default();
+                
+                if key.len() == crate::crypto::KEY_SIZE {
+                    // 2. Encrypt plaintext
+                    match crate::crypto::encrypt(msg.content.as_bytes(), &key) {
+                        Ok(ciphertext) => {
+                            // 3. Wrap in GroupFrame
+                            let frame = crate::p2p::protocol::GroupFrame {
+                                sender_id: local_node_id.clone(),
+                                content: ciphertext,
+                            }.encode();
+                            
+                            // 4. Broadcast
+                            network.broadcast_group(conversation_id, frame).await
+                        }
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    Err(anyhow::anyhow!("Group key missing or invalid size"))
+                }
             } else {
                 network.send_direct(conversation_id, ticket_hint.as_deref(), frame).await
             };

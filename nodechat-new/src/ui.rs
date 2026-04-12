@@ -101,6 +101,18 @@ pub fn run_app() -> anyhow::Result<()> {
     });
 
     let cmd = ui_bridge.clone();
+    let ui_handle = app.as_weak();
+    app.on_send_group_message(move |text| {
+        if let Some(ui) = ui_handle.upgrade() {
+            let convo_id = ui.get_active_conversation().id.to_string();
+            let _ = cmd.send(Command::SendMessage { 
+                conversation_id: convo_id, 
+                plaintext: text.to_string() 
+            });
+        }
+    });
+
+    let cmd = ui_bridge.clone();
     app.on_add_peer(move |ticket| {
         let _ = cmd.send(Command::AddContact { ticket_or_peer_id: ticket.to_string() });
     });
