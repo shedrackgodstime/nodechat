@@ -212,28 +212,28 @@ export component InfoScreen inherits Rectangle {
                         // 1. Message
                         ActionCircle {
                             label: "Message";
-                            icon: @image-url("../images/nav/chats.svg");
+                            icon: @image-url("../../assets/icons/chats.svg");
                             clicked => { root.chat-clicked(); }
                         }
 
                         // 2. Share
                         if !is-group : ActionCircle {
                             label: "Share";
-                            icon: @image-url("../images/nav/globe.svg");
+                            icon: @image-url("../../assets/icons/globe.svg");
                             clicked => { root.share-clicked(); }
                         }
 
                         // 3. Add (Group Only)
                         if is-group : ActionCircle {
                             label: "Add Member";
-                            icon: @image-url("../images/nav/add.svg");
+                            icon: @image-url("../../assets/icons/add.svg");
                             clicked => { root.add-members(); }
                         }
 
                         // 4. Verify (Peer Only)
                         if !is-group : ActionCircle {
                             label: contact.is-verified ? "Verified" : "Verify";
-                            icon: @image-url("../images/nav/check.svg");
+                            icon: @image-url("../../assets/icons/check.svg");
                             tint: contact.is-verified ? AppTheme.accent-success : AppTheme.accent;
                             clicked => { root.toggle-verify(!contact.is-verified); }
                         }
@@ -295,7 +295,7 @@ export component InfoScreen inherits Rectangle {
 
                         VerticalLayout {
                             ActionRow {
-                                icon-svg: @image-url("../images/nav/delete.svg");
+                                icon-svg: @image-url("../../assets/icons/delete.svg");
                                 title: "Clear History";
                                 subtitle: "Delete all messages for this chat";
                                 is-danger: true;
@@ -303,7 +303,7 @@ export component InfoScreen inherits Rectangle {
                             }
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
-                                icon-svg: @image-url("../images/nav/warning.svg");
+                                icon-svg: @image-url("../../assets/icons/warning.svg");
                                 title: is-group ? "Leave Group" : "Remove Contact";
                                 subtitle: is-group ? "Exit the p2p conversation" : "Irreversibly unlink peer";
                                 is-danger: true;

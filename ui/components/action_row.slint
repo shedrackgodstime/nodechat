@@ -144,19 +144,19 @@ export component ActionRow inherits Rectangle {
                     y: (parent.height - self.height) / 2;
 
                     if root.last-message-status == "delivered" : Image {
-                        source: @image-url("../images/nav/check-check.svg");
+                        source: @image-url("../../assets/icons/check-check.svg");
                         width: 14px; height: 14px; colorize: AppTheme.accent-success;
                     }
                     if root.last-message-status == "sent" : Image {
-                        source: @image-url("../images/nav/check.svg");
+                        source: @image-url("../../assets/icons/check.svg");
                         width: 14px; height: 14px; colorize: AppTheme.text-tertiary;
                     }
                     if root.last-message-status == "failed" : Image {
-                        source: @image-url("../images/nav/failed.svg");
+                        source: @image-url("../../assets/icons/failed.svg");
                         width: 14px; height: 14px; colorize: AppTheme.accent-danger;
                     }
                     if root.last-message-status == "queued" : Image {
-                        source: @image-url("../images/nav/clock.svg");
+                        source: @image-url("../../assets/icons/clock.svg");
                         width: 14px; height: 14px; colorize: AppTheme.text-tertiary;
                     }
                 }
@@ -206,7 +206,7 @@ export component ActionRow inherits Rectangle {
                 background: root.is-toggle-on ? AppTheme.accent : transparent;
                 animate background { duration: AppTheme.dur-short; }
                 if root.is-toggle-on : Image {
-                    source: @image-url("../images/nav/check.svg");
+                    source: @image-url("../../assets/icons/check.svg");
                     width: 14px; height: 14px; colorize: #FFFFFF;
                     horizontal-alignment: center; vertical-alignment: center;
                 }
@@ -223,7 +223,7 @@ export component ActionRow inherits Rectangle {
                     vertical-alignment: center;
                 }
                 Image {
-                    source: root.show-copied ? @image-url("../images/nav/clipboard-checked.svg") : @image-url("../images/nav/clipboard.svg");
+                    source: root.show-copied ? @image-url("../../assets/icons/clipboard-checked.svg") : @image-url("../../assets/icons/clipboard.svg");
                     width: 18px;
                     height: 18px;
                     colorize: root.show-copied ? AppTheme.accent-success : AppTheme.text-tertiary;

@@ -38,7 +38,7 @@ NodeChat is a purely peer-to-peer (P2P), serverless chat application built nativ
 | Utilities | `uuid` 1.23.0, `anyhow` 1.0.102 |
 | Platform | Desktop (Windows, Linux, macOS) + Android (stretch goal) |
 
-> **Note:** See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete dependency list with versions.
+> **Note:** See [ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md) for the complete dependency list with versions.
 
 ---
 
@@ -46,10 +46,10 @@ NodeChat is a purely peer-to-peer (P2P), serverless chat application built nativ
 
 | Document | Purpose |
 |---|---|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Full system design, module hierarchy, cryptographic decisions, implementation phases |
-| [UX_FLOW.md](./UX_FLOW.md) | Complete UX flow, screen designs, component specifications |
-| [RULES.md](./RULES.md) | Strict engineering and testing standards — binding for all contributors |
-| [AGENT.md](./AGENT.md) | Rules for AI agent interactions with this codebase |
+| [ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md) | Full system design, module hierarchy, cryptographic decisions, implementation phases |
+| [UX_FLOW.md](./docs/architecture/UX_FLOW.md) | Complete UX flow, screen designs, component specifications |
+| [RULES.md](./docs/RULES.md) | Strict engineering and testing standards — binding for all contributors |
+| [AGENT.md](./docs/AGENT.md) | Rules for AI agent interactions with this codebase |
 
 ---
 
@@ -57,17 +57,19 @@ NodeChat is a purely peer-to-peer (P2P), serverless chat application built nativ
 
 ```
 nodechat/
-├── src/               ← Rust backend + UI wiring
-│   ├── core/          ← Actor Model worker (Command/AppEvent loop)
+├── src/               ← Rust backend
+│   ├── backend.rs     ← Async I/O, core loop, command handler
+│   ├── bridge.rs      ← Event/Channel bridge between Slint UI and Tokio
+│   ├── crypto.rs      ← X25519 DH, ChaCha20, hash ratchet
 │   ├── p2p/           ← Iroh networking (unicast + gossip)
-│   ├── crypto/        ← X25519 DH, ChaCha20, hash ratchet
 │   ├── storage/       ← SQLite schema and queries
-│   └── ui/            ← Slint window loader + callback wiring
-├── ui/                ← .slint UI markup files (zero Rust logic)
-│   ├── components/    ← Reusable components (bubble, contact row, etc.)
-│   └── screens/       ← Full screen layouts
-├── assets/            ← Fonts, icons
-└── tests/             ← Integration tests
+│   ├── ui.rs          ← Slint definitions and view models
+│   └── ui_models.rs   ← Structs binding backend state to the Slint UI
+├── ui/                ← .slint UI markup files
+│   ├── components/    ← High-level UI sub-components
+│   └── screens/       ← Full screen layouts (ChatView, Settings, etc.)
+├── assets/            ← Icons & App Logos
+└── docs/              ← Architecture diagrams and project history
 ```
 
 ---
@@ -91,12 +93,12 @@ cargo run --release
 
 | Phase | Description | Status |
 |---|---|---|
-| Phase 1 | Cargo workspace, Slint window, SQLite schema, Actor Model channels | 🔲 Not started |
-| Phase 2 | Iroh endpoint, Pkarr discovery, LAN unicast | 🔲 Not started |
-| Phase 3 | X25519 identity, ChaCha20 E2EE, hash ratchet, offline queue | 🔲 Not started |
-| Phase 4 | Full Slint UI, all screens wired | 🔲 Not started |
-| Phase 5 | iroh-gossip group chat, symmetric key distribution | 🔲 Not started |
-| Phase 6 | Polish, testing, defense prep | 🔲 Not started |
+| Phase 1 | Cargo workspace, Slint window, SQLite schema, Actor Model channels | ✅ Complete |
+| Phase 2 | Iroh endpoint, Pkarr discovery, LAN unicast | ✅ Complete |
+| Phase 3 | X25519 identity, ChaCha20 E2EE, hash ratchet, offline queue | ✅ Complete |
+| Phase 4 | Full Slint UI, all screens wired | ✅ Complete |
+| Phase 5 | iroh-gossip group chat, symmetric key distribution | ✅ Complete |
+| Phase 6 | Polish, UI reduction compilation, Android compilation testing | ✅ Complete |
 
 ---
 
