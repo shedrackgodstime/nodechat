@@ -43,11 +43,14 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
             ui.set_debug_logs(text.into());
         }
         AppEvent::Log { level: _, message } => {
-            // Append to the rolling debug log (max 100 lines displayed)
+            // Append to the rolling debug log (max 500 lines displayed)
             let current = ui.get_debug_logs().to_string();
-            let mut lines: Vec<&str> = current.lines().collect();
-            lines.push(Box::leak(message.into_boxed_str()));
-            if lines.len() > 100 { lines.drain(0..lines.len()-100); }
+            let mut lines: Vec<String> = current.lines().map(|s| s.to_string()).collect();
+            lines.push(message);
+            let limit = 500;
+            if lines.len() > limit {
+                lines.drain(0..lines.len() - limit);
+            }
             ui.set_debug_logs(lines.join("\n").into());
         }
         AppEvent::StatusNotice(msg) => {
@@ -55,6 +58,40 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         }
         AppEvent::UserError(err) => {
             eprintln!("[ERROR] {}", err);
+        }
+        AppEvent::MessageStatusChanged { conversation_id, message_id, status } => {
+            update_message_status(ui, &conversation_id, &message_id, status);
+        }
+    }
+}
+
+fn update_message_status(ui: &AppWindow, conversation_id: &str, message_id: &str, status: crate::contract::MessageStatus) {
+    // 1. Update active conversation messages if visible
+    let active = ui.get_active_conversation();
+    if active.id == conversation_id {
+        let model = ui.get_active_messages();
+        for i in 0..model.row_count() {
+            if let Some(mut msg) = model.row_data(i) {
+                if msg.id == message_id {
+                    msg.status = status.to_string().into();
+                    model.set_row_data(i, msg);
+                    break;
+                }
+            }
+        }
+    }
+
+    // 2. Update chat list preview status
+    let chats_model = ui.get_chats();
+    for i in 0..chats_model.row_count() {
+        if let Some(mut chat) = chats_model.row_data(i) {
+            if chat.id == conversation_id {
+                chat.last_message_status = status.to_string().into();
+                // If this was the last message, we might also want to update has_queued_messages
+                // but that's better handled by a full chat list refresh if needed.
+                chats_model.set_row_data(i, chat);
+                break;
+            }
         }
     }
 }

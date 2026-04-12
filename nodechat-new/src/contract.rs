@@ -327,4 +327,9 @@ pub enum AppEvent {
     Log { level: String, message: String },
     StatusNotice(String),
     UserError(String),
+    MessageStatusChanged {
+        conversation_id: String,
+        message_id:      String,
+        status:          MessageStatus,
+    },
 }

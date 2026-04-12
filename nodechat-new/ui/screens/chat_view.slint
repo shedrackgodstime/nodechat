@@ -210,8 +210,8 @@ export component ChatViewScreen inherits Rectangle {
 
         // 3. COMPOSER (Keyboard-safe, anchored bottom)
         Composer {
-            is-disabled: !is-online && connection-mode == "direct";
-            placeholder: is-online ? "Message..." : "Connecting...";
+            is-disabled: false; // Always allow typing!
+            placeholder: "Message...";
             send-message(msg) => { root.send-message(msg); }
         }
     }
