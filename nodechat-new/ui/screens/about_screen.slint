@@ -290,39 +290,99 @@ export component AboutScreen inherits Rectangle {
 
                             VerticalLayout {
                                 spacing: AppTheme.sp-sm;
-                                Text {
-                                    text: "• Rust: Ensuring memory safety and high-performance cross-platform execution.";
-                                    font-size: 14px;
-                                    color: AppTheme.text-secondary;
-                                    wrap: word-wrap;
+                                VerticalLayout {
+                                    spacing: AppTheme.sp-xs;
+                                    HorizontalLayout {
+                                        spacing: AppTheme.sp-sm;
+                                        alignment: start;
+                                        Text { text: "•"; font-size: 14px; color: AppTheme.accent; }
+                                        Text { text: "Rust:"; font-size: 14px; font-weight: 700; color: AppTheme.text-primary; }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 18px;
+                                        Text {
+                                            text: "Ensuring memory safety and high-performance cross-platform execution.";
+                                            font-size: 13px;
+                                            color: AppTheme.text-secondary;
+                                            wrap: word-wrap;
+                                        }
+                                    }
                                 }
 
-                                Text {
-                                    text: "• Slint: Powers our native, lightweight UI with smooth animations and minimal overhead.";
-                                    font-size: 14px;
-                                    color: AppTheme.text-secondary;
-                                    wrap: word-wrap;
+                                VerticalLayout {
+                                    spacing: AppTheme.sp-xs;
+                                    HorizontalLayout {
+                                        spacing: AppTheme.sp-sm;
+                                        alignment: start;
+                                        Text { text: "•"; font-size: 14px; color: AppTheme.accent; }
+                                        Text { text: "Slint:"; font-size: 14px; font-weight: 700; color: AppTheme.text-primary; }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 18px;
+                                        Text {
+                                            text: "Powers our native, lightweight UI with smooth animations and minimal overhead.";
+                                            font-size: 13px;
+                                            color: AppTheme.text-secondary;
+                                            wrap: word-wrap;
+                                        }
+                                    }
                                 }
 
-                                Text {
-                                    text: "• Iroh: The decentralized engine providing reliable P2P discovery and encrypted data sync.";
-                                    font-size: 14px;
-                                    color: AppTheme.text-secondary;
-                                    wrap: word-wrap;
+                                VerticalLayout {
+                                    spacing: AppTheme.sp-xs;
+                                    HorizontalLayout {
+                                        spacing: AppTheme.sp-sm;
+                                        alignment: start;
+                                        Text { text: "•"; font-size: 14px; color: AppTheme.accent; }
+                                        Text { text: "Iroh:"; font-size: 14px; font-weight: 700; color: AppTheme.text-primary; }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 18px;
+                                        Text {
+                                            text: "The decentralized engine providing reliable P2P discovery and encrypted data sync.";
+                                            font-size: 13px;
+                                            color: AppTheme.text-secondary;
+                                            wrap: word-wrap;
+                                        }
+                                    }
                                 }
 
-                                Text {
-                                    text: "• SQLite (Rusqlite): Providing a robust, SQL-driven local storage for your chat history.";
-                                    font-size: 14px;
-                                    color: AppTheme.text-secondary;
-                                    wrap: word-wrap;
+                                VerticalLayout {
+                                    spacing: AppTheme.sp-xs;
+                                    HorizontalLayout {
+                                        spacing: AppTheme.sp-sm;
+                                        alignment: start;
+                                        Text { text: "•"; font-size: 14px; color: AppTheme.accent; }
+                                        Text { text: "SQLite (Rusqlite):"; font-size: 14px; font-weight: 700; color: AppTheme.text-primary; }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 18px;
+                                        Text {
+                                            text: "Providing a robust, SQL-driven local storage for your chat history.";
+                                            font-size: 13px;
+                                            color: AppTheme.text-secondary;
+                                            wrap: word-wrap;
+                                        }
+                                    }
                                 }
 
-                                Text {
-                                    text: "• Tokio: The asynchronous runtime driving the high-concurrency networking layer.";
-                                    font-size: 14px;
-                                    color: AppTheme.text-secondary;
-                                    wrap: word-wrap;
+                                VerticalLayout {
+                                    spacing: AppTheme.sp-xs;
+                                    HorizontalLayout {
+                                        spacing: AppTheme.sp-sm;
+                                        alignment: start;
+                                        Text { text: "•"; font-size: 14px; color: AppTheme.accent; }
+                                        Text { text: "Tokio:"; font-size: 14px; font-weight: 700; color: AppTheme.text-primary; }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 18px;
+                                        Text {
+                                            text: "The asynchronous runtime driving the high-concurrency networking layer.";
+                                            font-size: 13px;
+                                            color: AppTheme.text-secondary;
+                                            wrap: word-wrap;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -391,5 +451,6 @@ export component AboutScreen inherits Rectangle {
                 }
             }
         }
+
     }
 }
