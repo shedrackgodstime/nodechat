@@ -108,18 +108,66 @@ impl Visit for MsgVisitor {
 impl<S: tracing::Subscriber> Layer<S> for UiLogLayer {
     fn on_event(&self, event: &tracing::Event<'_>, _ctx: tracing_subscriber::layer::Context<'_, S>) {
         let target = event.metadata().target();
-        // Only capture our own crate's events to avoid flooding with iroh/quinn noise.
-        if !target.starts_with("nodechat") {
-            return;
-        }
-        let level = event.metadata().level().to_string().to_uppercase();
+        let level  = event.metadata().level();
+
+        // ── Smart filter ─────────────────────────────────────────────────────
+        // Tier 1 – our own crate (loose matching): DEBUG and above.
+        let is_ours  = target.to_lowercase().contains("nodechat");
+        
+        let is_net   = target.starts_with("iroh")
+                    || target.starts_with("quinn")
+                    || target.starts_with("rustls")
+                    || target.starts_with("n0_")
+                    || target.starts_with("noq")
+                    || target.starts_with("hickory");
+        let is_noise = target.starts_with("h2")
+                    || target.starts_with("hyper")
+                    || target.starts_with("tokio_util")
+                    || target.starts_with("want")
+                    || target.starts_with("mio")
+                    || target.starts_with("polling");
+
+        let pass = if is_noise {
+            false
+        } else if is_ours {
+            true                              // Our code = everything
+        } else if is_net {
+            *level <= tracing::Level::WARN    // Net libs = WARN/ERR only
+        } else {
+            *level <= tracing::Level::WARN    // Others = WARN/ERR only
+        };
+
+        if !pass { return; }
+
+        // ── Format ───────────────────────────────────────────────────────────
         let mut visitor = MsgVisitor(String::new());
         event.record(&mut visitor);
-        let message = format!("[{}] [{}] {}", level, target, visitor.0);
-        // Non-blocking: drop the log if the channel is full.
-        let _ = self.event_tx.try_send(AppEvent::Log { level, message });
+        let msg = visitor.0;
+        if msg.is_empty() { return; }
+
+        // Short readable module tag: last 1-2 path segments
+        let tag = {
+            let parts: Vec<&str> = target.split("::").collect();
+            if parts.len() <= 2 { target.to_string() }
+            else { parts[parts.len()-2..].join("::") }
+        };
+
+        let lvl = match *level {
+            tracing::Level::ERROR => "ERR ",
+            tracing::Level::WARN  => "WARN",
+            tracing::Level::INFO  => "INFO",
+            tracing::Level::DEBUG => "DEBG",
+            tracing::Level::TRACE => "TRCE",
+        };
+
+        let message = format!("[{}] {} | {}", lvl, tag, msg);
+        let _ = self.event_tx.try_send(AppEvent::Log {
+            level: lvl.trim().to_string(),
+            message,
+        });
     }
 }
+
 
 /// Production runtime — uses the real SQLite database and Tokio for P2P.
 pub struct RealRuntime {
@@ -142,11 +190,16 @@ impl RealRuntime {
         let (log_tx, log_rx) = mpsc::sync_channel::<AppEvent>(256);
         let ui_layer = UiLogLayer { event_tx: log_tx };
 
-        // stderr layer: show ALL events from our crate at INFO+, noisy iroh libraries at WARN+
+        // stderr layer: mirrors the UiLogLayer filter so terminal and panel agree.
         let stderr_filter = tracing_subscriber::EnvFilter::try_from_default_env()
             .unwrap_or_else(|_| {
                 tracing_subscriber::EnvFilter::new(
-                    "nodechat_new=debug,iroh=warn,quinn=warn,rustls=warn,warn"
+                    // our code = DEBUG+, useful net libs = WARN+, codec noise = off
+                    "nodechat_new=debug,\
+                     iroh=warn,quinn=warn,rustls=warn,\
+                     n0_=warn,noq=warn,hickory=warn,\
+                     h2=off,hyper=off,tokio_util=off,mio=off,polling=off,want=off,\
+                     warn"
                 )
             });
         let stderr_layer = tracing_subscriber::fmt::layer()
@@ -154,10 +207,13 @@ impl RealRuntime {
             .with_level(true)
             .with_filter(stderr_filter);
 
-        let _ = tracing_subscriber::registry()
+        match tracing_subscriber::registry()
             .with(stderr_layer)
             .with(ui_layer)
-            .try_init(); // try_init so a second call (tests) doesn't panic
+            .try_init() {
+                Ok(_) => eprintln!("[BRIDGE] Tracing subscriber installed successfully"),
+                Err(e) => eprintln!("[BRIDGE] FAILED to install tracing subscriber: {}. It might already be set.", e),
+            }
 
         // Drain log events from the sync channel into the main event channel.
         let event_tx_log = event_tx.clone();
@@ -178,8 +234,16 @@ impl RealRuntime {
         });
 
         runtime.spawn(async move {
+            eprintln!("[BRIDGE] Spawning backend worker thread...");
             let (net_tx, mut net_rx) = tokio::sync::mpsc::channel::<crate::p2p::NetworkEvent>(100);
-            let mut backend = RealBackend::open(net_tx).expect("failed to open local database");
+            let mut backend = match RealBackend::open(net_tx, event_tx.clone()) {
+                Ok(b) => b,
+                Err(e) => {
+                    eprintln!("[BRIDGE] FATAL: Failed to open backend: {}", e);
+                    return;
+                }
+            };
+            eprintln!("[BRIDGE] Backend opened successfully. Sending initial snapshot.");
             let _ = event_tx.send(AppEvent::SnapshotReady(backend.snapshot()));
             let ext = event_tx.clone();
             

@@ -99,6 +99,7 @@ pub struct ChatPreviewRecord {
     pub is_outgoing:         bool,
     pub timestamp:           i64,     // raw, caller formats for display
     pub is_verified:         bool,
+    pub is_session_ready:    bool,
     pub has_queued:          bool,
 }
 
@@ -179,17 +180,19 @@ pub fn delete_all(conn: &Connection) -> Result<()> {
 
 // ── Peers ─────────────────────────────────────────────────────────────────────
 
-/// Insert a new peer, or update display_name + ticket on conflict.
-pub fn insert_peer(conn: &Connection, r: &PeerRecord) -> Result<()> {
+/// Upsert a peer record: insert if new, or update everything on conflict.
+pub fn upsert_peer(conn: &Connection, r: &PeerRecord) -> Result<()> {
     conn.execute(
         "INSERT INTO peers (node_id, display_name, endpoint_ticket, x25519_pubkey, verified)
          VALUES (?1, ?2, ?3, ?4, ?5)
          ON CONFLICT(node_id) DO UPDATE SET
              display_name    = excluded.display_name,
-             endpoint_ticket = excluded.endpoint_ticket",
+             endpoint_ticket = excluded.endpoint_ticket,
+             x25519_pubkey   = excluded.x25519_pubkey,
+             verified        = excluded.verified",
         params![r.node_id, r.display_name, r.endpoint_ticket, r.x25519_pubkey, r.verified as i32],
     )
-    .context("insert_peer failed")?;
+    .context("upsert_peer failed")?;
     Ok(())
 }
 
@@ -491,6 +494,7 @@ pub fn list_chat_previews(
             is_outgoing:         last.map(|m| m.sender_id == local_node_id).unwrap_or(false),
             timestamp:           last.map(|m| m.timestamp).unwrap_or(0),
             is_verified:         peer.verified,
+            is_session_ready:    !peer.x25519_pubkey.is_empty(),
             has_queued:          has_queued(conn, &peer.node_id)?,
         });
     }
@@ -509,6 +513,7 @@ pub fn list_chat_previews(
             is_outgoing:         last.map(|m| m.sender_id == local_node_id).unwrap_or(false),
             timestamp:           last.map(|m| m.timestamp).unwrap_or(0),
             is_verified:         true,   // groups are always trusted locally
+            is_session_ready:    true,   // groups don't need point-to-point handshake
             has_queued:          false,  // groups don't queue
         });
     }
@@ -552,6 +557,35 @@ fn collect_messages(
             })
         })
         .collect()
+}
+
+/// Return all messages with status `Queued` for a specific conversation.
+pub fn get_queued_messages(conn: &Connection, conversation_id: &str) -> Result<Vec<MessageRecord>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, kind, target_id, sender_id, content, timestamp, status, 
+                invite_topic_id, invite_group_name, invite_key 
+         FROM messages 
+         WHERE target_id = ? AND status = 'queued'
+         ORDER BY timestamp ASC",
+    )?;
+
+    stmt.query_map([conversation_id], |row| {
+        let status_str: String = row.get(6)?;
+        Ok(MessageRecord {
+            id:                Uuid::parse_str(&row.get::<_, String>(0)?).unwrap_or_default(),
+            kind:              row.get(1)?,
+            target_id:         row.get(2)?,
+            sender_id:         row.get(3)?,
+            content:           row.get(4)?,
+            timestamp:         row.get(5)?,
+            status:            parse_status(&status_str).unwrap_or(MessageStatus::Queued),
+            invite_topic_id:   row.get(7)?,
+            invite_group_name: row.get(8)?,
+            invite_key:        row.get(9)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()
+    .map_err(Into::into)
 }
 
 // ── Unit Tests ────────────────────────────────────────────────────────────────
