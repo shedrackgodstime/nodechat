@@ -10,8 +10,9 @@ export component ConfirmModal inherits Rectangle {
     in property <string> title: "Are you sure?";
     in property <string> subtitle: "This action cannot be undone.";
     in property <string> confirm-text: "I Understand, Confirm";
-    in property <string> action-slug: ""; // Used to toggle PIN requirement
+    in property <string> action-slug: ""; // Used to identify the operation successful
     in property <string> error-msg: "";
+    in property <bool> requires-pin: false;
     
     in-out property <string> pin: "";
     in-out property <bool> is-checked: false;
@@ -109,7 +110,7 @@ export component ConfirmModal inherits Rectangle {
             }
 
             // --- PIN Input (destructive identity actions) ---
-            if action-slug == "delete-identity" : VerticalLayout {
+            if requires-pin : VerticalLayout {
                 spacing: AppTheme.sp-sm;
                 
                 Text {

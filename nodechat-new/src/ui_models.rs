@@ -32,8 +32,10 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         AppEvent::MessageListReplaced { messages, .. } => {
             apply_messages(ui, messages);
         }
-        AppEvent::MessageAppended { message, .. } => {
-            append_message(ui, message);
+        AppEvent::MessageAppended { conversation_id, message } => {
+            if ui.get_active_conversation().id == conversation_id {
+                append_message(ui, message);
+            }
         }
         AppEvent::GroupCandidatesUpdated(candidates) => {
             apply_group_candidates(ui, candidates);
@@ -61,6 +63,10 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         }
         AppEvent::MessageStatusChanged { conversation_id, message_id, status } => {
             update_message_status(ui, &conversation_id, &message_id, status);
+        }
+        AppEvent::OperationSuccess(slug) => {
+            ui.set_operation_success_slug(slug.into());
+            ui.invoke_do_operation_success();
         }
     }
 }
@@ -102,6 +108,7 @@ fn apply_identity(ui: &AppWindow, identity: IdentityView) {
     ui.set_endpoint_ticket(identity.endpoint_ticket.into());
     ui.set_has_identity(identity.has_identity);
     ui.set_is_locked(identity.is_locked);
+    ui.set_has_password(identity.has_password);
 }
 
 fn apply_app_info(ui: &AppWindow, info: AppInfoView) {

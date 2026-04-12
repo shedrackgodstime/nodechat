@@ -85,6 +85,7 @@ pub struct IdentityView {
     pub endpoint_ticket: String,
     pub is_locked: bool,
     pub has_identity: bool,
+    pub has_password: bool,
 }
 
 impl IdentityView {
@@ -96,6 +97,7 @@ impl IdentityView {
             endpoint_ticket: String::new(),
             is_locked: true,
             has_identity: false,
+            has_password: false,
         }
     }
 }
@@ -339,4 +341,5 @@ pub enum AppEvent {
         message_id:      String,
         status:          MessageStatus,
     },
+    OperationSuccess(String),
 }
