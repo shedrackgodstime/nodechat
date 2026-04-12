@@ -1,102 +1,321 @@
+// NodeChat New — Message Bubble Component
+// ---------------------------------------------------------
+// Renders a single chat message.
+// Supports: outgoing vs incoming, timestamps, status,
+// invite bubbles, system messages.
+//
+// Width strategy: asymmetric padding (not max-width) to avoid
+// ScrollView binding loops while keeping bubbles ~70% wide.
+// The 'is-desktop' flag tightens the offset for narrow panels.
+// ---------------------------------------------------------
+
 import { AppTheme } from "../theme.slint";
-import { GroupInviteBubble } from "group_invite_bubble.slint";
 
 export struct MessageData {
     id: string,
+    sender: string,
     text: string,
     timestamp: string,
-    is-mine: bool,
-    status: string,
+    is-outgoing: bool,
+    is-system: bool,
+    is-invite: bool,
     is-ephemeral: bool,
     ttl-seconds: int,
-    is-group-invite: bool,
-    invite-group-name: string,
-    invite-topic-id: string,
+    invite-topic: string,
+    invite-name: string,
+    invite-desc: string,
     invite-key: string,
-    invite-is-joined: bool,
+    is-invite-joined: bool,
+    status: string,   // "sent" | "delivered" | "failed" | "queued"
+    received-timestamp: string,
+    is-delayed: bool,
+
+    is-contact-share: bool,
+    share-name: string,
+    share-node-id: string,
+    share-ticket: string,
 }
 
-export component MessageBubble inherits VerticalLayout {
-    in property <string> text: "";
-    in property <string> timestamp: "";
-    in property <bool> is-mine: false;
-    in property <string> status: "sent"; // sent, delivered, read, failed, queued
-    in property <bool> is-ephemeral: false;
-    in property <int> ttl-seconds: 0;
-    
-    // Group Invite Support
-    in property <bool> is-group-invite: false;
-    in property <string> invite-group-name: "";
-    in property <string> invite-topic-id: "";
-    in property <string> invite-key: "";
-    in property <bool> invite-is-joined: false;
+export component MessageBubble inherits Rectangle {
+    // Ensure bubbles adapt correctly to screen size
+    width: 100%;
 
-    callback open-group(string, string, string, bool);
+    in property <MessageData> data;
+    in property <bool> is-desktop: false; // Tightens offset for narrow panels
 
-    if is-group-invite: GroupInviteBubble {
-        width: 100%;
-        group-name: root.invite-group-name;
-        topic-id: root.invite-topic-id;
-        invite-key: root.invite-key;
-        timestamp: root.timestamp;
-        is-mine: root.is-mine;
-        is-joined: root.invite-is-joined;
-        open-group(topic, name, key, joined) => { root.open-group(topic, name, key, joined); }
-    }
+    callback open-invite(string, string, string, bool);
+    callback add-contact(string, string);
 
-    if !is-group-invite: HorizontalLayout {
-        alignment: is-mine ? end : start;
-        width: 100%;
+    // Responsive offset: smaller on desktop panels, larger on mobile
+    property <length> bubble-offset: is-desktop ? 48px : 72px;
 
-        VerticalLayout {
-            spacing: 4px;
-            alignment: is-mine ? end : start;
+    VerticalLayout {
+        spacing: 0;
+
+        // --- System Message ---
+        if data.is-system: HorizontalLayout {
+            alignment: center;
+            padding-top: AppTheme.space.sm;
+            padding-bottom: AppTheme.space.sm;
+            padding-left: AppTheme.space.xl;
+            padding-right: AppTheme.space.xl;
 
             Rectangle {
-                background: is-mine 
-                    ? @linear-gradient(135deg, AppTheme.accent 0%, #0056b3 100%)
-                    : AppTheme.surface-secondary;
-                border-radius: AppTheme.radius-md;
-                
-                VerticalLayout {
-                    padding: 12px;
-                    padding-left: 16px;
-                    padding-right: 16px;
-                    spacing: 4px;
-                    // Stable width constraint
-                    max-width: 600px;
+                border-radius: AppTheme.space.radius-pill;
+                background: AppTheme.surface-tertiary;
+
+                HorizontalLayout {
+                    padding-left: AppTheme.space.md;
+                    padding-right: AppTheme.space.md;
+                    padding-top: AppTheme.space.xs;
+                    padding-bottom: AppTheme.space.xs;
 
                     Text {
-                        text: root.text;
-                        color: is-mine ? #FFFFFF : AppTheme.text-primary;
-                        font-size: 15px;
+                        text: data.text;
+                        font-size: AppTheme.typo.label.size;
+                        font-weight: AppTheme.typo.label.weight;
+                        color: AppTheme.text-tertiary;
+                        horizontal-alignment: center;
                         wrap: word-wrap;
-                        horizontal-alignment: is-mine ? right : left;
+                    }
+                }
+            }
+        }
+
+        // --- Group Invite Bubble ---
+    if data.is-invite && !data.is-system: HorizontalLayout {
+            alignment: data.is-outgoing ? end : start;
+            padding-top: AppTheme.space.xs;
+            padding-bottom: AppTheme.space.xs;
+            padding-left: data.is-outgoing ? AppTheme.space.xl : AppTheme.space.sm;
+            padding-right: data.is-outgoing ? AppTheme.space.sm : AppTheme.space.xl;
+
+            Rectangle {
+                max-width: 280px;
+                border-radius: AppTheme.space.radius-lg;
+                background: AppTheme.surface-tertiary;
+                border-color: AppTheme.accent-soft;
+                border-width: 1px;
+
+                VerticalLayout {
+                    padding: AppTheme.space.md;
+                    spacing: AppTheme.space.sm;
+
+                    Text {
+                        text: "📨 Group Invite";
+                        font-size: AppTheme.typo.label.size;
+                        font-weight: AppTheme.typo.label.weight;
+                        color: AppTheme.accent;
+                        letter-spacing: 0.5px;
                     }
 
-                    HorizontalLayout {
-                        alignment: is-mine ? end : start;
-                        spacing: 6px;
+                    Text {
+                        text: data.invite-name != "" ? data.invite-name : "Unnamed Group";
+                        font-size: AppTheme.typo.header.size;
+                        font-weight: AppTheme.typo.header.weight;
+                        color: AppTheme.text-primary;
+                        wrap: word-wrap;
+                    }
 
-                        if is-ephemeral: Text { text: "⏱"; font-size: 10px; color: is-mine ? rgba(255,255,255,0.7) : AppTheme.text-tertiary; vertical-alignment: center; }
+                    if data.invite-desc != "": Text {
+                        text: data.invite-desc;
+                        font-size: 13px;
+                        color: AppTheme.text-secondary;
+                        wrap: word-wrap;
+                    }
 
-                        Text {
-                            text: timestamp;
-                            font-size: 11px;
-                            color: is-mine ? rgba(255,255,255,0.7) : AppTheme.text-tertiary;
-                            vertical-alignment: center;
+                    TouchArea {
+                        height: 36px;
+                        clicked => {
+                            root.open-invite(data.invite-topic, data.invite-name, data.invite-key, data.is-invite-joined);
                         }
 
-                        if is-mine: Text {
-                            text: 
-                                status == "read" ? "✓✓" :
-                                status == "delivered" ? "✓✓" :
-                                status == "sent" ? "✓" :
-                                status == "failed" ? "!" : "⏳";
-                            font-size: 11px;
-                            font-weight: 800;
-                            color: status == "read" ? #32D74B : (status == "failed" ? AppTheme.accent-danger : rgba(255,255,255,0.7));
-                            vertical-alignment: center;
+                        Rectangle {
+                            border-radius: AppTheme.space.radius-md;
+                            background: data.is-invite-joined ? AppTheme.surface-hover : AppTheme.accent;
+
+                            Text {
+                                text: data.is-invite-joined ? "View Group" : "Join Group";
+                                font-size: AppTheme.typo.label.size;
+                                font-weight: AppTheme.typo.label.weight;
+                                color: data.is-invite-joined ? AppTheme.text-primary : AppTheme.text-inverted;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Contact Share Bubble ---
+        if data.is-contact-share && !data.is-system: HorizontalLayout {
+            alignment: data.is-outgoing ? end : start;
+            padding-top: AppTheme.space.xs;
+            padding-bottom: AppTheme.space.xs;
+            padding-left: data.is-outgoing ? AppTheme.space.xl : AppTheme.space.sm;
+            padding-right: data.is-outgoing ? AppTheme.space.sm : AppTheme.space.xl;
+
+            Rectangle {
+                max-width: 280px;
+                border-radius: AppTheme.space.radius-lg;
+                background: AppTheme.surface-tertiary;
+                border-color: AppTheme.accent-soft;
+                border-width: 1px;
+
+                VerticalLayout {
+                    padding: AppTheme.space.md;
+                    spacing: AppTheme.space.sm;
+
+                    Text {
+                        text: "👤 Shared Contact";
+                        font-size: AppTheme.typo.label.size;
+                        font-weight: AppTheme.typo.label.weight;
+                        color: AppTheme.accent;
+                        letter-spacing: 0.5px;
+                    }
+
+                    Text {
+                        text: data.share-name != "" ? data.share-name : "Unknown Peer";
+                        font-size: AppTheme.typo.header.size;
+                        font-weight: AppTheme.typo.header.weight;
+                        color: AppTheme.text-primary;
+                        wrap: word-wrap;
+                    }
+
+                    TouchArea {
+                        height: 36px;
+                        clicked => {
+                            root.add-contact(data.share-name, data.share-ticket != "" ? data.share-ticket : data.share-node-id);
+                        }
+
+                        Rectangle {
+                            border-radius: AppTheme.space.radius-md;
+                            background: AppTheme.accent;
+                            Text {
+                                text: "Add Peer";
+                                font-size: AppTheme.typo.label.size;
+                                font-weight: AppTheme.typo.label.weight;
+                                color: AppTheme.text-inverted;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Standard Chat Bubble ---
+    // Asymmetric padding: outgoing → pushed right, incoming → pushed left.
+    // Offset scales with is-desktop to keep bubbles proportional on all panels.
+    if !data.is-system && !data.is-invite && !data.is-contact-share: HorizontalLayout {
+            alignment: data.is-outgoing ? end : start;
+            padding-top: AppTheme.space.xs;
+            padding-bottom: AppTheme.space.xs;
+            padding-left: data.is-outgoing ? bubble-offset : AppTheme.space.sm;
+            padding-right: data.is-outgoing ? AppTheme.space.sm : bubble-offset;
+
+            VerticalLayout {
+                spacing: 2px;
+
+                // Sender name — incoming group messages only
+            if !data.is-outgoing && data.sender != "": HorizontalLayout {
+                    padding-left: AppTheme.space.sm;
+
+                    Text {
+                        text: data.sender;
+                        font-size: AppTheme.typo.label.size;
+                        font-weight: AppTheme.typo.label.weight;
+                        color: AppTheme.accent;
+                    }
+                }
+
+                // The bubble body
+            Rectangle {
+                    border-radius: AppTheme.space.radius-lg;
+                    background: data.is-outgoing ? AppTheme.bubble-out : AppTheme.bubble-in;
+
+                    VerticalLayout {
+                        padding-left: AppTheme.space.md;
+                        padding-right: AppTheme.space.md;
+                        padding-top: AppTheme.space.sm;
+                        padding-bottom: AppTheme.space.sm;
+                        spacing: AppTheme.space.xs;
+
+                        Text {
+                            text: data.text;
+                            font-size: AppTheme.typo.body.size;
+                            font-weight: AppTheme.typo.body.weight;
+                            color: data.is-outgoing ? #FFFFFF : AppTheme.text-primary;
+                            wrap: word-wrap;
+                        }
+
+                        // Timestamp + status row
+                    HorizontalLayout {
+                            alignment: end;
+                            spacing: AppTheme.space.xs;
+
+                            Text {
+                                text: data.timestamp;
+                                font-size: AppTheme.typo.label.size;
+                                font-weight: AppTheme.typo.label.weight;
+                                color: data.is-outgoing ? rgba(255, 255, 255, 0.7) : AppTheme.text-tertiary;
+                                vertical-alignment: center;
+                            }
+
+                            // Ephemeral indicator
+                        if data.is-ephemeral: HorizontalLayout {
+                                spacing: 4px;
+                                Image {
+                                    source: @image-url("../images/nav/clock.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: data.is-outgoing ? rgba(255, 255, 255, 0.8) : AppTheme.accent;
+                                    y: (parent.height - self.height) / 2;
+                                }
+
+                                if data.ttl-seconds > 0: Text {
+                                    text: data.ttl-seconds + "s";
+                                    font-size: 10px;
+                                    font-weight: 800;
+                                    color: data.is-outgoing ? rgba(255, 255, 255, 0.8) : AppTheme.accent;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            // SVG status indicator (outgoing only) — cross-platform safe
+                        if data.is-outgoing && data.status == "delivered": Image {
+                                source: @image-url("../images/nav/check-check.svg");
+                                width: 14px;
+                                height: 14px;
+                                colorize: AppTheme.accent-success;
+                                y: (parent.height - self.height) / 2;
+                            }
+
+                            if data.is-outgoing && data.status == "sent": Image {
+                                source: @image-url("../images/nav/check.svg");
+                                width: 14px;
+                                height: 14px;
+                                colorize: rgba(255, 255, 255, 0.5);
+                                y: (parent.height - self.height) / 2;
+                            }
+
+                            if data.is-outgoing && data.status == "failed": Image {
+                                source: @image-url("../images/nav/failed.svg");
+                                width: 14px;
+                                height: 14px;
+                                colorize: AppTheme.accent-danger;
+                                y: (parent.height - self.height) / 2;
+                            }
+
+                            if data.is-outgoing && data.status == "queued": Image {
+                                source: @image-url("../images/nav/clock.svg");
+                                width: 14px;
+                                height: 14px;
+                                colorize: rgba(255, 255, 255, 0.5);
+                                y: (parent.height - self.height) / 2;
+                            }
                         }
                     }
                 }

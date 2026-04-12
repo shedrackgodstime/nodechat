@@ -1,9 +1,9 @@
-//! SQLite database initialisation and schema management.
+//! Local SQLite database — initialisation and schema management.
 //!
-//! Call `initialize` once at startup — all DDL uses `CREATE TABLE IF NOT EXISTS`
-//! so it is safe and idempotent on every launch (RULES.md DB-05).
+//! Call `initialize` once at startup. All DDL uses `CREATE TABLE IF NOT EXISTS`
+//! so it is safe and idempotent on every launch.
 //!
-//! WAL mode and foreign key enforcement are enabled immediately (RULES.md DB-06).
+//! WAL mode and foreign key enforcement are enabled on every open.
 
 use anyhow::{Context, Result};
 use rusqlite::Connection;
@@ -11,25 +11,18 @@ use std::path::Path;
 
 pub mod queries;
 
-/// Open (or create) the database at `path` and apply the full NodeChat schema.
+/// Open (or create) the database at `path` and apply the full schema.
 ///
 /// WAL mode and foreign keys are enabled before any other operation.
-///
-/// # Errors
-/// Returns an error if the file cannot be opened or schema setup fails.
 pub fn initialize(path: &Path) -> Result<Connection> {
     let conn = Connection::open(path)
         .with_context(|| format!("failed to open database at {:?}", path))?;
-
     enable_pragmas(&conn)?;
     apply_schema(&conn)?;
-
     Ok(conn)
 }
 
-/// Open an in-memory database with the full schema applied.
-///
-/// Used exclusively in unit tests (RULES.md T-RULE-04).
+/// Open an in-memory database — used exclusively in unit tests.
 #[cfg(test)]
 pub fn open_in_memory() -> Result<Connection> {
     let conn = Connection::open_in_memory()
@@ -39,7 +32,7 @@ pub fn open_in_memory() -> Result<Connection> {
     Ok(conn)
 }
 
-/// Enable WAL and foreign key enforcement (RULES.md DB-06).
+/// WAL journal mode + foreign key enforcement.
 fn enable_pragmas(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "PRAGMA journal_mode=WAL;
@@ -51,95 +44,62 @@ fn enable_pragmas(conn: &Connection) -> Result<()> {
 /// Create all tables if they do not already exist.
 fn apply_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS local_identity (
-            id                    INTEGER PRIMARY KEY CHECK (id = 1),
-            display_name          TEXT NOT NULL,
-            node_id_bytes         BLOB NOT NULL,
-            x25519_secret         BLOB NOT NULL,
-            pin_hash              TEXT NOT NULL DEFAULT ''
+        "
+        -- Singleton identity row. id is always 1.
+        CREATE TABLE IF NOT EXISTS local_identity (
+            id              INTEGER PRIMARY KEY CHECK (id = 1),
+            display_name    TEXT    NOT NULL,
+            node_id_hex     TEXT    NOT NULL,
+            x25519_secret   BLOB    NOT NULL,
+            endpoint_ticket TEXT    NOT NULL DEFAULT '',
+            pin_hash        TEXT    NOT NULL DEFAULT ''
         );
 
+        -- Known peers / contact book.
+        -- node_id is the hex iroh NodeId — the stable primary key.
         CREATE TABLE IF NOT EXISTS peers (
-            node_id       TEXT PRIMARY KEY,
-            display_name  TEXT NOT NULL,
+            node_id         TEXT PRIMARY KEY,
+            display_name    TEXT NOT NULL,
             endpoint_ticket TEXT NOT NULL DEFAULT '',
-            x25519_pubkey TEXT NOT NULL,
-            verified      INTEGER NOT NULL DEFAULT 0
+            x25519_pubkey   TEXT NOT NULL DEFAULT '',
+            verified        INTEGER NOT NULL DEFAULT 0
         );
 
+        -- Swarm groups joined locally.
         CREATE TABLE IF NOT EXISTS groups (
-            topic_id      TEXT PRIMARY KEY,
-            group_name    TEXT NOT NULL,
-            -- symmetric_key is encrypted at rest under the local password key (RULES.md C-05)
-            symmetric_key BLOB NOT NULL
+            topic_id        TEXT PRIMARY KEY,
+            group_name      TEXT NOT NULL,
+            description     TEXT NOT NULL DEFAULT '',
+            symmetric_key   BLOB NOT NULL
         );
 
+        -- All messages: direct and group.
+        -- target_id = peers.node_id  (direct) OR groups.topic_id (group).
+        -- sender_id = sender's node_id_hex. Never the string 'me'.
+        -- kind: 'standard' | 'system' | 'group_invite'.
+        -- status: 'queued' | 'sent' | 'delivered' | 'read' | 'failed'.
+        -- invite_* columns are only populated when kind = 'group_invite'.
         CREATE TABLE IF NOT EXISTS messages (
-            id        TEXT PRIMARY KEY,
-            -- 'direct' | 'group' | 'file' | 'group_invite'
-            type      TEXT NOT NULL,
-            -- NodeId for 1:1 messages, TopicId for group messages
-            target_id TEXT NOT NULL,
-            sender_id TEXT NOT NULL,
-            -- Decrypted plaintext stored locally (RULES.md C-06)
-            content   TEXT NOT NULL,
-            -- UTC Unix seconds (RULES.md U-07)
-            timestamp INTEGER NOT NULL,
-            -- 'queued' | 'sent' | 'delivered' | 'read'
-            status    TEXT NOT NULL
-        );",
+            id                TEXT PRIMARY KEY,
+            kind              TEXT NOT NULL DEFAULT 'standard',
+            target_id         TEXT NOT NULL,
+            sender_id         TEXT NOT NULL,
+            content           TEXT NOT NULL,
+            timestamp         INTEGER NOT NULL,
+            received_at       INTEGER NOT NULL DEFAULT 0,
+            status            TEXT NOT NULL DEFAULT 'queued',
+            invite_topic_id   TEXT NOT NULL DEFAULT '',
+            invite_group_name TEXT NOT NULL DEFAULT '',
+            invite_key        TEXT NOT NULL DEFAULT ''
+        );
+        ",
     )
-    .context("failed to apply database schema")
-    .and_then(|_| ensure_peer_schema(conn))
-    .and_then(|_| ensure_local_identity_schema(conn))
-}
+    .context("failed to apply database schema")?;
 
-fn ensure_peer_schema(conn: &Connection) -> Result<()> {
-    let mut stmt = conn
-        .prepare("PRAGMA table_info(peers)")
-        .context("failed to inspect peers schema")?;
-    let mut rows = stmt.query([])?;
-    let mut has_endpoint_ticket = false;
-
-    while let Some(row) = rows.next().context("failed to read peers schema row")? {
-        let name: String = row.get(1).context("schema column name")?;
-        if name == "endpoint_ticket" {
-            has_endpoint_ticket = true;
-            break;
-        }
-    }
-
-    if !has_endpoint_ticket {
-        conn.execute_batch(
-            "ALTER TABLE peers ADD COLUMN endpoint_ticket TEXT NOT NULL DEFAULT '';",
-        )
-        .context("failed to add endpoint_ticket column to peers")?;
-    }
-
-    Ok(())
-}
-
-fn ensure_local_identity_schema(conn: &Connection) -> Result<()> {
-    let mut stmt = conn
-        .prepare("PRAGMA table_info(local_identity)")
-        .context("failed to inspect local_identity schema")?;
-    let mut rows = stmt.query([])?;
-    let mut has_pin_hash = false;
-
-    while let Some(row) = rows.next().context("failed to read local_identity schema row")? {
-        let name: String = row.get(1).context("schema column name")?;
-        if name == "pin_hash" {
-            has_pin_hash = true;
-            break;
-        }
-    }
-
-    if !has_pin_hash {
-        conn.execute_batch(
-            "ALTER TABLE local_identity ADD COLUMN pin_hash TEXT NOT NULL DEFAULT '';",
-        )
-        .context("failed to add pin_hash column to local_identity")?;
-    }
+    // --- 🚀 Lazy Migrations ---
+    // If table existed before we added 'description', SQLITE won't update it automatically.
+    let _ = conn.execute("ALTER TABLE groups ADD COLUMN description TEXT NOT NULL DEFAULT ''", []);
+    let _ = conn.execute("ALTER TABLE messages ADD COLUMN received_at INTEGER NOT NULL DEFAULT 0", []);
 
     Ok(())
 }

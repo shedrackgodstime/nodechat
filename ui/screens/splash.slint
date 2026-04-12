@@ -3,15 +3,20 @@ import { AppTheme } from "../theme.slint";
 export component SplashScreen inherits Rectangle {
     background: AppTheme.surface-primary;
     
+    // Once backend is ready or animation finishes, this emits
     callback finished();
 
     VerticalLayout {
+        width: 100%;
+        height: 100%;
         alignment: center;
         spacing: AppTheme.sp-xl;
 
         // --- Logo Glow Spot ---
-        Rectangle {
-            width: 200px; height: 200px;
+        HorizontalLayout {
+            alignment: center;
+            Rectangle {
+                width: 200px; height: 200px;
             
             // Subtle Glow
             Rectangle {
@@ -21,35 +26,45 @@ export component SplashScreen inherits Rectangle {
 
             VerticalLayout {
                 alignment: center;
-                Text { text: "💬"; font-size: 80px; horizontal-alignment: center; }
+                Image {
+                    source: @image-url("../../assets/icons/app_logo_with_name_transparent_bg.png");
+                    width: 160px;
+                    image-fit: contain;
+                }
+            }
             }
         }
 
-        VerticalLayout {
-            spacing: AppTheme.sp-md;
-            Text { text: "NodeChat"; font-size: 32px; font-weight: 900; color: #FFFFFF; horizontal-alignment: center; letter-spacing: -1px; }
-            Text { text: "Secure P2P Mesh Network"; font-size: 14px; font-weight: 700; color: AppTheme.text-tertiary; horizontal-alignment: center; letter-spacing: 1px; }
+        HorizontalLayout {
+            alignment: center;
+            VerticalLayout {
+                spacing: AppTheme.sp-md;
+                Text { text: "NodeChat"; font-size: 32px; font-weight: 900; color: #FFFFFF; horizontal-alignment: center; letter-spacing: -1px; }
+                Text { text: "Decentralized. Peer-to-Peer."; font-size: 14px; font-weight: 700; color: AppTheme.text-tertiary; horizontal-alignment: center; letter-spacing: 1px; }
+            }
         }
 
         // --- Minimal Loading Bar ---
-        Rectangle {
-            width: 120px; height: 4px;
-            background: AppTheme.surface-secondary;
-            border-radius: 2px;
-            clip: true;
-
+        HorizontalLayout {
+            alignment: center;
             Rectangle {
-                x: 0; width: 40px; height: 100%;
-                background: AppTheme.accent;
+                width: 120px; height: 4px;
+                background: AppTheme.surface-secondary;
                 border-radius: 2px;
-                
-                animate x {
-                    duration: 1000ms;
-                    easing: ease-in-out;
-                    iteration-count: -1;
+                clip: true;
+
+                Rectangle {
+                    x: 0; width: 40px; height: 100%;
+                    background: AppTheme.accent;
+                    border-radius: 2px;
+                    
+                    animate x {
+                        duration: 1000ms;
+                        easing: ease-in-out;
+                        iteration-count: -1;
+                    }
                 }
             }
         }
     }
 }
-
