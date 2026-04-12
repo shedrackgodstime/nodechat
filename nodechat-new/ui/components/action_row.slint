@@ -18,6 +18,7 @@ export component ActionRow inherits Rectangle {
     in property <image> icon-svg: @image-url(""); // Set for Settings Mode
     in property <string> timestamp;
     in property <int> badge-count: 0;
+    in property <int> member-count: 0;
     
     // --- State Properties ---
     in property <bool> is-online: false;
@@ -121,6 +122,11 @@ export component ActionRow inherits Rectangle {
                     text: root.title; font-size: 16px; font-weight: 700;
                     color: root.is-danger ? AppTheme.accent-danger : AppTheme.text-primary;
                     overflow: elide; horizontal-stretch: 1;
+                }
+                if root.member-count > 0 : Text {
+                    text: "· " + root.member-count;
+                    font-size: 13px; font-weight: 500; color: AppTheme.text-tertiary;
+                    vertical-alignment: center;
                 }
                 if root.is-verified && (root.subtitle == "" || root.subtitle == "Waiting for handshake...") : Rectangle {
                     width: 8px; height: 8px; border-radius: 4px;

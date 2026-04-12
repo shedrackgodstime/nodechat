@@ -266,6 +266,8 @@ fn map_message(m: MessageItem) -> MessageData {
         is_ephemeral: m.is_ephemeral,
         ttl_seconds: m.ttl_seconds,
         status: m.status.to_string().into(),
+        received_timestamp: m.received_timestamp.into(),
+        is_delayed: m.is_delayed,
         is_contact_share,
         share_name: share_name.into(),
         share_node_id: share_node_id.into(),

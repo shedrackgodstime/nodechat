@@ -55,6 +55,18 @@ pub enum NetworkEvent {
         /// Hex-encoded NodeId.
         node_id: String,
     },
+
+    /// A neighbor has joined a gossip group topic.
+    GroupNeighborUp {
+        topic: String,
+        node_id: String,
+    },
+
+    /// A neighbor has left a gossip group topic.
+    GroupNeighborDown {
+        topic: String,
+        node_id: String,
+    },
 }
 
 /// Manages all network connections: Iroh direct connections for 1:1 and Iroh Gossip for groups.
@@ -83,6 +95,9 @@ struct NetworkManagerInner {
     /// Topics currently subscribed (for idempotency guard — RULES.md P-05).
     subscribed_topics: HashSet<String>,
 
+    /// Count of active gossip neighbors per topic.
+    group_neighbors: HashMap<String, usize>,
+
     /// Sender half for surfacing network events to the core worker.
     event_tx: tokio::sync::mpsc::Sender<NetworkEvent>,
 }
@@ -97,8 +112,25 @@ impl NetworkManager {
                 gossip: None,
                 connections: Arc::new(Mutex::new(HashMap::new())),
                 subscribed_topics: HashSet::new(),
+                group_neighbors: HashMap::new(),
                 event_tx,
             })),
+        }
+    }
+
+    /// Returns the number of active gossip neighbors for a topic.
+    pub fn group_neighbor_count(&self, topic_id: &str) -> usize {
+        let inner = self.inner.lock().unwrap_or_else(|p| p.into_inner());
+        *inner.group_neighbors.get(topic_id).unwrap_or(&0)
+    }
+
+    pub(crate) fn update_group_neighbor_count(&self, topic_id: &str, delta: i32) {
+        let mut inner = self.inner.lock().unwrap_or_else(|p| p.into_inner());
+        let count = inner.group_neighbors.entry(topic_id.to_string()).or_insert(0);
+        if delta > 0 {
+            *count += delta as usize;
+        } else {
+            *count = count.saturating_sub(delta.abs() as usize);
         }
     }
 
@@ -208,13 +240,6 @@ impl NetworkManager {
     /// # Errors
     /// Returns an error if the subscription fails.
     pub async fn subscribe_group(&self, topic_id: &str, bootstrap: Vec<String>) -> Result<()> {
-        {
-            let inner = self.inner.lock().unwrap_or_else(|p| p.into_inner());
-            if inner.subscribed_topics.contains(topic_id) {
-                return Ok(());
-            }
-        }
-        
         let mut bootstrap_ids = Vec::new();
         for id_hex in bootstrap {
             if let Ok(id) = id_hex.parse::<iroh::EndpointId>() {
@@ -222,11 +247,60 @@ impl NetworkManager {
             }
         }
 
-        group::subscribe(self.clone(), topic_id, bootstrap_ids).await?;
-        {
+        let is_new = {
             let mut inner = self.inner.lock().unwrap_or_else(|p| p.into_inner());
-            inner.subscribed_topics.insert(topic_id.to_owned());
+            inner.subscribed_topics.insert(topic_id.to_owned())
+        };
+
+        if is_new {
+            group::subscribe(self.clone(), topic_id, bootstrap_ids).await?;
+        } else {
+            // Already subscribed, just add new bootstrap peers to the swarm
+            group::join_topic(self.clone(), topic_id, bootstrap_ids).await?;
         }
+        Ok(())
+    }
+
+    /// Proactively dial a peer to establish a connection (RULES.md P-04).
+    pub async fn dial_peer(&self, target_node_id: &str, ticket: Option<&str>) -> Result<()> {
+        // We can just call send_direct with an empty payload?
+        // No, let's just use the connection logic.
+        // Actually, send_direct with empty payload is 0 bytes on wire?
+        // Most protocols allow it.
+        // But better is to just connect.
+        
+        // I'll just use the existing logic in direct::send by making it a bit more flexible.
+        // Actually, I'll just implement it here for simplicity since it's just a connect.
+        
+        if self.has_connection(target_node_id) {
+            return Ok(());
+        }
+
+        let (endpoint, connections) = {
+            let inner = self.inner.lock().unwrap_or_else(|p| p.into_inner());
+            let ep = inner.endpoint.clone().ok_or_else(|| anyhow::anyhow!("endpoint not initialised"))?;
+            (ep, self.inner.clone()) 
+        };
+
+        let target: iroh::EndpointAddr = if let Some(hint) = ticket {
+            if let Ok(ticket) = hint.parse::<iroh_tickets::endpoint::EndpointTicket>() {
+                ticket.endpoint_addr().clone()
+            } else {
+                let target: iroh::EndpointId = hint.parse().map_err(|e| anyhow::anyhow!("Invalid peer ID: {}", e))?;
+                target.into()
+            }
+        } else {
+            let target: iroh::EndpointId = target_node_id.parse().map_err(|e| anyhow::anyhow!("Invalid target ID: {}", e))?;
+            target.into()
+        };
+
+        let conn = endpoint.connect(target, DIRECT_ALPN).await?;
+        {
+            let inner = connections.lock().unwrap_or_else(|p| p.into_inner());
+            let mut conns = inner.connections.lock().unwrap_or_else(|p| p.into_inner());
+            conns.insert(target_node_id.to_owned(), conn.clone());
+        }
+        self.spawn_direct_reader(target_node_id.to_owned(), conn);
         Ok(())
     }
 

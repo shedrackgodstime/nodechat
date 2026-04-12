@@ -81,7 +81,8 @@ pub struct MessageRecord {
     pub target_id:         String,
     pub sender_id:         String,   // actual node_id_hex, never the literal "me"
     pub content:           String,
-    pub timestamp:         i64,      // UTC Unix seconds
+    pub timestamp:         i64,      // UTC Unix seconds (Sent At)
+    pub received_at:       i64,      // UTC Unix seconds (Local Arrival)
     pub status:            MessageStatus,
     pub invite_topic_id:   String,
     pub invite_group_name: String,
@@ -352,9 +353,9 @@ pub fn group_exists(conn: &Connection, topic_id: &str) -> Result<bool> {
 pub fn insert_message(conn: &Connection, r: &MessageRecord) -> Result<()> {
     conn.execute(
         "INSERT OR IGNORE INTO messages
-             (id, kind, target_id, sender_id, content, timestamp, status,
+             (id, kind, target_id, sender_id, content, timestamp, received_at, status,
               invite_topic_id, invite_group_name, invite_key)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             r.id.to_string(),
             r.kind,
@@ -362,6 +363,7 @@ pub fn insert_message(conn: &Connection, r: &MessageRecord) -> Result<()> {
             r.sender_id,
             r.content,
             r.timestamp,
+            r.received_at,
             r.status.as_str(),
             r.invite_topic_id,
             r.invite_group_name,
@@ -377,11 +379,25 @@ pub fn list_messages(conn: &Connection, target_id: &str) -> Result<Vec<MessageRe
     let mut stmt = conn
         .prepare(
             "SELECT id, kind, target_id, sender_id, content, timestamp, status,
-                    invite_topic_id, invite_group_name, invite_key
+                    invite_topic_id, invite_group_name, invite_key, received_at
              FROM messages WHERE target_id = ?1 ORDER BY timestamp ASC",
         )
         .context("prepare list_messages")?;
     collect_messages(stmt.query_map(params![target_id], map_message_row)?)
+}
+
+/// Fetch all messages for a conversation received strictly after `ts`.
+pub fn list_messages_after(conn: &Connection, target_id: &str, ts: i64) -> Result<Vec<MessageRecord>> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, kind, target_id, sender_id, content, timestamp, status,
+                    invite_topic_id, invite_group_name, invite_key, received_at
+             FROM messages 
+             WHERE target_id = ?1 AND received_at > ?2 
+             ORDER BY timestamp ASC",
+        )
+        .context("prepare list_messages_after")?;
+    collect_messages(stmt.query_map(params![target_id, ts], map_message_row)?)
 }
 
 /// Fetch only queued / sent messages for a given conversation (for retry).
@@ -389,7 +405,7 @@ pub fn list_queued(conn: &Connection, target_id: &str) -> Result<Vec<MessageReco
     let mut stmt = conn
         .prepare(
             "SELECT id, kind, target_id, sender_id, content, timestamp, status,
-                    invite_topic_id, invite_group_name, invite_key
+                    invite_topic_id, invite_group_name, invite_key, received_at
              FROM messages
              WHERE target_id = ?1 AND status IN ('queued', 'sent')
              ORDER BY timestamp ASC",
@@ -399,6 +415,13 @@ pub fn list_queued(conn: &Connection, target_id: &str) -> Result<Vec<MessageReco
 }
 
 /// Returns true if any queued message exists for `target_id`.
+/// Return the latest 'received_at' timestamp for a given conversation.
+pub fn get_latest_received_timestamp(conn: &Connection, target_id: &str) -> Result<i64> {
+    let mut stmt = conn.prepare("SELECT MAX(received_at) FROM messages WHERE target_id = ?1")?;
+    let val: Option<i64> = stmt.query_row(params![target_id], |row| row.get(0))?;
+    Ok(val.unwrap_or(0))
+}
+
 pub fn has_queued(conn: &Connection, target_id: &str) -> Result<bool> {
     let count: i64 = conn
         .query_row(
@@ -528,12 +551,12 @@ pub fn list_chat_previews(
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-type MsgRow = (String, String, String, String, String, i64, String, String, String, String);
+type MsgRow = (String, String, String, String, String, i64, String, String, String, String, i64);
 
 fn map_message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<MsgRow> {
     Ok((
         row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?,
-        row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?,
+        row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?, row.get(10)?,
     ))
 }
 
@@ -545,7 +568,7 @@ fn collect_messages(
         .context("collect messages")?
         .into_iter()
         .map(|(id, kind, target_id, sender_id, content, timestamp, status_str,
-               invite_topic_id, invite_group_name, invite_key)| {
+               invite_topic_id, invite_group_name, invite_key, received_at)| {
             Ok(MessageRecord {
                 id: Uuid::parse_str(&id).with_context(|| format!("invalid UUID {:?}", id))?,
                 kind,
@@ -553,6 +576,7 @@ fn collect_messages(
                 sender_id,
                 content,
                 timestamp,
+                received_at,
                 status: parse_status(&status_str)?,
                 invite_topic_id,
                 invite_group_name,
@@ -566,29 +590,13 @@ fn collect_messages(
 pub fn get_queued_messages(conn: &Connection, conversation_id: &str) -> Result<Vec<MessageRecord>> {
     let mut stmt = conn.prepare(
         "SELECT id, kind, target_id, sender_id, content, timestamp, status, 
-                invite_topic_id, invite_group_name, invite_key 
+                invite_topic_id, invite_group_name, invite_key, received_at 
          FROM messages 
          WHERE target_id = ? AND status = 'queued'
          ORDER BY timestamp ASC",
     )?;
 
-    stmt.query_map([conversation_id], |row| {
-        let status_str: String = row.get(6)?;
-        Ok(MessageRecord {
-            id:                Uuid::parse_str(&row.get::<_, String>(0)?).unwrap_or_default(),
-            kind:              row.get(1)?,
-            target_id:         row.get(2)?,
-            sender_id:         row.get(3)?,
-            content:           row.get(4)?,
-            timestamp:         row.get(5)?,
-            status:            parse_status(&status_str).unwrap_or(MessageStatus::Queued),
-            invite_topic_id:   row.get(7)?,
-            invite_group_name: row.get(8)?,
-            invite_key:        row.get(9)?,
-        })
-    })?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(Into::into)
+    collect_messages(stmt.query_map([conversation_id], map_message_row)?)
 }
 
 // ── Unit Tests ────────────────────────────────────────────────────────────────
@@ -626,6 +634,7 @@ mod tests {
             sender_id:         sender.to_string(),
             content:           "hello".to_string(),
             timestamp:         1_700_000_000,
+            received_at:       1_700_000_000,
             status,
             invite_topic_id:   String::new(),
             invite_group_name: String::new(),

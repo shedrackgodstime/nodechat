@@ -45,11 +45,41 @@ pub(crate) async fn subscribe(
                         payload: msg.content.to_vec(),
                     }).await;
                 }
+                Ok(iroh_gossip::api::Event::NeighborUp(peer)) => {
+                    manager.update_group_neighbor_count(&topic_id_owned, 1);
+                    let _ = event_tx.send(NetworkEvent::GroupNeighborUp {
+                        topic: topic_id_owned.clone(),
+                        node_id: peer.to_string(),
+                    }).await;
+                }
+                Ok(iroh_gossip::api::Event::NeighborDown(peer)) => {
+                    manager.update_group_neighbor_count(&topic_id_owned, -1);
+                    let _ = event_tx.send(NetworkEvent::GroupNeighborDown {
+                        topic: topic_id_owned.clone(),
+                        node_id: peer.to_string(),
+                    }).await;
+                }
                 _ => {}
             }
         }
     });
 
+    Ok(())
+}
+
+/// Join the gossip swarm for `topic_id` with additional bootstrap peers.
+/// Does not spawn a receiver task. Use this to update an existing subscription.
+pub(crate) async fn join_topic(
+    manager: NetworkManager,
+    topic_id: &str,
+    bootstrap: Vec<iroh::EndpointId>,
+) -> Result<()> {
+    let gossip = {
+        let inner = manager.inner.lock().unwrap_or_else(|p| p.into_inner());
+        inner.gossip.clone().ok_or_else(|| anyhow::anyhow!("gossip not initialised"))?
+    };
+    let id = derive_topic_id(topic_id);
+    let _Res = gossip.subscribe(id, bootstrap).await?;
     Ok(())
 }
 
@@ -66,9 +96,14 @@ pub(crate) async fn broadcast(
 
     let id = derive_topic_id(topic_id);
     
+    // We attempt to broadcast regardless of local neighbor count.
+    // The Gossip engine will handle propagation if/when neighbors appear.
+    // This prevents the flush loop from failing and allows the message to reach the engine.
     let res = gossip.subscribe(id, vec![]).await?;
     let (sender, _) = res.split();
     sender.broadcast(payload.into()).await?;
+    
+    tracing::info!(topic = %topic_id, "Gossip: broadcast payload pushed to engine");
 
     Ok(())
 }

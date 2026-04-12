@@ -27,6 +27,8 @@ export struct MessageData {
     invite-key: string,
     is-invite-joined: bool,
     status: string,   // "sent" | "delivered" | "failed" | "queued"
+    received-timestamp: string,
+    is-delayed: bool,
 
     is-contact-share: bool,
     share-name: string,
