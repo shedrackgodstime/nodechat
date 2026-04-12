@@ -3,6 +3,7 @@ pub mod storage;
 pub mod p2p;
 pub mod backend;
 pub mod bridge;
+pub mod crypto;
 pub mod ui;
 pub mod ui_models;
 

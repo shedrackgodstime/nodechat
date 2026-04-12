@@ -141,3 +141,39 @@ impl DirectFrame {
         }
     }
 }
+/// Group Message Frame (NC3G)
+/// ---------------------------------------------------------
+/// Framing for messages broadcast over Iroh Gossip.
+/// Magic(4) + SenderNodeId(32) + PayloadLen(4) + Payload(N)
+
+pub const GROUP_MAGIC: [u8; 4] = [0x4E, 0x43, 0x33, 0x47]; // NC3G
+
+#[derive(Debug, Clone)]
+pub struct GroupFrame {
+    pub sender_id: String, // hex
+    pub content: Vec<u8>,
+}
+
+impl GroupFrame {
+    pub fn encode(&self) -> Vec<u8> {
+        let sender_bytes = hex::decode(&self.sender_id).unwrap_or_else(|_| vec![0u8; 32]);
+        let mut buf = Vec::with_capacity(4 + 32 + 4 + self.content.len());
+        buf.extend_from_slice(&GROUP_MAGIC);
+        buf.extend_from_slice(&sender_bytes);
+        buf.extend_from_slice(&(self.content.len() as u32).to_be_bytes());
+        buf.extend_from_slice(&self.content);
+        buf
+    }
+
+    pub fn decode(data: &[u8]) -> Result<Self> {
+        if data.len() < 4 + 32 + 4 { bail!("group frame too short"); }
+        if data[0..4] != GROUP_MAGIC { bail!("invalid group magic"); }
+        
+        let sender_id = hex::encode(&data[4..36]);
+        let len = u32::from_be_bytes([data[36], data[37], data[38], data[39]]) as usize;
+        if data.len() < 40 + len { bail!("truncated group payload"); }
+        let content = data[40..40+len].to_vec();
+        
+        Ok(Self { sender_id, content })
+    }
+}
