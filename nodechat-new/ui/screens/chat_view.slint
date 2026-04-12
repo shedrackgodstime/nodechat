@@ -87,8 +87,8 @@ export component ChatViewScreen inherits Rectangle {
                             vertical-alignment: center;
                         }
 
-                        // Presence Dot
-                        if is-online || is-relay : Rectangle {
+                        // Presence Dot (Only for 1:1 direct chats)
+                        if connection-mode != "group" && (is-online || is-relay) : Rectangle {
                             width: 12px;
                             height: 12px;
                             border-radius: 6px;
@@ -121,11 +121,13 @@ export component ChatViewScreen inherits Rectangle {
                     }
 
                     Text {
-                        text: connection-stage != "" ? connection-stage
+                        text: connection-mode == "group" ? "Group Conversation"
+                            : connection-stage != "" ? connection-stage
                             : is-online ? (is-relay ? "via relay" : "direct")
                             : "offline";
                         font-size: 12px;
-                        color: is-online
+                        color: connection-mode == "group" ? AppTheme.accent
+                            : is-online
                             ? (is-relay ? AppTheme.accent-warning : AppTheme.accent-success)
                             : AppTheme.text-tertiary;
                     }
