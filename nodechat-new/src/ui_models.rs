@@ -212,17 +212,44 @@ fn append_message(ui: &AppWindow, message: MessageItem) {
 }
 
 fn apply_group_candidates(ui: &AppWindow, candidates: Vec<RustCandidate>) {
-    let rows: Vec<GroupCandidateItem> = candidates.into_iter().map(|c| GroupCandidateItem {
-        contact_id: c.contact_id.into(),
-        display_name: c.display_name.into(),
-        initials: c.initials.into(),
-        is_selected: c.is_selected,
-        is_online: c.is_online,
+    let mut selected_count = 0;
+    let rows: Vec<GroupCandidateItem> = candidates.into_iter().map(|c| {
+        if c.is_selected { selected_count += 1; }
+        GroupCandidateItem {
+            contact_id: c.contact_id.into(),
+            display_name: c.display_name.into(),
+            initials: c.initials.into(),
+            is_selected: c.is_selected,
+            is_online: c.is_online,
+        }
     }).collect();
     ui.set_group_candidates(VecModel::from_slice(&rows).into());
+    ui.set_group_candidates_selected(selected_count);
 }
 
 fn map_message(m: MessageItem) -> MessageData {
+    let mut is_contact_share = matches!(m.kind, crate::contract::MessageKind::ContactShare);
+    let mut share_name = String::new();
+    let mut share_node_id = String::new();
+    let mut share_ticket = String::new();
+
+    if is_contact_share {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&m.text) {
+            share_name = value.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            share_node_id = value.get("node_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            share_ticket = value.get("ticket").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        } else {
+            is_contact_share = false;
+        }
+    }
+
+    let mut invite_desc = String::new();
+    if matches!(m.kind, crate::contract::MessageKind::GroupInvite) {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&m.text) {
+             invite_desc = value.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        }
+    }
+
     MessageData {
         id: m.message_id.into(),
         sender: m.sender_name.into(),
@@ -233,10 +260,15 @@ fn map_message(m: MessageItem) -> MessageData {
         is_invite: matches!(m.kind, crate::contract::MessageKind::GroupInvite),
         invite_topic: m.invite_topic_id.into(),
         invite_name: m.invite_group_name.into(),
+        invite_desc: invite_desc.into(),
         invite_key: m.invite_key.into(),
         is_invite_joined: m.invite_is_joined,
         is_ephemeral: m.is_ephemeral,
         ttl_seconds: m.ttl_seconds,
         status: m.status.to_string().into(),
+        is_contact_share,
+        share_name: share_name.into(),
+        share_node_id: share_node_id.into(),
+        share_ticket: share_ticket.into(),
     }
 }

@@ -69,6 +69,7 @@ fn apply_schema(conn: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS groups (
             topic_id        TEXT PRIMARY KEY,
             group_name      TEXT NOT NULL,
+            description     TEXT NOT NULL DEFAULT '',
             symmetric_key   BLOB NOT NULL
         );
 
@@ -92,5 +93,11 @@ fn apply_schema(conn: &Connection) -> Result<()> {
         );
         ",
     )
-    .context("failed to apply database schema")
+    .context("failed to apply database schema")?;
+
+    // --- 🚀 Lazy Migrations ---
+    // If table existed before we added 'description', SQLITE won't update it automatically.
+    let _ = conn.execute("ALTER TABLE groups ADD COLUMN description TEXT NOT NULL DEFAULT ''", []);
+
+    Ok(())
 }

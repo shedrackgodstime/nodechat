@@ -3,15 +3,13 @@ pub mod storage;
 pub mod p2p;
 pub mod backend;
 pub mod bridge;
-pub mod mock_backend;
 pub mod ui;
 pub mod ui_models;
 
 slint::include_modules!();
 
-pub use bridge::{MockRuntime, RealRuntime, UiBridge};
+pub use bridge::{RealRuntime, UiBridge};
 pub use contract::*;
-pub use mock_backend::MockBackend;
 
 pub static ANDROID_DATA_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 

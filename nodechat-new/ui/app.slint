@@ -149,6 +149,7 @@ export component AppWindow inherits Window {
     // --- Temporary State for Flows ---
     property <string> temp-group-name: "";
     property <string> temp-group-desc: "";
+    property <string> inviting-group-id: "";
     property <int> group-selection-return: 10;
     property <string> sharing-contact-id: "";
     out property <string> pending-action-id: "";
@@ -179,6 +180,7 @@ export component AppWindow inherits Window {
     in property <int> relay-peers: 0;
     in property <bool> is-offline: false;
     in property <[GroupCandidateItem]> group-candidates: [];
+    in property <int> group-candidates-selected: 0;
 
     // --- Modal State ---
     in-out property <bool> confirm-modal-show: false;
@@ -226,6 +228,7 @@ export component AppWindow inherits Window {
     callback toggle-verify(string, bool);
     callback toggle-group-candidate(string);
     callback create-group(string, string);
+    callback invite-to-group(string);
     callback copy-node-id();
     callback change-password();
     callback submit-password(string, string);
@@ -420,6 +423,17 @@ export component AppWindow inherits Window {
                         open-contact-info => {
                              root.push-screen(9);
                         }
+                        open-invite(topic, name, key, joined) => {
+                            if (!joined) {
+                                root.accept-group-invite(root.active-conversation.id, topic, key);
+                            } else {
+                                root.load-conversation(topic, true);
+                                root.current-screen = 2;
+                            }
+                        }
+                        add-contact(ticket) => {
+                            root.add-peer(ticket);
+                        }
                         retry-queued => { root.retry-queued(); }
                         request-delete-conversation => { 
                              root.pending-action-id = root.active-conversation.id;
@@ -583,6 +597,7 @@ export component AppWindow inherits Window {
                         }
                         add-members => { 
                              root.sharing-contact-id = "";
+                             root.inviting-group-id = root.active-conversation.id;
                              root.push-screen(11); 
                         }
                         share-clicked => {
@@ -606,14 +621,20 @@ export component AppWindow inherits Window {
                     if root.current-screen == 11: SelectContactsScreen {
                         is-desktop: root.is-desktop;
                         contacts: root.group-candidates;
-                        group-name: root.sharing-contact-id == "" ? root.temp-group-name : "Share Contact";
+                        selected-count: root.group-candidates-selected;
+                        active-intent: root.sharing-contact-id != "" ? "share" : (root.inviting-group-id != "" ? "invite" : "create");
+                        group-name: root.sharing-contact-id != "" ? "Share Contact" : (root.inviting-group-id != "" ? root.active-conversation.title : root.temp-group-name);
                         back-clicked => { 
                              root.sharing-contact-id = "";
                              root.back(); 
                         }
                         toggled(id) => { root.toggle-group-candidate(id); }
                         create-clicked => { 
-                             if (root.sharing-contact-id != "") {
+                             if (root.inviting-group-id != "") {
+                                 root.invite-to-group(root.inviting-group-id);
+                                 root.back();
+                                 root.inviting-group-id = "";
+                             } else if (root.sharing-contact-id != "") {
                                  // Collecting selected contacts is handled by Rust side usually 
                                  // via the group-candidates list states. 
                                  // We'll call a dedicated command.
@@ -621,8 +642,11 @@ export component AppWindow inherits Window {
                                  root.back();
                                  root.sharing-contact-id = "";
                              } else {
-                                 root.create-group(root.temp-group-name, root.temp-group-desc); 
-                                 root.current-screen = 0; 
+                                 root.create-group(root.temp-group-name, root.temp-group-desc);
+                                 root.temp-group-name = "";
+                                 root.temp-group-desc = "";
+                                 // Open the new group chat directly
+                                 root.current-screen = 2;
                                  root.last-screen = 0;
                              }
                         }

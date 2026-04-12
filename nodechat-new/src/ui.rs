@@ -157,10 +157,18 @@ pub fn run_app() -> anyhow::Result<()> {
     });
 
     let cmd = ui_bridge.clone();
-    app.on_create_group(move |name, _desc| {
+    app.on_create_group(move |name, desc| {
         let _ = cmd.send(Command::CreateGroup { 
             name: name.to_string(), 
+            description: desc.to_string(),
             member_contact_ids: Vec::new() // Backend manages this via ToggleGroupCandidate state
+        });
+    });
+
+    let cmd = ui_bridge.clone();
+    app.on_invite_to_group(move |id| {
+        let _ = cmd.send(Command::InviteToGroup { 
+            group_id: id.to_string() 
         });
     });
 
@@ -177,7 +185,6 @@ pub fn run_app() -> anyhow::Result<()> {
     app.on_share_contact(move |id, _targets| {
         let _ = cmd.send(Command::ShareContact { 
             contact_id: id.to_string(), 
-            target_contact_ids: Vec::new() 
         });
     });
 

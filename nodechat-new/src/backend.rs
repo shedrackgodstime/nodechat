@@ -42,12 +42,18 @@ impl RealBackend {
 
         let (local_node_id, local_display_name, secret_key) =
             match queries::get_local_identity(&conn)? {
-                Some(id) => (
-                    id.node_id_hex, 
-                    id.display_name, 
-                    Some(iroh::SecretKey::from_bytes(&id.x25519_secret.try_into().unwrap_or([0u8; 32])))
-                ),
-                None => (String::new(), String::new(), None),
+                Some(id) => {
+                    tracing::info!(name = %id.display_name, node_id = %id.node_id_hex, "Found existing local identity in database");
+                    (
+                        id.node_id_hex, 
+                        id.display_name, 
+                        Some(iroh::SecretKey::from_bytes(&id.x25519_secret.try_into().unwrap_or([0u8; 32])))
+                    )
+                },
+                None => {
+                    tracing::warn!("No local identity found in database. User will be prompted to create one.");
+                    (String::new(), String::new(), None)
+                },
             };
 
         let network = NetworkManager::new(net_tx);
@@ -106,7 +112,8 @@ impl RealBackend {
     /// Build the full application snapshot for the initial UI load.
     pub fn snapshot(&self) -> AppSnapshot {
         self.build_snapshot().unwrap_or_else(|e| {
-            eprintln!("[RealBackend] snapshot error: {e}");
+            // This is now a true "last resort" fallback
+            tracing::error!("CRITICAL: Everything failed in snapshot: {}", e);
             AppSnapshot {
                 identity:             IdentityView::empty(),
                 app_info:             AppInfoView::current(),
@@ -116,7 +123,7 @@ impl RealBackend {
                 group_candidates:     vec![],
                 active_conversation:  ConversationView::empty(ConversationKind::Direct),
                 active_messages:      vec![],
-                debug_feed:           vec!["[ERROR] failed to build snapshot".to_string()],
+                debug_feed:           vec![format!("[ERROR] critical snapshot failure: {}", e)],
             }
         })
     }
@@ -260,13 +267,14 @@ impl RealBackend {
             }
 
             // ── Create Group ──────────────────────────────────────────────
-            Command::CreateGroup { name, .. } => {
+            Command::CreateGroup { name, description, .. } => {
                 let topic_id = format!("topic-{}", Uuid::new_v4());
                 let symmetric_key = vec![0u8; 32]; // placeholder until crypto engine is fully re-integrated
 
                 queries::insert_group(&self.conn, &GroupRecord {
                     topic_id:      topic_id.clone(),
                     group_name:    name.clone(),
+                    description:   description.clone(),
                     symmetric_key: symmetric_key.clone(),
                 })?;
 
@@ -283,6 +291,7 @@ impl RealBackend {
                         "topic": topic_id,
                         "key": hex::encode(&symmetric_key),
                         "group_name": name,
+                        "description": description,
                     }).to_string();
 
                     let invite_record = MessageRecord {
@@ -300,21 +309,78 @@ impl RealBackend {
                     };
                     let _ = queries::insert_message(&self.conn, &invite_record);
 
-                    // Actually attempt network send (bypassing crypto layer momentarily)
-                    if let Err(e) = self.network.send_direct(&peer_id, None, invite_record.content.into_bytes()).await {
-                        tracing::warn!("failed to route invite directly to {}: {:?}", peer_id, e);
-                    } else {
-                        let _ = queries::advance_status(&self.conn, &invite_record.id, MessageStatus::Sent);
-                    }
+                    // Actually attempt network send via the standard message pump
+                    self.spawn_message_pump(peer_id);
                 }
 
                 let chat_list = self.build_chat_list()?;
                 let candidates = self.build_group_candidates()?;
+                let conv_view = self.build_conversation_view(&topic_id)?;
                 Ok(vec![
                     AppEvent::ChatListUpdated(chat_list),
                     AppEvent::GroupCandidatesUpdated(candidates),
+                    AppEvent::ConversationUpdated(conv_view),
                     AppEvent::StatusNotice(format!("group created: {}", name)),
                 ])
+            }
+
+            // ── Invite to Group ───────────────────────────────────────────
+            Command::InviteToGroup { group_id } => {
+                // Fetch real group metadata from the local database
+                let group = queries::get_group(&self.conn, &group_id)?;
+                if group.is_none() {
+                    return Ok(vec![AppEvent::UserError("Cannot invite to non-existent group".to_string())]);
+                }
+                let group = group.unwrap();
+                
+                let group_name = group.group_name;
+                let symmetric_key = group.symmetric_key;
+                let topic_id = group_id.clone();
+                let mut chats_updated = false;
+
+                // Send invitations directly to selected peers asynchronously.
+                let targets = std::mem::take(&mut self.selected_candidates);
+                for peer_id in targets {
+                    let invite = serde_json::json!({
+                        "type": "group_invite",
+                        "topic": topic_id,
+                        "key": hex::encode(&symmetric_key),
+                        "group_name": group_name,
+                        "description": group.description,
+                    }).to_string();
+
+                    let invite_record = MessageRecord {
+                        id:                Uuid::new_v4(),
+                        kind:              "group_invite".to_owned(),
+                        target_id:         peer_id.clone(),
+                        sender_id:         self.local_node_id.clone(),
+                        content:           invite,
+                        timestamp:         unix_now(),
+                        status:            MessageStatus::Queued,
+                        invite_topic_id:   topic_id.clone(),
+                        invite_group_name: group_name.clone(),
+                        invite_key:        hex::encode(&symmetric_key),
+                    };
+                    let _ = queries::insert_message(&self.conn, &invite_record);
+
+                    // Actually attempt network send
+                    self.spawn_message_pump(peer_id);
+                    chats_updated = true;
+                }
+
+                let candidates = self.build_group_candidates()?;
+                let mut events = vec![
+                    AppEvent::GroupCandidatesUpdated(candidates),
+                    AppEvent::StatusNotice(format!("Invites sent to {} peers.", chats_updated as u8)),
+                ];
+                
+                if chats_updated {
+                    if let Ok(chat_list) = self.build_chat_list() {
+                        events.push(AppEvent::ChatListUpdated(chat_list));
+                    }
+                }
+                
+                Ok(events)
             }
 
             // ── Toggle Group Candidate ─────────────────────────────────────
@@ -429,9 +495,60 @@ impl RealBackend {
             }
 
             // ── Share Contact ─────────────────────────────────────────────
-            Command::ShareContact { .. } => {
-                // P2P feature — implemented when iroh is wired
-                Ok(vec![AppEvent::StatusNotice("share: pending P2P engine".to_string())])
+            Command::ShareContact { contact_id } => {
+                let shared_contact = queries::get_peer(&self.conn, &contact_id)?;
+                if shared_contact.is_none() {
+                    return Ok(vec![AppEvent::UserError("Contact to share not found".to_string())]);
+                }
+                let shared_contact = shared_contact.unwrap();
+                let share_payload = serde_json::json!({
+                    "type": "contact_share",
+                    "node_id": shared_contact.node_id,
+                    "name": shared_contact.display_name,
+                    "ticket": shared_contact.endpoint_ticket,
+                }).to_string();
+
+                let mut events = vec![];
+                let mut chats_updated = false;
+
+                let targets = std::mem::take(&mut self.selected_candidates);
+
+                for target_id in targets {
+                    let record = MessageRecord {
+                        id:                Uuid::new_v4(),
+                        kind:              "contact_share".to_string(),
+                        target_id:         target_id.clone(),
+                        sender_id:         self.local_node_id.clone(),
+                        content:           share_payload.clone(),
+                        timestamp:         unix_now(),
+                        status:            MessageStatus::Queued,
+                        invite_topic_id:   String::new(),
+                        invite_group_name: String::new(),
+                        invite_key:        String::new(),
+                    };
+                    let _ = queries::insert_message(&self.conn, &record);
+                    
+                    self.spawn_message_pump(target_id.clone());
+
+                    if self.active_conversation_id == target_id {
+                        if let Ok(msg) = self.to_message_item(&record) {
+                            events.push(AppEvent::MessageAppended {
+                                conversation_id: target_id.clone(),
+                                message: msg,
+                            });
+                        }
+                    }
+                    chats_updated = true;
+                }
+
+                if chats_updated {
+                    if let Ok(chat_list) = self.build_chat_list() {
+                        events.push(AppEvent::ChatListUpdated(chat_list));
+                    }
+                }
+                
+                events.push(AppEvent::StatusNotice(format!("Contact {} shared", shared_contact.display_name)));
+                Ok(events)
             }
 
             // ── Update Display Name ───────────────────────────────────────
@@ -473,19 +590,66 @@ impl RealBackend {
             }
 
             // ── Accept Group Invite ───────────────────────────────────────
-            Command::AcceptGroupInvite { topic_id, .. } => {
+            Command::AcceptGroupInvite { conversation_id, topic_id, invite_key } => {
+                // 1. Parse symmetric key from hex (comes from the invite message)
+                let key_bytes = if invite_key.is_empty() {
+                    vec![0u8; 32]
+                } else {
+                    hex::decode(&invite_key).unwrap_or_else(|_| vec![0u8; 32])
+                };
+
+                // 2. Look up the original group_name and description from the invite message record
+                let match_msg = queries::list_messages(&self.conn, &conversation_id)?
+                    .into_iter()
+                    .filter(|m| m.invite_topic_id == topic_id)
+                    .last();
+
+                let mut group_name = match_msg.as_ref().map(|m| m.invite_group_name.clone()).unwrap_or_default();
+                let mut description = String::new();
+
+                if let Some(msg) = match_msg {
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&msg.content) {
+                        if group_name.is_empty() {
+                            group_name = value.get("group_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        }
+                        description = value.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    }
+                }
+
+                if group_name.is_empty() {
+                    group_name = format!("Group {}", &topic_id[..topic_id.len().min(8)]);
+                }
+
+                // 3. Insert group record if not already present
                 if !queries::group_exists(&self.conn, &topic_id)? {
-                    let label_len = topic_id.len().min(8);
                     queries::insert_group(&self.conn, &GroupRecord {
                         topic_id:      topic_id.clone(),
-                        group_name:    format!("Group {}", &topic_id[..label_len]),
-                        symmetric_key: vec![0u8; 32],
+                        group_name:    group_name.clone(),
+                        description,
+                        symmetric_key: key_bytes,
                     })?;
+                    tracing::info!(topic = %topic_id, name = %group_name, "Accepted group invite — group stored");
                 }
+
+                // 4. Subscribe to the gossip swarm (bootstrap from anyone we're connected to)
+                let bootstrap = self.network.active_connections();
+                if let Err(e) = self.network.subscribe_group(&topic_id, bootstrap).await {
+                    tracing::warn!(topic = %topic_id, "Failed to subscribe to group gossip: {:?}", e);
+                } else {
+                    tracing::info!(topic = %topic_id, "Subscribed to group gossip swarm");
+                }
+
+                // 5. Mark the invite message as joined
+                for msg in queries::list_messages(&self.conn, &conversation_id)? {
+                    if msg.invite_topic_id == topic_id {
+                        let _ = queries::advance_status(&self.conn, &msg.id, MessageStatus::Read);
+                    }
+                }
+
                 let chat_list = self.build_chat_list()?;
                 Ok(vec![
                     AppEvent::ChatListUpdated(chat_list),
-                    AppEvent::StatusNotice(format!("joined group {}", topic_id)),
+                    AppEvent::StatusNotice(format!("Joined \"{}\"", group_name)),
                 ])
             }
 
@@ -604,17 +768,35 @@ impl RealBackend {
                                 let msg_id = id.to_string();
                                 tracing::info!(peer=%from, id=%msg_id, "NC2D framed message received");
 
+                                let mut kind = "standard".to_string();
+                                let mut invite_topic_id = String::new();
+                                let mut invite_group_name = String::new();
+                                let mut invite_key = String::new();
+
+                                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
+                                    if let Some(msg_type) = parsed.get("type").and_then(|t| t.as_str()) {
+                                        if msg_type == "contact_share" {
+                                            kind = "contact_share".to_string();
+                                        } else if msg_type == "group_invite" {
+                                            kind = "group_invite".to_string();
+                                            invite_topic_id = parsed.get("topic").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                            invite_group_name = parsed.get("group_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                            invite_key = parsed.get("key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                        }
+                                    }
+                                }
+
                                 let record = MessageRecord {
                                     id,
-                                    kind: "standard".to_string(),
+                                    kind,
                                     target_id: from.clone(),
                                     sender_id: from.clone(),
                                     content: text,
                                     timestamp: unix_now(),
                                     status: MessageStatus::Delivered,
-                                    invite_topic_id: String::new(),
-                                    invite_group_name: String::new(),
-                                    invite_key: String::new(),
+                                    invite_topic_id,
+                                    invite_group_name,
+                                    invite_key,
                                 };
                                 let _ = queries::insert_message(&self.conn, &record);
 
@@ -650,17 +832,35 @@ impl RealBackend {
                 }
 
                 if let Ok(text) = String::from_utf8(payload) {
+                                let mut kind = "standard".to_string();
+                                let mut invite_topic_id = String::new();
+                                let mut invite_group_name = String::new();
+                                let mut invite_key = String::new();
+
+                                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
+                                    if let Some(msg_type) = parsed.get("type").and_then(|t| t.as_str()) {
+                                        if msg_type == "contact_share" {
+                                            kind = "contact_share".to_string();
+                                        } else if msg_type == "group_invite" {
+                                            kind = "group_invite".to_string();
+                                            invite_topic_id = parsed.get("topic").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                            invite_group_name = parsed.get("group_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                            invite_key = parsed.get("key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                        }
+                                    }
+                                }
+
                     let record = MessageRecord {
                         id: Uuid::new_v4(),
-                        kind: "standard".to_string(),
+                        kind,
                         target_id: from.clone(),
                         sender_id: from.clone(),
                         content: text,
                         timestamp: unix_now(),
                         status: MessageStatus::Delivered,
-                        invite_topic_id: String::new(),
-                        invite_group_name: String::new(),
-                        invite_key: String::new(),
+                        invite_topic_id,
+                        invite_group_name,
+                        invite_key,
                     };
                     let _ = queries::insert_message(&self.conn, &record);
                     
@@ -693,13 +893,33 @@ impl RealBackend {
     // ── Snapshot Builders ─────────────────────────────────────────────────────
 
     fn build_snapshot(&self) -> Result<AppSnapshot> {
+        let identity = self.build_identity_view().unwrap_or_else(|e| {
+            tracing::error!("Snapshot: failed to build identity view: {}", e);
+            IdentityView::empty()
+        });
+
+        let chat_list = self.build_chat_list().unwrap_or_else(|e| {
+            tracing::error!("Snapshot: failed to build chat list: {}", e);
+            vec![]
+        });
+
+        let contact_list = self.build_contact_list().unwrap_or_else(|e| {
+            tracing::error!("Snapshot: failed to build contact list: {}", e);
+            vec![]
+        });
+
+        let group_candidates = self.build_group_candidates().unwrap_or_else(|e| {
+            tracing::error!("Snapshot: failed to build group candidates: {}", e);
+            vec![]
+        });
+
         Ok(AppSnapshot {
-            identity:            self.build_identity_view()?,
+            identity,
             app_info:            AppInfoView::current(),
             app_flags:           AppFlags { direct_peer_count: 0, relay_peer_count: 0, is_offline: true },
-            chat_list:           self.build_chat_list()?,
-            contact_list:        self.build_contact_list()?,
-            group_candidates:    self.build_group_candidates()?,
+            chat_list,
+            contact_list,
+            group_candidates,
             active_conversation: ConversationView::empty(ConversationKind::Direct),
             active_messages:     vec![],
             debug_feed:          vec![],
@@ -714,7 +934,7 @@ impl RealBackend {
                 initials:        derive_initials(&id.display_name),
                 peer_id:         id.node_id_hex,
                 endpoint_ticket: id.endpoint_ticket,
-                is_locked:       false,
+                is_locked:       !id.pin_hash.is_empty(), // Lock if PIN exists
                 has_identity:    true,
             }),
         }
@@ -885,6 +1105,7 @@ impl RealBackend {
         let kind = match r.kind.as_str() {
             "group_invite" => MessageKind::GroupInvite,
             "system"       => MessageKind::System,
+            "contact_share" => MessageKind::ContactShare,
             _              => MessageKind::Standard,
         };
 
@@ -1123,13 +1344,15 @@ fn hash_pin(pin: &str) -> String {
 #[cfg(not(target_os = "android"))]
 pub fn db_path() -> PathBuf {
     use directories::ProjectDirs;
-    if let Some(proj) = ProjectDirs::from("com", "nodechat", "NodeChat") {
+    let path = if let Some(proj) = ProjectDirs::from("com", "nodechat", "NodeChat") {
         let dir = proj.data_dir().to_path_buf();
-        std::fs::create_dir_all(&dir).ok();
+        let _ = std::fs::create_dir_all(&dir);
         dir.join("nodechat.db")
     } else {
         PathBuf::from("nodechat.db")
-    }
+    };
+    tracing::info!(path = ?path, "Resolved database path");
+    path
 }
 
 /// On Android the data directory is managed by the OS.
