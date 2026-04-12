@@ -1,53 +1,109 @@
-// NodeChat Design System — Dark Mode
-// Tokens defined here, referenced everywhere. Never hardcode hex in components.
+// NodeChat Design System — Simple & Systemic
+// ---------------------------------------------------------
+// This theme system borrows best-practices from Slint's
+// official demos (Printer Demo, Energy Monitor).
+// ---------------------------------------------------------
+
+export struct Font {
+    size: length,
+    weight: int,
+}
+
+export struct TypoSystem {
+    label: Font,
+    body: Font,
+    header: Font,
+    title: Font,
+}
+
+export struct MeasurementSystem {
+    xs: length,
+    sm: length,
+    md: length,
+    lg: length,
+    xl: length,
+    radius-sm: length,
+    radius-md: length,
+    radius-lg: length,
+    radius-xl: length,
+    radius-pill: length,
+}
 
 export global AppTheme {
-    // --- Surface Colors (Premium Charcoal/Navy palette) ---
-    out property <color> surface-primary:   #0F0F10;   // Deepest background
-    out property <color> surface-secondary: #1C1C1E;   // Main cards/headers
-    out property <color> surface-tertiary:  #2C2C2E;   // Dividers/Input fields
-    out property <color> surface-hover:     #3A3A3C;
+    // --- 1. Measurement System (8pt Grid) ---
+    out property <MeasurementSystem> space: {
+        xs: 4px, sm: 8px, md: 16px, lg: 24px, xl: 32px,
+        radius-sm: 4px, radius-md: 8px, radius-lg: 12px, radius-xl: 16px, radius-pill: 999px
+    };
 
-    // --- Accent Colors (Vibrant Electric Blue) ---
-    out property <color> accent:          #0A84FF;   // Primary Action
-    out property <color> accent-gradient: #0A84FF;   // Used for gradients
-    out property <color> accent-soft:     rgba(10, 132, 255, 0.15);
-    out property <color> accent-success:  #32D74B;   // Online/Secure
-    out property <color> accent-warning:  #FFD60A;   // Relay/Pending
-    out property <color> accent-danger:   #FF453A;   // Error/Delete
+    // --- 2. Typography System ---
+    out property <TypoSystem> typo: {
+        label: { size: 11px, weight: 600 },
+        body:  { size: 14px, weight: 400 },
+        header: { size: 16px, weight: 700 },
+        title:  { size: 24px, weight: 800 }
+    };
 
-    // --- Text Colors (High Contrast) ---
-    out property <color> text-primary:   #FFFFFF;
-    out property <color> text-secondary: #EBEBF5;   // 60% opacity secondary
-    out property <color> text-tertiary:  #8E8E93;   // Muted
+    // --- 3. Color Palette (Simple & High Utility) ---
+    // Base Surfaces
+    out property <color> surface-primary:   #09090B;   // Main Background
+    out property <color> surface-secondary: #121215;   // Headers / Secondary Cards
+    out property <color> surface-tertiary:  #1A1A1E;   // Inputs / Dividers
+    out property <color> surface-hover:     #242429;
+    
+    // Accents
+    out property <color> accent:          #3F8CFF;   // Branded Blue
+    out property <color> accent-soft:     rgba(63, 140, 255, 0.1);
+    out property <color> accent-success:  #22C55E;
+    out property <color> accent-warning:  #F59E0B;
+    out property <color> accent-danger:   #EF4444;
+
+    // Typography Colors
+    out property <color> text-primary:   #FAFAFA;
+    out property <color> text-secondary: #A1A1AA;
+    out property <color> text-tertiary:  #52525B;
     out property <color> text-inverted:  #000000;
 
-    // --- Chat Bubble Palette ---
-    out property <color> bubble-out:      #007AFF;
-    out property <color> bubble-out-text: #FFFFFF;
-    out property <color> bubble-in:       #262629;
-    out property <color> bubble-in-text:  #FFFFFF;
+    // Chat Bubbles
+    out property <color> bubble-out:      #3F8CFF;
+    out property <color> bubble-in:       #27272A;
 
-    // --- Dividers & Borders ---
-    out property <color> divider: rgba(255, 255, 255, 0.08);
-    out property <color> border:  rgba(255, 255, 255, 0.12);
+    // Borders
+    out property <color> divider: #1E1E22;
+    out property <color> border:  #27272A;
 
-    // --- Spacing (8pt Grid) ---
+    // --- 4. Animation ---
+    out property <duration> dur-short: 150ms;
+    out property <duration> dur-md:    300ms;
+
+    // Legacy Aliases (to prevent breaking current components temporarily)
     out property <length> sp-xs: 4px;
     out property <length> sp-sm: 8px;
     out property <length> sp-md: 16px;
     out property <length> sp-lg: 24px;
     out property <length> sp-xl: 32px;
-
-    // --- Rounded Corners ---
-    out property <length> radius-sm:   8px;
-    out property <length> radius-md:  12px;
-    out property <length> radius-lg:  20px;
-    out property <length> radius-xl:  28px;
-    out property <length> radius-pill: 99px;
-
-    // --- Animation Timings ---
-    out property <duration> dur-short: 150ms;
-    out property <duration> dur-md:    300ms;
+    out property <length> radius-sm: 4px;
+    out property <length> radius-md: 8px;
+    out property <length> radius-lg: 12px;
+    out property <length> radius-xl: 16px;
+    out property <length> radius-pill: 999px;
+    out property <color> surface-glass: #1A1A1E;
+    out property <color> accent-gradient: #3F8CFF;
 }
 
+// ---------------------------------------------------------
+// VertScroll — The ONE way to scroll in NodeChat
+// ---------------------------------------------------------
+export component VertScroll inherits Rectangle {
+    in-out property <length> viewport-height <=> flick.viewport-height;
+    in-out property <length> viewport-y <=> flick.viewport-y;
+
+    clip: true; // Allowed here because we inherit from Rectangle
+
+    flick := Flickable {
+        width: 100%;
+        height: 100%;
+        viewport-width: self.width;
+        @children
+    }
+}

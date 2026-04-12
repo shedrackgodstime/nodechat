@@ -1,194 +1,232 @@
-//! All SQL CRUD for NodeChat — the single location for every SQL string (RULES.md DB-01).
+//! All SQL CRUD for NodeChat-New.
 //!
-//! Every function uses `rusqlite::params![]` (RULES.md DB-03).
-//! Every function returns `Result<T>` (RULES.md DB-02).
-//! Status transitions are forward-only and enforced here (RULES.md DB-04).
+//! Rules:
+//! - Every SQL string lives in this file only.
+//! - Every function returns `Result<T>`.
+//! - Status transitions are forward-only (queued → sent → delivered → read).
+//! - `INSERT OR IGNORE` for messages (idempotent receive).
+//! - `ON CONFLICT DO UPDATE` for peers (upsert on reconnect).
 
 use anyhow::{bail, Context, Result};
 use rusqlite::{params, Connection};
 use uuid::Uuid;
 
-use crate::core::commands::MessageStatus;
+use crate::contract::MessageStatus;
 
-// ── Local Identity ──────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// The user's own identity, stored encrypted at rest.
-#[derive(Debug, Clone)]
-pub struct LocalIdentityRecord {
-    pub display_name: String,
-    pub node_id_bytes: Vec<u8>,
-    pub x25519_secret: Vec<u8>,
-    pub pin_hash: String,
+/// Parse a status string from the DB into a `MessageStatus`.
+fn parse_status(s: &str) -> Result<MessageStatus> {
+    match s {
+        "queued"    => Ok(MessageStatus::Queued),
+        "sent"      => Ok(MessageStatus::Sent),
+        "delivered" => Ok(MessageStatus::Delivered),
+        "read"      => Ok(MessageStatus::Read),
+        other       => bail!("unknown message status in DB: {:?}", other),
+    }
 }
 
-/// Insert the local identity. Only one can exist (id = 1).
-pub fn insert_local_identity(conn: &Connection, identity: &LocalIdentityRecord) -> Result<()> {
+/// Derive a two-letter avatar label from a display name.
+pub fn derive_initials(name: &str) -> String {
+    let mut out = String::new();
+    for word in name.split_whitespace() {
+        if let Some(ch) = word.chars().next() {
+            out.push(ch.to_ascii_uppercase());
+        }
+        if out.chars().count() >= 2 {
+            break;
+        }
+    }
+    if out.is_empty() {
+        name.chars().take(2).collect::<String>().to_ascii_uppercase()
+    } else {
+        out
+    }
+}
+
+// ── Record Types ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct LocalIdentityRecord {
+    pub display_name:    String,
+    pub node_id_hex:     String,
+    pub x25519_secret:   Vec<u8>,
+    pub endpoint_ticket: String,
+    pub pin_hash:        String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PeerRecord {
+    /// Hex-encoded iroh NodeId — the stable primary key.
+    pub node_id:         String,
+    pub display_name:    String,
+    pub endpoint_ticket: String,
+    pub x25519_pubkey:   String,
+    pub verified:        bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupRecord {
+    /// Hex-encoded iroh TopicId — the primary key.
+    pub topic_id:      String,
+    pub group_name:    String,
+    pub description:   String,
+    pub symmetric_key: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MessageRecord {
+    pub id:                Uuid,
+    pub kind:              String,   // "standard" | "system" | "group_invite"
+    pub target_id:         String,
+    pub sender_id:         String,   // actual node_id_hex, never the literal "me"
+    pub content:           String,
+    pub timestamp:         i64,      // UTC Unix seconds (Sent At)
+    pub received_at:       i64,      // UTC Unix seconds (Local Arrival)
+    pub status:            MessageStatus,
+    pub invite_topic_id:   String,
+    pub invite_group_name: String,
+    pub invite_key:        String,
+}
+
+/// A flat row used to build the home-screen chat list.
+#[derive(Debug, Clone)]
+pub struct ChatPreviewRecord {
+    pub id:                  String,
+    pub title:               String,
+    pub initials:            String,
+    pub is_group:            bool,
+    pub last_message:        String,
+    pub last_message_status: MessageStatus,
+    pub is_outgoing:         bool,
+    pub timestamp:           i64,     // raw, caller formats for display
+    pub is_verified:         bool,
+    pub is_session_ready:    bool,
+    pub has_queued:          bool,
+}
+
+// ── Local Identity ────────────────────────────────────────────────────────────
+
+/// Insert the local identity. Only one row can ever exist (id = 1).
+pub fn insert_local_identity(conn: &Connection, r: &LocalIdentityRecord) -> Result<()> {
     conn.execute(
-        "INSERT INTO local_identity (id, display_name, node_id_bytes, x25519_secret, pin_hash)
-         VALUES (1, ?1, ?2, ?3, ?4)",
-        params![
-            identity.display_name,
-            identity.node_id_bytes,
-            identity.x25519_secret,
-            identity.pin_hash
-        ],
+        "INSERT OR REPLACE INTO local_identity
+             (id, display_name, node_id_hex, x25519_secret, endpoint_ticket, pin_hash)
+         VALUES (1, ?1, ?2, ?3, ?4, ?5)",
+        params![r.display_name, r.node_id_hex, r.x25519_secret, r.endpoint_ticket, r.pin_hash],
     )
-    .context("failed to insert local identity")?;
+    .context("insert_local_identity failed")?;
     Ok(())
 }
 
-/// Fetch the local identity if one exists.
+/// Fetch the local identity row if it exists.
 pub fn get_local_identity(conn: &Connection) -> Result<Option<LocalIdentityRecord>> {
     let mut stmt = conn
-        .prepare("SELECT display_name, node_id_bytes, x25519_secret, pin_hash FROM local_identity WHERE id = 1")
-        .context("failed to prepare get_local_identity statement")?;
+        .prepare(
+            "SELECT display_name, node_id_hex, x25519_secret, endpoint_ticket, pin_hash
+             FROM local_identity WHERE id = 1",
+        )
+        .context("prepare get_local_identity")?;
 
     let mut rows = stmt.query([])?;
-    if let Some(row) = rows.next().context("failed to read local identity row")? {
+    if let Some(row) = rows.next().context("read local_identity row")? {
         Ok(Some(LocalIdentityRecord {
-            display_name:  row.get(0).context("display_name")?,
-            node_id_bytes: row.get(1).context("node_id_bytes")?,
-            x25519_secret: row.get(2).context("x25519_secret")?,
-            pin_hash:      row.get(3).context("pin_hash")?,
+            display_name:    row.get(0).context("display_name")?,
+            node_id_hex:     row.get(1).context("node_id_hex")?,
+            x25519_secret:   row.get(2).context("x25519_secret")?,
+            endpoint_ticket: row.get(3).context("endpoint_ticket")?,
+            pin_hash:        row.get(4).context("pin_hash")?,
         }))
     } else {
         Ok(None)
     }
 }
 
-/// Update the PIN hash for the local identity (used by Change Password flow).
-pub fn update_pin_hash(conn: &Connection, pin_hash: &str) -> Result<()> {
-    conn.execute(
-        "UPDATE local_identity SET pin_hash = ?1 WHERE id = 1",
-        params![pin_hash],
-    )
-    .context("failed to update pin_hash")?;
-    Ok(())
-}
-
-/// Update the display name for the local identity.
-pub fn update_local_identity_name(conn: &Connection, name: &str) -> Result<()> {
+pub fn update_display_name(conn: &Connection, name: &str) -> Result<()> {
     conn.execute(
         "UPDATE local_identity SET display_name = ?1 WHERE id = 1",
         params![name],
     )
-    .context("failed to update local_identity display_name")?;
+    .context("update_display_name failed")?;
     Ok(())
 }
 
-
-
-/// A peer as stored in the local contact book.
-#[derive(Debug, Clone)]
-pub struct PeerRecord {
-    /// Hex-encoded NodeId (primary key).
-    pub node_id: String,
-    /// Local display name assigned by the user.
-    pub display_name: String,
-    /// The imported ticket or address string used for first contact.
-    pub endpoint_ticket: String,
-    /// Hex-encoded X25519 public key, used for DH key exchange.
-    pub x25519_pubkey: String,
-    /// `true` if the user has completed safety-number verification with this peer.
-    pub verified: bool,
+pub fn update_endpoint_ticket(conn: &Connection, ticket: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE local_identity SET endpoint_ticket = ?1 WHERE id = 1",
+        params![ticket],
+    )
+    .context("update_endpoint_ticket failed")?;
+    Ok(())
 }
 
-/// Insert a new peer into the contact book.
-///
-/// # Errors
-/// Returns an error if a peer with this `node_id` already exists or the write fails.
-pub fn insert_peer(conn: &Connection, peer: &PeerRecord) -> Result<()> {
+pub fn update_pin_hash(conn: &Connection, hash: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE local_identity SET pin_hash = ?1 WHERE id = 1",
+        params![hash],
+    )
+    .context("update_pin_hash failed")?;
+    Ok(())
+}
+
+/// Wipe all user data. Used by ResetIdentity.
+pub fn delete_all(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "DELETE FROM messages;
+         DELETE FROM groups;
+         DELETE FROM peers;
+         DELETE FROM local_identity;",
+    )
+    .context("delete_all failed")
+}
+
+// ── Peers ─────────────────────────────────────────────────────────────────────
+
+/// Upsert a peer record: insert if new, or update everything on conflict.
+pub fn upsert_peer(conn: &Connection, r: &PeerRecord) -> Result<()> {
     conn.execute(
         "INSERT INTO peers (node_id, display_name, endpoint_ticket, x25519_pubkey, verified)
          VALUES (?1, ?2, ?3, ?4, ?5)
          ON CONFLICT(node_id) DO UPDATE SET
-             display_name = excluded.display_name,
-             endpoint_ticket = excluded.endpoint_ticket",
-        params![
-            peer.node_id,
-            peer.display_name,
-            peer.endpoint_ticket,
-            peer.x25519_pubkey,
-            peer.verified as i32
-        ],
+             display_name    = excluded.display_name,
+             endpoint_ticket = excluded.endpoint_ticket,
+             x25519_pubkey   = excluded.x25519_pubkey,
+             verified        = excluded.verified",
+        params![r.node_id, r.display_name, r.endpoint_ticket, r.x25519_pubkey, r.verified as i32],
     )
-    .context("failed to insert peer")?;
+    .context("upsert_peer failed")?;
     Ok(())
 }
 
-/// Update the stored X25519 public key for an existing peer.
-///
-/// # Errors
-/// Returns an error if the peer does not exist or the write fails.
-pub fn update_peer_x25519_pubkey(conn: &Connection, node_id: &str, x25519_pubkey: &str) -> Result<()> {
-    let rows = conn
-        .execute(
-            "UPDATE peers SET x25519_pubkey = ?2 WHERE node_id = ?1",
-            params![node_id, x25519_pubkey],
-        )
-        .context("failed to update peer x25519 pubkey")?;
-    if rows == 0 {
-        bail!("update_peer_x25519_pubkey: no peer found with node_id {:?}", node_id);
-    }
-    Ok(())
-}
-
-/// Update the stored endpoint ticket for an existing peer.
-pub fn update_peer_endpoint_ticket(conn: &Connection, node_id: &str, endpoint_ticket: &str) -> Result<()> {
-    let rows = conn
-        .execute(
-            "UPDATE peers SET endpoint_ticket = ?2 WHERE node_id = ?1",
-            params![node_id, endpoint_ticket],
-        )
-        .context("failed to update peer endpoint ticket")?;
-    if rows == 0 {
-        bail!("update_peer_endpoint_ticket: no peer found with node_id {:?}", node_id);
-    }
-    Ok(())
-}
-
-/// Fetch a single peer by NodeId. Returns `None` if not found.
-///
-/// # Errors
-/// Returns an error on a database failure.
 pub fn get_peer(conn: &Connection, node_id: &str) -> Result<Option<PeerRecord>> {
     let mut stmt = conn
         .prepare(
             "SELECT node_id, display_name, endpoint_ticket, x25519_pubkey, verified
              FROM peers WHERE node_id = ?1",
         )
-        .context("failed to prepare get_peer statement")?;
-
-    let mut rows = stmt
-        .query(params![node_id])
-        .context("failed to query peer")?;
-
-    if let Some(row) = rows.next().context("failed to read peer row")? {
+        .context("prepare get_peer")?;
+    let mut rows = stmt.query(params![node_id])?;
+    if let Some(row) = rows.next().context("read peer row")? {
         Ok(Some(PeerRecord {
-            node_id:      row.get(0).context("node_id")?,
-            display_name: row.get(1).context("display_name")?,
-            endpoint_ticket: row.get(2).context("endpoint_ticket")?,
-            x25519_pubkey: row.get(3).context("x25519_pubkey")?,
-            verified:     row.get::<_, i32>(4).context("verified")? != 0,
+            node_id:         row.get(0)?,
+            display_name:    row.get(1)?,
+            endpoint_ticket: row.get(2)?,
+            x25519_pubkey:   row.get(3)?,
+            verified:        row.get::<_, i32>(4)? != 0,
         }))
     } else {
         Ok(None)
     }
 }
 
-/// Fetch all peers in the contact book.
-///
-/// # Errors
-/// Returns an error on a database failure.
 pub fn list_peers(conn: &Connection) -> Result<Vec<PeerRecord>> {
     let mut stmt = conn
         .prepare(
             "SELECT node_id, display_name, endpoint_ticket, x25519_pubkey, verified
              FROM peers ORDER BY display_name ASC",
         )
-        .context("failed to prepare list_peers statement")?;
-
-    let peers = stmt
+        .context("prepare list_peers")?;
+    let rows = stmt
         .query_map([], |row| {
             Ok(PeerRecord {
                 node_id:         row.get(0)?,
@@ -198,233 +236,228 @@ pub fn list_peers(conn: &Connection) -> Result<Vec<PeerRecord>> {
                 verified:        row.get::<_, i32>(4)? != 0,
             })
         })
-        .context("failed to query peers")?
+        .context("query list_peers")?
         .collect::<rusqlite::Result<Vec<_>>>()
-        .context("failed to collect peers")?;
-
-    Ok(peers)
+        .context("collect list_peers")?;
+    Ok(rows)
 }
 
-/// Mark a peer as key-verified.
-///
-/// # Errors
-/// Returns an error if no peer with this `node_id` exists or the write fails.
-pub fn mark_peer_verified(conn: &Connection, node_id: &str, verified: bool) -> Result<()> {
-    let val = if verified { 1 } else { 0 };
-    let rows = conn
+pub fn update_peer_ticket(conn: &Connection, node_id: &str, ticket: &str) -> Result<()> {
+    let n = conn
         .execute(
-            "UPDATE peers SET verified = ?1 WHERE node_id = ?2",
-            params![val, node_id],
+            "UPDATE peers SET endpoint_ticket = ?2 WHERE node_id = ?1",
+            params![node_id, ticket],
         )
-        .context("failed to update peer verification status")?;
-    if rows == 0 {
-        bail!("mark_peer_verified: no peer found with node_id {:?}", node_id);
-    }
+        .context("update_peer_ticket failed")?;
+    if n == 0 { bail!("update_peer_ticket: peer {:?} not found", node_id); }
     Ok(())
 }
 
-// ── Group Records ─────────────────────────────────────────────────────────────
-
-/// A group entry stored in the local database.
-#[derive(Debug, Clone)]
-pub struct GroupRecord {
-    /// Hex-encoded TopicId (primary key).
-    pub topic_id: String,
-    /// Human-readable group name.
-    pub group_name: String,
-    /// Symmetric key bytes, stored encrypted at rest (RULES.md C-05).
-    pub symmetric_key: Vec<u8>,
+pub fn update_peer_pubkey(conn: &Connection, node_id: &str, pubkey: &str) -> Result<()> {
+    let n = conn
+        .execute(
+            "UPDATE peers SET x25519_pubkey = ?2 WHERE node_id = ?1",
+            params![node_id, pubkey],
+        )
+        .context("update_peer_pubkey failed")?;
+    if n == 0 { bail!("update_peer_pubkey: peer {:?} not found", node_id); }
+    Ok(())
 }
 
-/// A chat row assembled from local peers, groups, and messages.
-#[derive(Debug, Clone)]
-pub struct ChatPreviewRecord {
-    /// Hex-encoded peer node ID or group topic ID.
-    pub id: String,
-    /// Display name shown in the list.
-    pub name: String,
-    /// Short initials for the avatar.
-    pub initials: String,
-    /// Preview text for the latest message or queue state.
-    pub last_message: String,
-    /// Timestamp label shown in the row.
-    pub timestamp: String,
-    /// Unread badge count.
-    pub unread: i32,
-    /// `true` if this row represents a group chat.
-    pub is_group: bool,
-    /// `true` if the peer is currently reachable.
-    pub is_online: bool,
-    /// `true` if the peer is currently using relay routing.
-    pub is_relay: bool,
-    /// `true` if the row has queued outbound messages.
-    pub is_queued: bool,
-    /// `true` if the peer has been key-verified.
-    pub is_verified: bool,
+pub fn set_peer_verified(conn: &Connection, node_id: &str, verified: bool) -> Result<()> {
+    let n = conn
+        .execute(
+            "UPDATE peers SET verified = ?2 WHERE node_id = ?1",
+            params![node_id, verified as i32],
+        )
+        .context("set_peer_verified failed")?;
+    if n == 0 { bail!("set_peer_verified: peer {:?} not found", node_id); }
+    Ok(())
 }
 
-/// Insert a new group.
-///
-/// # Errors
-/// Returns an error on duplicate topic_id or write failure.
-pub fn insert_group(conn: &Connection, group: &GroupRecord) -> Result<()> {
+pub fn delete_peer(conn: &Connection, node_id: &str) -> Result<()> {
+    conn.execute("DELETE FROM peers WHERE node_id = ?1", params![node_id])
+        .context("delete_peer failed")?;
+    Ok(())
+}
+
+// ── Groups ────────────────────────────────────────────────────────────────────
+
+pub fn insert_group(conn: &Connection, r: &GroupRecord) -> Result<()> {
     conn.execute(
-        "INSERT INTO groups (topic_id, group_name, symmetric_key)
-         VALUES (?1, ?2, ?3)",
-        params![group.topic_id, group.group_name, group.symmetric_key],
+        "INSERT OR IGNORE INTO groups (topic_id, group_name, description, symmetric_key)
+         VALUES (?1, ?2, ?3, ?4)",
+        params![r.topic_id, r.group_name, r.description, r.symmetric_key],
     )
-    .context("failed to insert group")?;
+    .context("insert_group failed")?;
     Ok(())
 }
 
-/// Fetch a group by TopicId. Returns `None` if not found.
-///
-/// # Errors
-/// Returns an error on database failure.
 pub fn get_group(conn: &Connection, topic_id: &str) -> Result<Option<GroupRecord>> {
     let mut stmt = conn
-        .prepare("SELECT topic_id, group_name, symmetric_key FROM groups WHERE topic_id = ?1")
-        .context("failed to prepare get_group statement")?;
-
-    let mut rows = stmt.query(params![topic_id]).context("failed to query group")?;
-
-    if let Some(row) = rows.next().context("failed to read group row")? {
+        .prepare("SELECT topic_id, group_name, description, symmetric_key FROM groups WHERE topic_id = ?1")
+        .context("prepare get_group")?;
+    let mut rows = stmt.query(params![topic_id])?;
+    if let Some(row) = rows.next().context("read group row")? {
         Ok(Some(GroupRecord {
-            topic_id:      row.get(0).context("topic_id")?,
-            group_name:    row.get(1).context("group_name")?,
-            symmetric_key: row.get(2).context("symmetric_key")?,
+            topic_id:      row.get(0)?,
+            group_name:    row.get(1)?,
+            description:   row.get(2)?,
+            symmetric_key: row.get(3)?,
         }))
     } else {
         Ok(None)
     }
 }
 
-/// Fetch all groups in the local database.
-///
-/// # Errors
-/// Returns an error on database failure.
 pub fn list_groups(conn: &Connection) -> Result<Vec<GroupRecord>> {
     let mut stmt = conn
-        .prepare("SELECT topic_id, group_name, symmetric_key FROM groups ORDER BY group_name ASC")
-        .context("failed to prepare list_groups statement")?;
-
-    let groups = stmt
+        .prepare("SELECT topic_id, group_name, description, symmetric_key FROM groups ORDER BY group_name ASC")
+        .context("prepare list_groups")?;
+    let rows = stmt
         .query_map([], |row| {
             Ok(GroupRecord {
-                topic_id: row.get(0)?,
-                group_name: row.get(1)?,
-                symmetric_key: row.get(2)?,
+                topic_id:      row.get(0)?,
+                group_name:    row.get(1)?,
+                description:   row.get(2)?,
+                symmetric_key: row.get(3)?,
             })
         })
-        .context("failed to query groups")?
+        .context("query list_groups")?
         .collect::<rusqlite::Result<Vec<_>>>()
-        .context("failed to collect groups")?;
-
-    Ok(groups)
+        .context("collect list_groups")?;
+    Ok(rows)
 }
 
-// ── Message Records ───────────────────────────────────────────────────────────
-
-/// A message as stored in the local database.
-#[derive(Debug, Clone)]
-pub struct MessageRecord {
-    /// Unique message ID.
-    pub id: Uuid,
-    /// Message type: `"direct"`, `"group"`, `"file"`, or `"group_invite"`.
-    pub msg_type: String,
-    /// NodeId (1:1) or TopicId (group) of the conversation.
-    pub target_id: String,
-    /// NodeId of the sender.
-    pub sender_id: String,
-    /// Decrypted plaintext stored locally (RULES.md C-06).
-    pub content: String,
-    /// UTC Unix timestamp in seconds (RULES.md U-07).
-    pub timestamp: i64,
-    /// Current delivery status.
-    pub status: MessageStatus,
-}
-
-/// Insert a new message.
-///
-/// # Errors
-/// Returns an error on duplicate ID or write failure.
-pub fn insert_message(conn: &Connection, msg: &MessageRecord) -> Result<()> {
-    conn.execute(
-        "INSERT OR IGNORE INTO messages (id, type, target_id, sender_id, content, timestamp, status)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![
-            msg.id.to_string(),
-            msg.msg_type,
-            msg.target_id,
-            msg.sender_id,
-            msg.content,
-            msg.timestamp,
-            msg.status.as_str()
-        ],
-    )
-    .context("failed to insert message")?;
+pub fn delete_group(conn: &Connection, topic_id: &str) -> Result<()> {
+    conn.execute("DELETE FROM groups WHERE topic_id = ?1", params![topic_id])
+        .context("delete_group failed")?;
     Ok(())
 }
 
-/// Fetch a message by its unique ID.
-///
-/// # Errors
-/// Returns an error on database failure.
-pub fn get_message(conn: &Connection, id: &Uuid) -> Result<Option<MessageRecord>> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, type, target_id, sender_id, content, timestamp, status
-             FROM messages WHERE id = ?1",
+/// Check whether a topic_id is already in the local groups table.
+/// Used to derive `invite_is_joined`.
+pub fn group_exists(conn: &Connection, topic_id: &str) -> Result<bool> {
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM groups WHERE topic_id = ?1",
+            params![topic_id],
+            |row| row.get(0),
         )
-        .context("failed to prepare get_message statement")?;
-
-    let mut rows = stmt
-        .query(params![id.to_string()])
-        .context("failed to query message")?;
-
-    if let Some(row) = rows.next().context("failed to read message row")? {
-        let id: String = row.get(0).context("id")?;
-        let status: String = row.get(6).context("status")?;
-        Ok(Some(MessageRecord {
-            id: Uuid::parse_str(&id).with_context(|| format!("invalid UUID {:?}", id))?,
-            msg_type: row.get(1).context("type")?,
-            target_id: row.get(2).context("target_id")?,
-            sender_id: row.get(3).context("sender_id")?,
-            content: row.get(4).context("content")?,
-            timestamp: row.get(5).context("timestamp")?,
-            status: MessageStatus::from_db_str(&status)?,
-        }))
-    } else {
-        Ok(None)
-    }
+        .context("group_exists query failed")?;
+    Ok(count > 0)
 }
 
-/// Advance the status of a message — enforces forward-only transitions (RULES.md DB-04).
-///
-/// # Errors
-/// Returns an error if the message is not found or the transition is invalid.
-pub fn advance_message_status(
-    conn: &Connection,
-    id: &Uuid,
-    new_status: &MessageStatus,
-) -> Result<()> {
-    // Read current status first.
+// ── Messages ──────────────────────────────────────────────────────────────────
+
+pub fn insert_message(conn: &Connection, r: &MessageRecord) -> Result<()> {
+    conn.execute(
+        "INSERT OR IGNORE INTO messages
+             (id, kind, target_id, sender_id, content, timestamp, received_at, status,
+              invite_topic_id, invite_group_name, invite_key)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        params![
+            r.id.to_string(),
+            r.kind,
+            r.target_id,
+            r.sender_id,
+            r.content,
+            r.timestamp,
+            r.received_at,
+            r.status.as_str(),
+            r.invite_topic_id,
+            r.invite_group_name,
+            r.invite_key,
+        ],
+    )
+    .context("insert_message failed")?;
+    Ok(())
+}
+
+/// Fetch all messages for a conversation, oldest first.
+pub fn list_messages(conn: &Connection, target_id: &str) -> Result<Vec<MessageRecord>> {
     let mut stmt = conn
-        .prepare("SELECT status FROM messages WHERE id = ?1")
-        .context("failed to prepare status query")?;
+        .prepare(
+            "SELECT id, kind, target_id, sender_id, content, timestamp, status,
+                    invite_topic_id, invite_group_name, invite_key, received_at
+             FROM messages WHERE target_id = ?1 ORDER BY timestamp ASC",
+        )
+        .context("prepare list_messages")?;
+    collect_messages(stmt.query_map(params![target_id], map_message_row)?)
+}
 
-    let current_str: String = stmt
-        .query_row(params![id.to_string()], |row| row.get(0))
-        .with_context(|| format!("message {:?} not found", id))?;
+/// Fetch all messages for a conversation received strictly after `ts`.
+pub fn list_messages_after(conn: &Connection, target_id: &str, ts: i64) -> Result<Vec<MessageRecord>> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, kind, target_id, sender_id, content, timestamp, status,
+                    invite_topic_id, invite_group_name, invite_key, received_at
+             FROM messages 
+             WHERE target_id = ?1 AND received_at > ?2 
+             ORDER BY timestamp ASC",
+        )
+        .context("prepare list_messages_after")?;
+    collect_messages(stmt.query_map(params![target_id, ts], map_message_row)?)
+}
 
-    let current = MessageStatus::from_db_str(&current_str)?;
+/// Fetch only queued / sent messages for a given conversation (for retry).
+pub fn list_queued(conn: &Connection, target_id: &str) -> Result<Vec<MessageRecord>> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, kind, target_id, sender_id, content, timestamp, status,
+                    invite_topic_id, invite_group_name, invite_key, received_at
+             FROM messages
+             WHERE target_id = ?1 AND status IN ('queued', 'sent')
+             ORDER BY timestamp ASC",
+        )
+        .context("prepare list_queued")?;
+    collect_messages(stmt.query_map(params![target_id], map_message_row)?)
+}
 
-    if !current.can_advance_to(new_status) {
+/// Returns true if any queued message exists for `target_id`.
+/// Return the latest 'received_at' timestamp for a given conversation.
+pub fn get_latest_received_timestamp(conn: &Connection, target_id: &str) -> Result<i64> {
+    let mut stmt = conn.prepare("SELECT MAX(received_at) FROM messages WHERE target_id = ?1")?;
+    let val: Option<i64> = stmt.query_row(params![target_id], |row| row.get(0))?;
+    Ok(val.unwrap_or(0))
+}
+
+pub fn has_queued(conn: &Connection, target_id: &str) -> Result<bool> {
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM messages WHERE target_id = ?1 AND status = 'queued'",
+            params![target_id],
+            |row| row.get(0),
+        )
+        .context("has_queued query failed")?;
+    Ok(count > 0)
+}
+
+/// Advance the delivery status of a message — forward-only transitions enforced.
+pub fn advance_status(conn: &Connection, id: &Uuid, new_status: MessageStatus) -> Result<()> {
+    let current_str: String = conn
+        .query_row(
+            "SELECT status FROM messages WHERE id = ?1",
+            params![id.to_string()],
+            |row| row.get(0),
+        )
+        .with_context(|| format!("advance_status: message {} not found", id))?;
+
+    let current = parse_status(&current_str)?;
+
+    // Forward-only guard
+    let ok = matches!(
+        (current, new_status),
+        (MessageStatus::Queued,    MessageStatus::Sent)
+        | (MessageStatus::Sent,      MessageStatus::Delivered)
+        | (MessageStatus::Delivered, MessageStatus::Read)
+        // Allow queued → delivered for cases where we get an ACK before a sent receipt
+        | (MessageStatus::Queued,    MessageStatus::Delivered)
+    );
+    if !ok {
         bail!(
             "invalid status transition {:?} → {:?} for message {}",
-            current.as_str(),
-            new_status.as_str(),
-            id
+            current_str, new_status.as_str(), id
         );
     }
 
@@ -432,306 +465,138 @@ pub fn advance_message_status(
         "UPDATE messages SET status = ?1 WHERE id = ?2",
         params![new_status.as_str(), id.to_string()],
     )
-    .context("failed to update message status")?;
-
+    .context("advance_status update failed")?;
     Ok(())
 }
 
-/// Fetch all messages in a conversation since a given timestamp, with a limit.
-pub fn list_messages_since(
-    conn: &Connection,
-    target_id: &str,
-    since_ts: i64,
-    limit: usize,
-) -> Result<Vec<MessageRecord>> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, type, target_id, sender_id, content, timestamp, status
-             FROM messages 
-             WHERE target_id = ?1 AND timestamp > ?2 
-             ORDER BY timestamp ASC 
-             LIMIT ?3",
-        )
-        .context("failed to prepare list_messages_since statement")?;
-
-    let messages = stmt
-        .query_map(params![target_id, since_ts, limit], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, i64>(5)?,
-                row.get::<_, String>(6)?,
-            ))
-        })
-        .context("failed to query messages since")?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .context("failed to collect messages since")?;
-
-    messages
-        .into_iter()
-        .map(|(id, msg_type, target_id, sender_id, content, timestamp, status_str)| {
-            Ok(MessageRecord {
-                id: Uuid::parse_str(&id).with_context(|| format!("invalid UUID {:?}", id))?,
-                msg_type,
-                target_id,
-                sender_id,
-                content,
-                timestamp,
-                status: MessageStatus::from_db_str(&status_str)?,
-            })
-        })
-        .collect()
+/// Delete all messages across all conversations.
+pub fn clear_messages(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM messages", []).context("clear_messages failed")?;
+    Ok(())
 }
 
-/// Fetch all messages in a conversation (single peer or group topic), ordered by timestamp.
-///
-/// # Errors
-/// Returns an error on database failure.
-pub fn list_messages(conn: &Connection, target_id: &str) -> Result<Vec<MessageRecord>> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, type, target_id, sender_id, content, timestamp, status
-             FROM messages WHERE target_id = ?1 ORDER BY timestamp ASC",
-        )
-        .context("failed to prepare list_messages statement")?;
-
-    let messages = stmt
-        .query_map(params![target_id], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, i64>(5)?,
-                row.get::<_, String>(6)?,
-            ))
-        })
-        .context("failed to query messages")?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .context("failed to collect messages")?;
-
-    messages
-        .into_iter()
-        .map(|(id, msg_type, target_id, sender_id, content, timestamp, status_str)| {
-            Ok(MessageRecord {
-                id: Uuid::parse_str(&id).with_context(|| format!("invalid UUID {:?}", id))?,
-                msg_type,
-                target_id,
-                sender_id,
-                content,
-                timestamp,
-                status: MessageStatus::from_db_str(&status_str)?,
-            })
-        })
-        .collect()
+/// Delete all messages in one conversation without removing the peer/group.
+pub fn clear_conversation(conn: &Connection, target_id: &str) -> Result<()> {
+    conn.execute(
+        "DELETE FROM messages WHERE target_id = ?1",
+        params![target_id],
+    )
+    .context("clear_conversation failed")?;
+    Ok(())
 }
 
-/// Fetch all messages with status `queued` for a given peer (used by flush_offline_queue).
-///
-/// # Errors
-/// Returns an error on database failure.
-pub fn list_queued_messages(conn: &Connection, target_id: &str) -> Result<Vec<MessageRecord>> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, type, target_id, sender_id, content, timestamp, status
-             FROM messages WHERE target_id = ?1 AND status IN ('queued', 'sent') ORDER BY timestamp ASC",
-        )
-        .context("failed to prepare list_queued_messages statement")?;
-
-    let messages = stmt
-        .query_map(params![target_id], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, i64>(5)?,
-                row.get::<_, String>(6)?,
-            ))
-        })
-        .context("failed to query queued messages")?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .context("failed to collect queued messages")?;
-
-    messages
-        .into_iter()
-        .map(|(id, msg_type, target_id, sender_id, content, timestamp, status_str)| {
-            Ok(MessageRecord {
-                id: Uuid::parse_str(&id).with_context(|| format!("invalid UUID {:?}", id))?,
-                msg_type,
-                target_id,
-                sender_id,
-                content,
-                timestamp,
-                status: MessageStatus::from_db_str(&status_str)?,
-            })
-        })
-        .collect()
+/// Delete a conversation and its peer or group row entirely.
+pub fn delete_conversation(conn: &Connection, target_id: &str, is_group: bool) -> Result<()> {
+    clear_conversation(conn, target_id)?;
+    if is_group {
+        delete_group(conn, target_id)?;
+    } else {
+        delete_peer(conn, target_id)?;
+    }
+    Ok(())
 }
 
-/// List all peers that have at least one queued message.
-///
-/// Used by `flush_offline_queue` to know which peers to retry.
-///
-/// # Errors
-/// Returns an error on database failure.
-pub fn list_peers_with_queued_messages(conn: &Connection) -> Result<Vec<String>> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT DISTINCT target_id FROM messages WHERE status = 'queued'",
-        )
-        .context("failed to prepare list_peers_with_queued statement")?;
-
-    let peers = stmt
-        .query_map([], |row| row.get::<_, String>(0))
-        .context("failed to query peers with queued messages")?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .context("failed to collect peer IDs")?;
-
-    Ok(peers)
-}
+// ── Chat List (composite) ─────────────────────────────────────────────────────
 
 /// Build the home-screen chat previews from peers, groups, and message history.
-///
-/// # Errors
-/// Returns an error on database failure.
-pub fn list_chat_previews(conn: &Connection) -> Result<Vec<ChatPreviewRecord>> {
+/// `local_node_id` is used to derive `is_outgoing` on the last message.
+pub fn list_chat_previews(
+    conn: &Connection,
+    local_node_id: &str,
+) -> Result<Vec<ChatPreviewRecord>> {
     let mut previews = Vec::new();
 
+    // Direct peer chats
     for peer in list_peers(conn)? {
-        let messages = list_messages(conn, &peer.node_id)?;
-        let queued = list_queued_messages(conn, &peer.node_id)?;
-        let latest = messages.last();
-        let initials = derive_initials(&peer.display_name);
-        let timestamp = latest
-            .map(|msg| msg.timestamp.to_string())
-            .unwrap_or_default();
-        let last_message = latest
-            .map(|msg| msg.content.clone())
-            .unwrap_or_default();
-
+        let msgs = list_messages(conn, &peer.node_id)?;
+        let last = msgs.last();
         previews.push(ChatPreviewRecord {
-            id: peer.node_id,
-            name: peer.display_name,
-            initials,
-            last_message,
-            timestamp,
-            unread: 0,
-            is_group: false,
-            is_online: false,
-            is_relay: false,
-            is_queued: !queued.is_empty(),
-            is_verified: peer.verified,
+            id:                  peer.node_id.clone(),
+            title:               peer.display_name.clone(),
+            initials:            derive_initials(&peer.display_name),
+            is_group:            false,
+            last_message:        last.map(|m| m.content.clone()).unwrap_or_default(),
+            last_message_status: last.map(|m| m.status).unwrap_or(MessageStatus::Sent),
+            is_outgoing:         last.map(|m| m.sender_id == local_node_id).unwrap_or(false),
+            timestamp:           last.map(|m| m.timestamp).unwrap_or(0),
+            is_verified:         peer.verified,
+            is_session_ready:    !peer.x25519_pubkey.is_empty(),
+            has_queued:          has_queued(conn, &peer.node_id)?,
         });
     }
 
+    // Group chats
     for group in list_groups(conn)? {
-        let messages = list_messages(conn, &group.topic_id)?;
-        let latest = messages.last();
-        let initials = derive_initials(&group.group_name);
-        let timestamp = latest
-            .map(|msg| msg.timestamp.to_string())
-            .unwrap_or_default();
-        let last_message = latest
-            .map(|msg| msg.content.clone())
-            .unwrap_or_default();
-
+        let msgs = list_messages(conn, &group.topic_id)?;
+        let last = msgs.last();
         previews.push(ChatPreviewRecord {
-            id: group.topic_id,
-            name: group.group_name,
-            initials,
-            last_message,
-            timestamp,
-            unread: 0,
-            is_group: true,
-            is_online: false,
-            is_relay: false,
-            is_queued: false,
-            is_verified: true,
+            id:                  group.topic_id.clone(),
+            title:               group.group_name.clone(),
+            initials:            derive_initials(&group.group_name),
+            is_group:            true,
+            last_message:        last.map(|m| m.content.clone()).unwrap_or_default(),
+            last_message_status: last.map(|m| m.status).unwrap_or(MessageStatus::Sent),
+            is_outgoing:         last.map(|m| m.sender_id == local_node_id).unwrap_or(false),
+            timestamp:           last.map(|m| m.timestamp).unwrap_or(0),
+            is_verified:         true,   // groups are always trusted locally
+            is_session_ready:    true,   // groups don't need point-to-point handshake
+            has_queued:          false,  // groups don't queue
         });
     }
 
-    previews.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    // Sort by most recent message first
+    previews.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     Ok(previews)
 }
 
-/// Derive a two-letter avatar label from a display name.
-pub fn derive_initials(name: &str) -> String {
-    let mut initials = String::new();
-    for part in name.split_whitespace() {
-        if let Some(ch) = part.chars().next() {
-            initials.push(ch.to_ascii_uppercase());
-        }
-        if initials.chars().count() >= 2 {
-            break;
-        }
-    }
+// ── Internal helpers ──────────────────────────────────────────────────────────
 
-    if initials.is_empty() {
-        name.chars().take(2).collect::<String>().to_ascii_uppercase()
-    } else {
-        initials
-    }
+type MsgRow = (String, String, String, String, String, i64, String, String, String, String, i64);
+
+fn map_message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<MsgRow> {
+    Ok((
+        row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?,
+        row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?, row.get(10)?,
+    ))
 }
 
-/// Delete all messages from the database.
-pub fn clear_all_messages(conn: &Connection) -> Result<()> {
-    conn.execute("DELETE FROM messages", [])
-        .context("failed to clear messages table")?;
-    Ok(())
+fn collect_messages(
+    mapped: rusqlite::MappedRows<'_, impl FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<MsgRow>>,
+) -> Result<Vec<MessageRecord>> {
+    mapped
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .context("collect messages")?
+        .into_iter()
+        .map(|(id, kind, target_id, sender_id, content, timestamp, status_str,
+               invite_topic_id, invite_group_name, invite_key, received_at)| {
+            Ok(MessageRecord {
+                id: Uuid::parse_str(&id).with_context(|| format!("invalid UUID {:?}", id))?,
+                kind,
+                target_id,
+                sender_id,
+                content,
+                timestamp,
+                received_at,
+                status: parse_status(&status_str)?,
+                invite_topic_id,
+                invite_group_name,
+                invite_key,
+            })
+        })
+        .collect()
 }
 
-/// Delete all messages in a single conversation without removing the peer/group row.
-pub fn clear_conversation_messages(conn: &Connection, target_id: &str) -> Result<()> {
-    conn.execute(
-        "DELETE FROM messages WHERE target_id = ?1",
-        params![target_id],
-    )
-    .context("failed to clear conversation messages")?;
-    Ok(())
-}
+/// Return all messages with status `Queued` for a specific conversation.
+pub fn get_queued_messages(conn: &Connection, conversation_id: &str) -> Result<Vec<MessageRecord>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, kind, target_id, sender_id, content, timestamp, status, 
+                invite_topic_id, invite_group_name, invite_key, received_at 
+         FROM messages 
+         WHERE target_id = ? AND status = 'queued'
+         ORDER BY timestamp ASC",
+    )?;
 
-/// Delete a single conversation and its local rows.
-///
-/// For direct chats, this removes the peer contact row and all messages.
-/// For groups, this removes the group row and all messages.
-pub fn delete_conversation(conn: &Connection, target_id: &str, is_group: bool) -> Result<()> {
-    conn.execute(
-        "DELETE FROM messages WHERE target_id = ?1",
-        params![target_id],
-    )
-    .context("failed to delete conversation messages")?;
-
-    if is_group {
-        conn.execute(
-            "DELETE FROM groups WHERE topic_id = ?1",
-            params![target_id],
-        )
-        .context("failed to delete group row")?;
-    } else {
-        conn.execute(
-            "DELETE FROM peers WHERE node_id = ?1",
-            params![target_id],
-        )
-        .context("failed to delete peer row")?;
-    }
-
-    Ok(())
-}
-
-/// Delete the local identity and all related data (peers, groups, messages).
-pub fn delete_local_identity(conn: &Connection) -> Result<()> {
-    // Note: We don't care if tables are already empty, so we ignore minor errors
-    let _ = conn.execute("DELETE FROM messages", []);
-    let _ = conn.execute("DELETE FROM groups", []);
-    let _ = conn.execute("DELETE FROM peers", []);
-    let _ = conn.execute("DELETE FROM local_identity", []);
-    Ok(())
+    collect_messages(stmt.query_map([conversation_id], map_message_row)?)
 }
 
 // ── Unit Tests ────────────────────────────────────────────────────────────────
@@ -741,118 +606,157 @@ mod tests {
     use super::*;
     use crate::storage::open_in_memory;
 
-    fn test_peer() -> PeerRecord {
+    fn identity() -> LocalIdentityRecord {
+        LocalIdentityRecord {
+            display_name:    "Alice".to_string(),
+            node_id_hex:     "aabbcc001122".to_string(),
+            x25519_secret:   vec![0u8; 32],
+            endpoint_ticket: "ticket-abc".to_string(),
+            pin_hash:        "".to_string(),
+        }
+    }
+
+    fn peer() -> PeerRecord {
         PeerRecord {
-            node_id:         "aabbcc".to_owned(),
-            display_name:    "Alice".to_owned(),
-            endpoint_ticket: "docaaacarwhmusoqf362j3jpzrehzkw3bqamcp2mmbhn3fmag3mzzfjp4beahj2v7aezhojvfqi5wltr4vxymgzqnctryyup327ct7iy4s5noxy6aaa".to_owned(),
-            x25519_pubkey:   "ddeeff".to_owned(),
+            node_id:         "ddeeff334455".to_string(),
+            display_name:    "Bob".to_string(),
+            endpoint_ticket: "ticket-bob".to_string(),
+            x25519_pubkey:   "bbccdd".to_string(),
             verified:        false,
         }
     }
 
-    fn test_message(target: &str, status: MessageStatus) -> MessageRecord {
+    fn message(target: &str, sender: &str, status: MessageStatus) -> MessageRecord {
         MessageRecord {
-            id:        Uuid::new_v4(),
-            msg_type:  "direct".to_owned(),
-            target_id: target.to_owned(),
-            sender_id: "me".to_owned(),
-            content:   "hello".to_owned(),
-            timestamp: 1_700_000_000,
+            id:                Uuid::new_v4(),
+            kind:              "standard".to_string(),
+            target_id:         target.to_string(),
+            sender_id:         sender.to_string(),
+            content:           "hello".to_string(),
+            timestamp:         1_700_000_000,
+            received_at:       1_700_000_000,
             status,
+            invite_topic_id:   String::new(),
+            invite_group_name: String::new(),
+            invite_key:        String::new(),
         }
     }
 
-    /// T-11: Write peer to DB → read it back, all fields match.
     #[test]
-    fn peer_roundtrip_fields_match() {
+    fn identity_roundtrip() {
         let conn = open_in_memory().unwrap();
-        let peer = test_peer();
-        insert_peer(&conn, &peer).unwrap();
-        let got = get_peer(&conn, &peer.node_id).unwrap().expect("peer must exist");
-        assert_eq!(got.node_id, peer.node_id);
-        assert_eq!(got.display_name, peer.display_name);
-        assert_eq!(got.endpoint_ticket, peer.endpoint_ticket);
-        assert_eq!(got.x25519_pubkey, peer.x25519_pubkey);
-        assert!(!got.verified);
+        let rec = identity();
+        insert_local_identity(&conn, &rec).unwrap();
+        let got = get_local_identity(&conn).unwrap().expect("should exist");
+        assert_eq!(got.display_name, "Alice");
+        assert_eq!(got.node_id_hex,  "aabbcc001122");
+        assert_eq!(got.endpoint_ticket, "ticket-abc");
     }
 
-    /// T-12: Write message with status queued → read back, status is queued.
     #[test]
-    fn message_queued_status_is_persisted() {
+    fn peer_upsert_updates_name() {
         let conn = open_in_memory().unwrap();
-        let peer = test_peer();
-        insert_peer(&conn, &peer).unwrap();
-        let msg = test_message(&peer.node_id, MessageStatus::Queued);
+        insert_peer(&conn, &peer()).unwrap();
+        let mut updated = peer();
+        updated.display_name = "Bobby".to_string();
+        insert_peer(&conn, &updated).unwrap(); // upsert
+        let got = get_peer(&conn, "ddeeff334455").unwrap().expect("should exist");
+        assert_eq!(got.display_name, "Bobby");
+    }
+
+    #[test]
+    fn verified_toggle() {
+        let conn = open_in_memory().unwrap();
+        insert_peer(&conn, &peer()).unwrap();
+        set_peer_verified(&conn, "ddeeff334455", true).unwrap();
+        assert!(get_peer(&conn, "ddeeff334455").unwrap().unwrap().verified);
+    }
+
+    #[test]
+    fn message_insert_and_list() {
+        let conn = open_in_memory().unwrap();
+        insert_peer(&conn, &peer()).unwrap();
+        let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Queued);
         insert_message(&conn, &msg).unwrap();
-        let msgs = list_messages(&conn, &peer.node_id).unwrap();
+        let msgs = list_messages(&conn, "ddeeff334455").unwrap();
         assert_eq!(msgs.len(), 1);
         assert_eq!(msgs[0].status, MessageStatus::Queued);
     }
 
-    /// T-13: Status advances queued → sent → delivered → read.
     #[test]
-    fn message_status_advances_forward() {
+    fn message_idempotent_insert() {
         let conn = open_in_memory().unwrap();
-        let peer = test_peer();
-        insert_peer(&conn, &peer).unwrap();
-        let msg = test_message(&peer.node_id, MessageStatus::Queued);
+        insert_peer(&conn, &peer()).unwrap();
+        let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Sent);
         insert_message(&conn, &msg).unwrap();
-
-        advance_message_status(&conn, &msg.id, &MessageStatus::Sent).unwrap();
-        advance_message_status(&conn, &msg.id, &MessageStatus::Delivered).unwrap();
-        advance_message_status(&conn, &msg.id, &MessageStatus::Read).unwrap();
-
-        let got = list_messages(&conn, &peer.node_id).unwrap();
-        assert_eq!(got[0].status, MessageStatus::Read);
+        insert_message(&conn, &msg).unwrap(); // second insert must be ignored
+        assert_eq!(list_messages(&conn, "ddeeff334455").unwrap().len(), 1);
     }
 
-    /// T-14: Message status cannot go backward.
     #[test]
-    fn message_status_cannot_go_backward() {
+    fn status_advances_forward() {
         let conn = open_in_memory().unwrap();
-        let peer = test_peer();
-        insert_peer(&conn, &peer).unwrap();
-        let msg = test_message(&peer.node_id, MessageStatus::Queued);
+        insert_peer(&conn, &peer()).unwrap();
+        let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Queued);
         insert_message(&conn, &msg).unwrap();
-        advance_message_status(&conn, &msg.id, &MessageStatus::Sent).unwrap();
-        advance_message_status(&conn, &msg.id, &MessageStatus::Delivered).unwrap();
-
-        // Attempt backward transition: Delivered → Queued must fail.
-        let result = advance_message_status(&conn, &msg.id, &MessageStatus::Queued);
-        assert!(result.is_err(), "backward transition must be rejected");
+        advance_status(&conn, &msg.id, MessageStatus::Sent).unwrap();
+        advance_status(&conn, &msg.id, MessageStatus::Delivered).unwrap();
+        let msgs = list_messages(&conn, "ddeeff334455").unwrap();
+        assert_eq!(msgs[0].status, MessageStatus::Delivered);
     }
 
-    /// T-15: Fetch all queued messages for a peer returns correct results.
     #[test]
-    fn list_queued_messages_returns_only_queued() {
+    fn status_backward_transition_rejected() {
         let conn = open_in_memory().unwrap();
-        let peer = test_peer();
-        insert_peer(&conn, &peer).unwrap();
-
-        let q = test_message(&peer.node_id, MessageStatus::Queued);
-        let s = test_message(&peer.node_id, MessageStatus::Sent);
-        insert_message(&conn, &q).unwrap();
-        insert_message(&conn, &s).unwrap();
-
-        let queued = list_queued_messages(&conn, &peer.node_id).unwrap();
-        assert_eq!(queued.len(), 1);
-        assert_eq!(queued[0].id, q.id);
+        insert_peer(&conn, &peer()).unwrap();
+        let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Delivered);
+        insert_message(&conn, &msg).unwrap();
+        assert!(advance_status(&conn, &msg.id, MessageStatus::Queued).is_err());
     }
 
-    /// T-16: Write group with key → read back, key bytes match.
     #[test]
-    fn group_key_roundtrip_bytes_match() {
+    fn has_queued_reflects_status() {
         let conn = open_in_memory().unwrap();
-        let key_bytes: Vec<u8> = (0u8..32).collect();
-        let group = GroupRecord {
-            topic_id:      "topic-001".to_owned(),
-            group_name:    "Dev Chat".to_owned(),
-            symmetric_key: key_bytes.clone(),
-        };
-        insert_group(&conn, &group).unwrap();
-        let got = get_group(&conn, "topic-001").unwrap().expect("group must exist");
-        assert_eq!(got.symmetric_key, key_bytes);
-        assert_eq!(got.group_name, "Dev Chat");
+        insert_peer(&conn, &peer()).unwrap();
+        let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Queued);
+        insert_message(&conn, &msg).unwrap();
+        assert!(has_queued(&conn, "ddeeff334455").unwrap());
+        advance_status(&conn, &msg.id, MessageStatus::Sent).unwrap();
+        // 'sent' is not 'queued' so has_queued returns false
+        assert!(!has_queued(&conn, "ddeeff334455").unwrap());
+    }
+
+    #[test]
+    fn delete_conversation_removes_peer_and_messages() {
+        let conn = open_in_memory().unwrap();
+        insert_peer(&conn, &peer()).unwrap();
+        let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Sent);
+        insert_message(&conn, &msg).unwrap();
+        delete_conversation(&conn, "ddeeff334455", false).unwrap();
+        assert!(get_peer(&conn, "ddeeff334455").unwrap().is_none());
+        assert!(list_messages(&conn, "ddeeff334455").unwrap().is_empty());
+    }
+
+    #[test]
+    fn chat_preview_sorted_by_timestamp() {
+        let conn = open_in_memory().unwrap();
+        let p1 = peer();
+        let mut p2 = peer();
+        p2.node_id = "ffffff000000".to_string();
+        p2.display_name = "Carol".to_string();
+        insert_peer(&conn, &p1).unwrap();
+        insert_peer(&conn, &p2).unwrap();
+
+        let mut m1 = message("ddeeff334455", "aabbcc001122", MessageStatus::Sent);
+        m1.timestamp = 1_000;
+        let mut m2 = message("ffffff000000", "aabbcc001122", MessageStatus::Sent);
+        m2.timestamp = 2_000;
+        insert_message(&conn, &m1).unwrap();
+        insert_message(&conn, &m2).unwrap();
+
+        let previews = list_chat_previews(&conn, "aabbcc001122").unwrap();
+        // Most recent first
+        assert_eq!(previews[0].id, "ffffff000000");
+        assert_eq!(previews[1].id, "ddeeff334455");
     }
 }

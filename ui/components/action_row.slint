@@ -1,24 +1,235 @@
+// NodeChat New — Unified Action Row Component
+// ---------------------------------------------------------
+// Standardised row for all list-oriented surfaces:
+//   - Chat List (Preview + Badge + Timestamp)
+//   - Contacts (Avatar + Status + Verified)
+//   - Settings (Icon + Action Toggle)
+// Supports compact (Rail) and expanded layouts.
+// ---------------------------------------------------------
+
+import { AppTheme } from "../theme.slint";
+
 export component ActionRow inherits Rectangle {
-    in property <string> label: "";
-    in property <color> background-color;
-    in property <color> text-color;
-    in property <length> font-size: 16px;
-
+    // --- Data Properties ---
+    in property <string> title;
+    in property <string> subtitle;
+    in property <string> initials;    // Set for Avatar Mode
+    in property <string> icon;        // Text icon (Emoji)
+    in property <image> icon-svg: @image-url(""); // Set for Settings Mode
+    in property <string> timestamp;
+    in property <int> badge-count: 0;
+    in property <int> member-count: 0;
+    
+    // --- State Properties ---
+    in property <bool> is-online: false;
+    in property <bool> is-session-ready: true;
+    in property <bool> has-queued-messages: false;
+    in property <bool> is-relay: false;
+    in property <bool> is-verified: false;
+    in property <bool> is-selected: false;
+    in property <bool> is-danger: false;
+    in property <bool> compact: false;
+    
+    // --- Last Message Status (Chat List Mode) ---
+    in property <bool> is-last-message-outgoing: false;
+    in property <string> last-message-status: ""; // "sent", "delivered", "failed", "queued"
+    
+    // --- Appearance ---
+    in property <string> accessory: "none"; // "arrow", "toggle", "checkbox", "copy", "none"
+    in property <bool> is-toggle-on: false;
+    in property <bool> show-copied: false;
+    in property <color> icon-color: root.is-danger ? AppTheme.accent-danger : AppTheme.accent;
+    
+    // --- Callbacks ---
     callback clicked();
+    callback toggled(bool);
 
-    height: 56px;
-    border-radius: 18px;
-    background: background-color;
+    // --- Layout Constants ---
+    property <length> item-height: root.compact ? 60px : (subtitle != "" ? 72px : 64px); 
+    height: item-height;
+    
+    background: root.is-selected ? AppTheme.accent-soft : transparent;
+    border-radius: AppTheme.radius-md;
+    clip: false;
 
-    TouchArea {
-        clicked => { root.clicked(); }
-        Text {
-            text: label;
-            font-size: font-size;
-            font-weight: 800;
-            color: text-color;
-            horizontal-alignment: center;
-            vertical-alignment: center;
+    // --- Interactions ---
+    states [
+        hovered when touch.has-hover && !is-selected : {
+            background: AppTheme.surface-hover;
+        }
+    ]
+
+    touch := TouchArea {
+        clicked => { 
+            root.clicked(); 
+            // Pro Flow: Tapping the row also toggles if it's a multi-select or setting row
+            if root.accessory == "checkbox" || root.accessory == "toggle" {
+                root.toggled(!root.is-toggle-on);
+            }
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: root.compact ? 0 : AppTheme.sp-md;
+        padding-right: root.compact ? 0 : AppTheme.sp-sm;
+        spacing: AppTheme.sp-lg;
+        alignment: root.compact ? center : start;
+
+        // --- 1. LEFT ZONE (Avatar or Icon) ---
+        Rectangle {
+            width: root.compact ? 48px : (root.initials != "" ? 48px : 38px);
+            height: self.width;
+            y: (parent.height - self.height) / 2;
+
+            if root.initials != "" : Rectangle {
+                width: 100%; height: 100%;
+                border-radius: self.width / 2;
+                background: AppTheme.accent-soft;
+                Text {
+                    text: root.initials; font-size: 15px; font-weight: 700; color: AppTheme.accent;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
+                if (root.is-online || root.is-relay || !root.is-session-ready) && !root.compact : Rectangle {
+                    width: 12px; height: 12px; border-radius: 6px;
+                    // Order of priority: Online (Success) > Session Ready (Warning) > Relay (Accent)
+                    background: root.is-online ? AppTheme.accent-success : (!root.is-session-ready ? AppTheme.accent-warning : AppTheme.accent);
+                    border-color: AppTheme.surface-primary; border-width: 2px;
+                    x: parent.width - self.width - 1px; y: parent.height - self.height - 1px;
+                }
+            }
+
+            if root.initials == "" && (root.icon-svg.width > 0 || root.icon != "") : Rectangle {
+                width: 38px; height: 38px; border-radius: AppTheme.radius-sm;
+                background: AppTheme.surface-tertiary;
+                if root.icon-svg.width > 0 : Image {
+                    source: root.icon-svg; width: 20px; height: 20px; colorize: root.icon-color;
+                }
+                if root.icon-svg.width == 0 && root.icon != "" : Text {
+                    text: root.icon; font-size: 20px; horizontal-alignment: center; vertical-alignment: center;
+                }
+            }
+        }
+
+        // --- 2. INFORMATION ZONE (Labels) ---
+        if !root.compact : VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 2px;
+            
+            HorizontalLayout {
+                spacing: AppTheme.sp-sm;
+                Text {
+                    text: root.title; font-size: 16px; font-weight: 700;
+                    color: root.is-danger ? AppTheme.accent-danger : AppTheme.text-primary;
+                    overflow: elide; horizontal-stretch: 1;
+                }
+                if root.member-count > 0 : Text {
+                    text: "· " + root.member-count;
+                    font-size: 13px; font-weight: 500; color: AppTheme.text-tertiary;
+                    vertical-alignment: center;
+                }
+                if root.is-verified && (root.subtitle == "" || root.subtitle == "Waiting for handshake...") : Rectangle {
+                    width: 8px; height: 8px; border-radius: 4px;
+                    background: #5090FF; // Clean Blue Dot for Established Handshake
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+
+            if root.subtitle != "" : HorizontalLayout {
+                spacing: 4px;
+                // Status indicator for outgoing messages
+                if root.is-last-message-outgoing : Rectangle {
+                    width: 14px;
+                    height: 14px;
+                    y: (parent.height - self.height) / 2;
+
+                    if root.last-message-status == "delivered" : Image {
+                        source: @image-url("../images/nav/check-check.svg");
+                        width: 14px; height: 14px; colorize: AppTheme.accent-success;
+                    }
+                    if root.last-message-status == "sent" : Image {
+                        source: @image-url("../images/nav/check.svg");
+                        width: 14px; height: 14px; colorize: AppTheme.text-tertiary;
+                    }
+                    if root.last-message-status == "failed" : Image {
+                        source: @image-url("../images/nav/failed.svg");
+                        width: 14px; height: 14px; colorize: AppTheme.accent-danger;
+                    }
+                    if root.last-message-status == "queued" : Image {
+                        source: @image-url("../images/nav/clock.svg");
+                        width: 14px; height: 14px; colorize: AppTheme.text-tertiary;
+                    }
+                }
+
+                Text {
+                    text: root.subtitle; font-size: 13px; font-weight: 500;
+                    color: AppTheme.text-tertiary; overflow: elide;
+                    horizontal-stretch: 1;
+                }
+            }
+        }
+
+        // --- 3. ACCESSORY ZONE (Far Right) ---
+        if !root.compact : VerticalLayout {
+            alignment: center;
+            padding-left: AppTheme.sp-sm;
+            
+            if root.badge-count > 0 : Rectangle {
+                width: 20px; height: 20px; border-radius: 10px; background: AppTheme.accent;
+                Text {
+                    text: root.badge-count > 9 ? "9+" : root.badge-count;
+                    font-size: 10px; font-weight: 800; color: AppTheme.text-inverted;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
+            }
+
+            if root.accessory == "arrow" : Text {
+                text: "›"; font-size: 24px; font-weight: 400; color: AppTheme.text-tertiary;
+            }
+
+            if root.accessory == "toggle" : Rectangle {
+                width: 44px; height: 24px; border-radius: 12px;
+                background: root.is-toggle-on ? AppTheme.accent : AppTheme.surface-tertiary;
+                animate background { duration: AppTheme.dur-short; }
+                Rectangle {
+                    x: root.is-toggle-on ? (parent.width - 20px - 2px) : 2px;
+                    width: 20px; height: 20px; border-radius: 10px; background: #FFFFFF;
+                    y: (parent.height - self.height) / 2;
+                    animate x { duration: AppTheme.dur-short; easing: ease-in-out; }
+                }
+            }
+
+            if root.accessory == "checkbox" : Rectangle {
+                width: 26px; height: 26px; border-radius: 6px;
+                border-width: 2px;
+                border-color: root.is-toggle-on ? AppTheme.accent : AppTheme.divider;
+                background: root.is-toggle-on ? AppTheme.accent : transparent;
+                animate background { duration: AppTheme.dur-short; }
+                if root.is-toggle-on : Image {
+                    source: @image-url("../images/nav/check.svg");
+                    width: 14px; height: 14px; colorize: #FFFFFF;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
+            }
+
+            if root.accessory == "copy" : HorizontalLayout {
+                spacing: AppTheme.sp-sm;
+                alignment: end;
+                if root.show-copied : Text {
+                    text: "COPIED";
+                    font-size: 10px;
+                    font-weight: 800;
+                    color: AppTheme.accent-success;
+                    vertical-alignment: center;
+                }
+                Image {
+                    source: root.show-copied ? @image-url("../images/nav/clipboard-checked.svg") : @image-url("../images/nav/clipboard.svg");
+                    width: 18px;
+                    height: 18px;
+                    colorize: root.show-copied ? AppTheme.accent-success : AppTheme.text-tertiary;
+                    animate colorize { duration: 150ms; }
+                }
+            }
         }
     }
 }

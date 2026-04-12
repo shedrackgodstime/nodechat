@@ -1,198 +1,224 @@
-import { ScrollView } from "std-widgets.slint";
-import { AppTheme } from "../theme.slint";
+// NodeChat New — Chat View Screen
+// ---------------------------------------------------------
+// The main messaging surface for 1:1 and group conversations.
+// Layout zones:
+//   1. Header (peer info, back, actions)
+//   2. Message stream (scrollable, bottom-anchored)
+//   3. Composer (keyboard-safe, fixed bottom)
+// ---------------------------------------------------------
+
+
+import { AppTheme, VertScroll } from "../theme.slint";
 import { MessageBubble, MessageData } from "../components/message_bubble.slint";
+import { Composer } from "../components/composer.slint";
+
 export { MessageData }
-import { ChatInput } from "../components/chat_input.slint";
 
 export component ChatViewScreen inherits Rectangle {
-    in property <string> peer-name: "";
-    in property <string> peer-initials: "";
-    in property <string> peer-node-id: "";
-    in property <string> connection-mode: "direct";
-    in property <bool> is-verified: false;
-    in property <bool> is-online: false;
     in property <bool> is-desktop: false;
+    in property <string> peer-name: "Chat";
+    in property <string> peer-initials: "?";
+    in property <string> peer-node-id: "";
+    in property <string> connection-mode: "direct"; // "direct" | "group"
+    in property <bool> is-online: false;
+    in property <bool> is-verified: false;
+    in property <bool> is-relay: false;
     in property <string> connection-stage: "";
     in property <[MessageData]> messages: [];
-
-    in property <length> safe-area-top: 0px;
-    in property <length> safe-area-bottom: 0px;
     in property <length> virtual-keyboard-height: 0px;
 
     callback go-back();
     callback send-message(string);
     callback open-contact-info();
-    callback open-group(string, string, string, bool);
-    callback request-delete-conversation();
+    callback open-invite(string, string, string, bool);
+    callback add-contact(string);
     callback retry-queued();
+    callback request-delete-conversation();
 
-    background: AppTheme.surface-primary; 
+    background: AppTheme.surface-primary;
 
     VerticalLayout {
-        padding: 0;
         spacing: 0;
 
-        // --- Premium Chat Header ---
+        // 1. HEADER
         Rectangle {
-            height: (is-desktop ? 72px : 86px) + root.safe-area-top;
-            background: AppTheme.surface-primary;
-            
-            HorizontalLayout {
-                padding-top: root.safe-area-top;
-                padding-left: AppTheme.sp-lg;
-                padding-right: AppTheme.sp-lg;
-                spacing: AppTheme.sp-md;
+            height: 60px;
+            background: AppTheme.surface-secondary;
+            border-color: AppTheme.divider;
 
-                if !is-desktop: VerticalLayout {
-                    alignment: center;
-                    TouchArea {
-                        width: 40px; height: 40px;
-                        clicked => { root.go-back(); }
-                        Text { text: "←"; font-size: 24px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
+            HorizontalLayout {
+                padding-left: AppTheme.sp-sm;
+                padding-right: 2px; // Absolute far right
+                spacing: AppTheme.sp-sm;
+                alignment: stretch;
+
+                // Back Button
+                TouchArea {
+                    width: 44px;
+                    clicked => { root.go-back(); }
+
+                    Text {
+                        text: "←";
+                        font-size: 22px;
+                        color: AppTheme.text-primary;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
                     }
                 }
 
-                VerticalLayout {
-                    alignment: center;
-                    TouchArea {
-                        width: 48px; height: 48px;
-                        clicked => { root.open-contact-info(); }
-                        Rectangle {
-                            width: 48px; height: 48px;
-                            border-radius: 24px;
-                            background: @linear-gradient(135deg, AppTheme.accent 0%, #0056b3 100%);
-                            Text {
-                                text: peer-initials != "" ? peer-initials : "?";
-                                font-size: 16px; font-weight: 800; color: #FFFFFF;
-                                horizontal-alignment: center; vertical-alignment: center;
-                            }
+                // Avatar
+                Rectangle {
+                    width: 38px;
+                    height: 38px;
+                    y: (parent.height - self.height) / 2;
+
+                    Rectangle {
+                        width: 100%;
+                        height: 100%;
+                        border-radius: 19px;
+                        background: AppTheme.accent-soft;
+
+                        Text {
+                            text: root.peer-initials;
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.accent;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        // Presence Dot (Only for 1:1 direct chats)
+                        if connection-mode != "group" && (is-online || is-relay) : Rectangle {
+                            width: 12px;
+                            height: 12px;
+                            border-radius: 6px;
+                            background: is-relay ? AppTheme.accent-warning : AppTheme.accent-success;
+                            border-color: AppTheme.surface-secondary;
+                            border-width: 2px;
+                            x: parent.width - self.width - 1px;
+                            y: parent.height - self.height - 1px;
                         }
                     }
                 }
 
+                // Peer Name + Status
                 VerticalLayout {
-                    horizontal-stretch: 1;
                     alignment: center;
-                    spacing: 2px;
+                    horizontal-stretch: 1;
+                    spacing: 1px;
+
                     HorizontalLayout {
                         spacing: AppTheme.sp-xs;
-                        alignment: start;
+
                         Text {
                             text: peer-name;
-                            font-size: 18px; font-weight: 700;
+                            font-size: 16px;
+                            font-weight: 700;
                             color: AppTheme.text-primary;
                             overflow: elide;
                         }
-                        if is-verified: Text { text: "✅"; font-size: 12px; vertical-alignment: center; }
+
                     }
-                    HorizontalLayout {
-                        spacing: 6px;
-                        alignment: start;
-                        VerticalLayout {
-                            alignment: center;
-                            Rectangle {
-                                width: 8px; height: 8px;
-                                border-radius: 4px;
-                                background: is-online ? AppTheme.accent-success : AppTheme.text-tertiary;
-                            }
-                        }
-                        Text {
-                            text: is-online ? "Connected via " + connection-mode : "Offline";
-                            font-size: 12px;
-                            color: AppTheme.text-tertiary;
-                        }
+
+                    Text {
+                        text: connection-mode == "group" ? "Group Conversation"
+                            : connection-stage != "" ? connection-stage
+                            : is-online ? (is-relay ? "via relay" : "direct")
+                            : "offline";
+                        font-size: 12px;
+                        color: connection-mode == "group" ? AppTheme.accent
+                            : is-online
+                            ? (is-relay ? AppTheme.accent-warning : AppTheme.accent-success)
+                            : AppTheme.text-tertiary;
                     }
                 }
 
-                VerticalLayout {
-                    alignment: center;
-                    TouchArea {
-                        width: 44px; height: 44px;
-                        clicked => { root.open-contact-info(); }
-                        Text { text: "⋮"; font-size: 24px; color: AppTheme.text-tertiary; horizontal-alignment: center; vertical-alignment: center; }
+                // Info Button
+                TouchArea {
+                    width: 44px;
+                    clicked => { root.open-contact-info(); }
+
+                    Image {
+                        source: @image-url("../images/nav/dots-vertical.svg");
+                        width: 24px;
+                        height: 24px;
+                        colorize: AppTheme.text-secondary;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
                     }
                 }
             }
-
-            Rectangle {
-                y: parent.height - 1px;
-                width: 100%; height: 1px;
-                background: AppTheme.divider; 
-            }
         }
 
-        // --- Connection Status Bar ---
-        if !is-verified || connection-mode == "relay": Rectangle {
-            height: 32px;
-            background: connection-mode == "relay" ? AppTheme.accent-warning : AppTheme.accent-soft;
-            Text {
-                text: connection-mode == "relay" ? "⚠️ Relay path: Messages are encrypted but slow." : "🔒 Identity verification pending.";
-                font-size: 11px; font-weight: 700; color: connection-mode == "relay" ? #1B1B1B : AppTheme.accent;
-                horizontal-alignment: center; vertical-alignment: center;
-            }
-        }
-
-        // --- Messages Scroll Area ---
+        // Thin separator
         Rectangle {
+            height: 1px;
+            background: AppTheme.divider;
+        }
+
+        // 2. MESSAGE LIST (vertical scroll only)
+        VertScroll {
             vertical-stretch: 1;
-            clip: true;
+            viewport-height: msg-list.preferred-height;
 
-            ScrollView {
-                VerticalLayout {
-                    padding-top: AppTheme.sp-lg;
-                    padding-bottom: AppTheme.sp-lg;
-                    
-                    HorizontalLayout {
-                        VerticalLayout {
-                            horizontal-stretch: 1;
-                            padding: AppTheme.sp-md;
-                            spacing: AppTheme.sp-md;
-                            alignment: start;
+            msg-list := VerticalLayout {
+                width: parent.width;
+                preferred-width: 100%;
+                padding: AppTheme.sp-sm;
+                spacing: AppTheme.sp-sm;
+                
+                // Vertical Spacer: Replaces expensive 'alignment: end'.
+                // It pushes messages to the bottom but is much faster for scrolling.
+                Rectangle { vertical-stretch: 1; }
 
-                            for msg[i] in messages: MessageBubble {
-                                text:         msg.text;
-                                timestamp:    msg.timestamp;
-                                is-mine:      msg.is-mine;
-                                status:       msg.status;
-                                is-ephemeral: msg.is-ephemeral;
-                                ttl-seconds:  msg.ttl-seconds;
-                                is-group-invite: msg.is-group-invite;
-                                invite-group-name: msg.invite-group-name;
-                                invite-topic-id: msg.invite-topic-id;
-                                invite-key: msg.invite-key;
-                                invite-is-joined: msg.invite-is-joined;
-                                open-group(topic, name, key, joined) => { root.open-group(topic, name, key, joined); }
-                            }
-                        }
+                if messages.length == 0 : VerticalLayout {
+                    alignment: center;
+                    spacing: AppTheme.sp-md;
+                    padding: AppTheme.sp-xl;
+
+                    Text {
+                        text: (connection-mode == "group") ? "👥" : "🔒";
+                        font-size: 40px;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: (connection-mode == "group") ? "Swarm Established" : "End-to-end encrypted";
+                        font-size: 15px;
+                        font-weight: 600;
+                        color: AppTheme.text-primary;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: (connection-mode == "group") 
+                            ? "This p2p group is ready. Tap the header to share the invite ticket with others!"
+                            : "Messages are encrypted in transit.\nSay hello!";
+                        font-size: 13px;
+                        color: AppTheme.text-secondary;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+
+                for msg in root.messages : MessageBubble {
+                    data: msg;
+                    is-desktop: root.is-desktop;
+                    open-invite(topic, name, key, joined) => {
+                        root.open-invite(topic, name, key, joined);
+                    }
+                    add-contact(name, ticket) => {
+                        root.add-contact(ticket);
                     }
                 }
             }
         }
 
-        // --- Composer / Input Bar ---
-        Rectangle {
-            background: AppTheme.surface-primary;
-            
-            VerticalLayout {
-                padding-bottom: Math.max(root.safe-area-bottom, virtual-keyboard-height);
-                animate padding-bottom { duration: AppTheme.dur-short; }
-                
-                Rectangle {
-                    height: 1px;
-                    background: AppTheme.divider;
-                }
-
-                HorizontalLayout {
-                    VerticalLayout {
-                        horizontal-stretch: 1;
-                        padding: AppTheme.sp-md;
-                        ChatInput {
-                            is-mobile: !is-desktop;
-                            send-message(msg) => { root.send-message(msg); }
-                        }
-                    }
-                }
-            }
+        // 3. COMPOSER (Keyboard-safe, anchored bottom)
+        Composer {
+            is-disabled: false; // Always allow typing!
+            placeholder: "Message...";
+            send-message(msg) => { root.send-message(msg); }
         }
     }
 }

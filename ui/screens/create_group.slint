@@ -1,114 +1,112 @@
+// NodeChat New — Create P2P Group Screen
+// ---------------------------------------------------------
+
 import { AppTheme } from "../theme.slint";
-import { BaseScreen } from "../components/base_screen.slint";
+import { Button } from "../components/button.slint";
+import { FormInput } from "../components/form_input.slint";
+import { AppInfo } from "../components/row_data.slint";
 
 export component CreateGroupScreen inherits Rectangle {
-    in-out property <string> group-name-input: "";
-    in property <int> member-count: 0;
     in property <bool> is-desktop: false;
-    in property <length> safe-area-top: 0px;
-    in property <length> safe-area-bottom: 0px;
+    in property <AppInfo> app-info;
+    
+    callback back-clicked();
+    callback create-group(string, string); // name, topic
 
-    callback go-back();
-    callback launch-group(string); // group-name
+    background: AppTheme.surface-primary;
 
-    property <bool> can-launch: group-name-input.character-count >= 2;
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: 0;
 
-    BaseScreen {
-        title: "New Group";
-        subtitle: member-count + " members selected";
-        is-desktop: root.is-desktop;
-        safe-area-top: root.safe-area-top;
-        safe-area-bottom: root.safe-area-bottom;
-        go-back => { root.go-back(); }
+        // 1. Header (Consistent with InfoScreen)
+        Rectangle {
+            height: is-desktop ? 80px : 64px;
+            background: AppTheme.surface-secondary;
 
-        VerticalLayout {
-            spacing: AppTheme.sp-xl;
-            padding-top: AppTheme.sp-lg;
-
-            // --- Group Avatar Spot ---
-            VerticalLayout {
-                spacing: AppTheme.sp-md;
-                alignment: center;
-                Rectangle {
-                    width: 120px; height: 120px;
-                    border-radius: 60px;
-                    background: AppTheme.surface-secondary;
-                    border-width: 2px; border-color: AppTheme.divider;
-                    
-                    Text { text: "👥"; font-size: 48px; horizontal-alignment: center; vertical-alignment: center; }
-                    
-                    // Edit Overlay
-                    Rectangle {
-                        y: parent.height - 32px; x: parent.width - 32px;
-                        width: 32px; height: 32px; border-radius: 16px;
-                        background: AppTheme.accent;
-                        Text { text: "+"; font-size: 20px; font-weight: 800; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                }
-                Text { text: "TAP TO SET PHOTO"; font-size: 10px; font-weight: 800; color: AppTheme.text-tertiary; horizontal-alignment: center; letter-spacing: 1px; }
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: AppTheme.divider;
             }
 
-            // --- Input Field ---
-            VerticalLayout {
+            HorizontalLayout {
+                padding-left: AppTheme.sp-md;
+                padding-right: AppTheme.sp-md;
                 spacing: AppTheme.sp-md;
-                Text { text: "GROUP NAME"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
-                
-                Rectangle {
-                    height: 64px;
-                    border-radius: AppTheme.radius-lg;
-                    background: AppTheme.surface-secondary;
-                    border-width: 1px;
-                    border-color: name-input.has-focus ? AppTheme.accent : transparent;
-                    animate border-color { duration: AppTheme.dur-short; }
+                alignment: start;
 
-                    HorizontalLayout {
-                        padding-left: AppTheme.sp-lg; padding-right: AppTheme.sp-lg;
-                        name-input := TextInput {
-                            text <=> root.group-name-input;
-                            font-size: 20px; font-weight: 600; color: AppTheme.text-primary;
-                            vertical-alignment: center; single-line: true;
-                            accepted => { if (root.can-launch) { root.launch-group(self.text); } }
-                        }
-                    }
-
-                    if name-input.text == "": Text {
-                        x: AppTheme.sp-lg; height: parent.height;
-                        text: "e.g. Project NodeChat"; font-size: 20px;
-                        color: AppTheme.text-tertiary; vertical-alignment: center; opacity: 0.3;
-                    }
+                TouchArea {
+                    width: 32px;
+                    clicked => { root.back-clicked(); }
+                    Text { text: "←"; font-size: 24px; color: AppTheme.text-primary; vertical-alignment: center; }
                 }
-            }
 
-            Rectangle { vertical-stretch: 1; }
-
-            // --- Action ---
-            VerticalLayout {
-                spacing: AppTheme.sp-md;
-                
-                Rectangle {
-                    height: 60px;
-                    background: can-launch ? @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%) : AppTheme.surface-tertiary;
-                    border-radius: 30px;
-                    animate background { duration: AppTheme.dur-short; }
-
-                    TouchArea {
-                        enabled: root.can-launch;
-                        clicked => { root.launch-group(root.group-name-input); }
-                        Text {
-                            text: "Build Cluster & Invite";
-                            font-size: 17px; font-weight: 800;
-                            color: root.can-launch ? #FFFFFF : AppTheme.text-tertiary;
-                            horizontal-alignment: center; vertical-alignment: center;
-                        }
-                    }
-                }
-                
-                Text {
-                    text: "Members will receive a secure gossip invite automatically.";
-                    font-size: 12px; color: AppTheme.text-tertiary; horizontal-alignment: center;
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: "New Group"; font-size: is-desktop ? 24px : 18px; font-weight: 700; color: AppTheme.text-primary; }
+                    Text { text: "Establish a new P2P swarm"; font-size: 13px; color: AppTheme.text-secondary; }
                 }
             }
         }
+
+        // 2. Body
+        VerticalLayout {
+            padding: AppTheme.sp-lg;
+            padding-top: AppTheme.sp-xl;
+            spacing: AppTheme.sp-lg;
+            alignment: start;
+
+            // Notice Box
+            Rectangle {
+                background: AppTheme.accent-soft;
+                border-radius: AppTheme.radius-md;
+                border-width: 1px;
+                border-color: AppTheme.accent;
+                
+                VerticalLayout {
+                    padding: AppTheme.sp-md;
+                    Text {
+                        text: "Groups in " + root.app-info.name + " are decentralized swarms. Once created, you can share the Join Ticket with others to invite them.";
+                        font-size: 13px;
+                        color: AppTheme.text-secondary;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Inputs
+            VerticalLayout {
+                spacing: AppTheme.sp-sm;
+                Text { text: "GROUP NAME"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1.5px; }
+                name-input := FormInput {
+                    placeholder: "e.g. Family Chat or Project Team";
+                }
+            }
+
+            VerticalLayout {
+                spacing: AppTheme.sp-sm;
+                Text { text: "GROUP DESCRIPTION"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1.5px; }
+                desc-input := FormInput {
+                    placeholder: "What is this group about?";
+                }
+                Text { 
+                    text: "This helps others identify the swarm purpose."; 
+                    font-size: 11px; 
+                    color: AppTheme.text-tertiary; 
+                }
+            }
+
+            // Next Button
+            Button {
+                text: "Next: Select Members";
+                kind: "primary";
+                enabled: name-input.text != "";
+                clicked => { root.create-group(name-input.text, desc-input.text); }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+        }
     }
 }
-

@@ -1,85 +1,82 @@
+// NodeChat New — Edit Profile Name Screen
+// ---------------------------------------------------------
+
 import { AppTheme } from "../theme.slint";
-import { BaseScreen } from "../components/base_screen.slint";
+import { Button } from "../components/button.slint";
+import { FormInput } from "../components/form_input.slint";
 
 export component EditNameScreen inherits Rectangle {
-    in-out property <string> display-name: "";
-    in property <bool>       is-desktop: false;
-    in property <length>     safe-area-top: 0px;
-    in property <length>     safe-area-bottom: 0px;
+    in property <bool> is-desktop: false;
+    in property <string> display-name: "";
+    
+    callback back-clicked();
+    callback confirm-name(string);
 
-    callback confirm-name(string); // string: new name
-    callback go-back();
+    background: AppTheme.surface-primary;
 
-    property <bool> valid: display-name.character-count >= 1 && display-name.character-count <= 32;
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: 0;
 
-    BaseScreen {
-        title: "Edit Profile";
-        is-desktop: root.is-desktop;
-        safe-area-top: root.safe-area-top;
-        safe-area-bottom: root.safe-area-bottom;
-        go-back => { root.go-back(); }
+        // 1. Header
+        Rectangle {
+            height: is-desktop ? 80px : 64px;
+            background: AppTheme.surface-secondary;
 
-        VerticalLayout {
-            spacing: AppTheme.sp-xl;
-            padding-top: AppTheme.sp-lg;
-
-            VerticalLayout {
-                spacing: AppTheme.sp-sm;
-                Text { text: "Change Your Name"; font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px; }
-                Text { text: "This will update your local identity and the name others see during secure P2P handshakes."; font-size: 14px; color: AppTheme.text-tertiary; wrap: word-wrap; }
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: AppTheme.divider;
             }
 
-            // --- Input Field ---
-            VerticalLayout {
+            HorizontalLayout {
+                padding-left: AppTheme.sp-md;
+                padding-right: AppTheme.sp-md;
                 spacing: AppTheme.sp-md;
-                Text { text: "DISPLAY NAME"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
-                
-                Rectangle {
-                    height: 64px;
-                    border-radius: AppTheme.radius-lg;
-                    background: AppTheme.surface-secondary;
-                    border-width: 1px;
-                    border-color: name-input.has-focus ? AppTheme.accent : transparent;
-                    animate border-color { duration: AppTheme.dur-short; }
+                alignment: start;
 
-                    HorizontalLayout {
-                        padding-left: AppTheme.sp-lg; padding-right: AppTheme.sp-lg;
-                        name-input := TextInput {
-                            text <=> root.display-name;
-                            font-size: 20px; font-weight: 600; color: AppTheme.text-primary;
-                            vertical-alignment: center; single-line: true;
-                            accepted => { if (root.valid) { root.confirm-name(self.text); } }
-                        }
-                    }
-
-                    if name-input.text == "": Text {
-                        x: AppTheme.sp-lg; height: parent.height;
-                        text: "e.g. Satoshi Nakamoto"; font-size: 20px;
-                        color: AppTheme.text-tertiary; vertical-alignment: center; opacity: 0.3;
-                    }
+                TouchArea {
+                    width: 32px;
+                    clicked => { root.back-clicked(); }
+                    Text { text: "←"; font-size: 24px; color: AppTheme.text-primary; vertical-alignment: center; }
                 }
+
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: "Edit Profile Name"; font-size: is-desktop ? 28px : 18px; font-weight: 700; color: AppTheme.text-primary; }
+                    Text { text: "How others see you"; font-size: 13px; color: AppTheme.text-secondary; }
+                }
+            }
+        }
+
+        // 2. Content
+        VerticalLayout {
+            padding: AppTheme.sp-lg;
+            padding-top: AppTheme.sp-xl;
+            spacing: AppTheme.sp-lg;
+
+            Text {
+                text: "PROFILE NAME";
+                font-size: 11px;
+                font-weight: 800;
+                color: AppTheme.text-tertiary;
+                letter-spacing: 1px;
+            }
+
+            name-input := FormInput {
+                placeholder: "Enter display name...";
+                initial-text: root.display-name;
+            }
+
+            Button {
+                text: "Save Changes";
+                kind: "primary";
+                enabled: name-input.text != "" && name-input.text != root.display-name;
+                clicked => { root.confirm-name(name-input.text); }
             }
 
             Rectangle { vertical-stretch: 1; }
-
-            // --- Action ---
-            Rectangle {
-                height: 60px;
-                background: valid ? @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%) : AppTheme.surface-tertiary;
-                border-radius: 30px;
-                animate background { duration: AppTheme.dur-short; }
-
-                TouchArea {
-                    enabled: root.valid;
-                    clicked => { root.confirm-name(root.display-name); }
-                    Text {
-                        text: "Save Changes";
-                        font-size: 17px; font-weight: 800;
-                        color: root.valid ? #FFFFFF : AppTheme.text-tertiary;
-                        horizontal-alignment: center; vertical-alignment: center;
-                    }
-                }
-            }
         }
     }
 }

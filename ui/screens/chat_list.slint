@@ -1,65 +1,90 @@
-import { ScrollView } from "std-widgets.slint";
-import { AppTheme } from "../theme.slint";
-import { AppHeader } from "../components/app_header.slint";
-import { ContactRow, ChatPreview } from "../components/contact_row.slint";
+// NodeChat New — Chat List Screen
+// ---------------------------------------------------------
+// The main home screen. Shows recent conversations.
+// Desktop: renders as the sidebar panel.
+// Mobile: renders as a full-screen panel.
+// ---------------------------------------------------------
+
+
+import { AppTheme, VertScroll } from "../theme.slint";
+import { ChatPreview } from "../components/row_data.slint";
+import { ActionRow } from "../components/action_row.slint";
+import { Button } from "../components/button.slint";
+
 export { ChatPreview }
 
 export component ChatListScreen inherits Rectangle {
+    in property <bool> is-desktop: false;
+    in property <bool> compact: false;
+    in property <string> active-id: "";
     in property <[ChatPreview]> chats: [];
-    in property <int>  direct-peers: 8;
-    in property <int>  relay-peers: 1;
-    in property <int>  queued-messages: 2;
+    in property <int> direct-peers: 0;
+    in property <int> relay-peers: 0;
     in property <bool> is-offline: false;
-    in property <bool> is-desktop: false; 
-    in property <string> my-endpoint-ticket: "";
 
-    in property <length> safe-area-top: 0px;
-    in property <length> safe-area-bottom: 0px;
-
-    callback open-chat(string, string, string, bool, bool, bool, bool, bool);
+    callback open-chat(ChatPreview);
     callback add-contact();
     callback open-contacts();
     callback open-settings();
 
-    background: AppTheme.surface-primary;
+    background: transparent;
 
     VerticalLayout {
-        padding: 0;
         spacing: 0;
 
-        // --- Standard Sidebar Header ---
-        Rectangle {
-            height: 72px + root.safe-area-top;
-            background: AppTheme.surface-primary;
-            
-            HorizontalLayout {
-                padding-top: root.safe-area-top;
-                padding-left: AppTheme.sp-lg;
-                padding-right: AppTheme.sp-lg;
-                alignment: space-between;
+        if !compact: VerticalLayout {
+            // --- Header Bar ---
+            Rectangle {
+                height: is-desktop ? 80px : 60px;
+                background: is-desktop ? transparent : AppTheme.surface-secondary;
+                border-color: AppTheme.divider;
 
-                VerticalLayout {
-                    alignment: center;
-                    Text {
-                        text: "Messages";
-                        font-size: 24px;
-                        font-weight: 800;
-                        color: AppTheme.text-primary;
-                    }
-                }
+                HorizontalLayout {
+                    padding-left: AppTheme.space.md;
+                    padding-right: 2px; // Absolute far right
+                    alignment: stretch;
 
-                VerticalLayout {
-                    alignment: center;
-                    TouchArea {
-                        width: 40px; height: 40px;
-                        clicked => { root.add-contact(); }
-                        Rectangle {
-                            background: AppTheme.surface-secondary;
-                            border-radius: 20px;
+                    // --- Left: Brand & Status ---
+                    HorizontalLayout {
+                        spacing: AppTheme.space.sm;
+                        alignment: start;
+                        horizontal-stretch: 1;
+
+                        VerticalLayout {
+                            alignment: center;
                             Text {
-                                text: "+";
-                                font-size: 24px;
-                                color: AppTheme.accent;
+                                text: "Chats";
+                                font-size: AppTheme.typo.title.size;
+                                font-weight: AppTheme.typo.title.weight;
+                                color: AppTheme.text-primary;
+                            }
+                        }
+
+                        // System Status Dot (Integrated)
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 8px;
+                                height: 8px;
+                                border-radius: 4px;
+                                background: is-offline ? AppTheme.accent-danger : (relay-peers > 0 ? AppTheme.accent-warning : AppTheme.accent-success);
+                            }
+                        }
+                    }
+
+                    // --- Right: Key Actions ---
+                    HorizontalLayout {
+                        spacing: AppTheme.space.xs;
+                        alignment: end;
+
+                        TouchArea {
+                            width: 44px;
+                            clicked => { root.add-contact(); }
+                            Image {
+                                source: @image-url("../images/nav/add.svg");
+                                width: 22px;
+                                height: 22px;
+                                colorize: AppTheme.accent;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -67,132 +92,84 @@ export component ChatListScreen inherits Rectangle {
                     }
                 }
             }
-        }
 
-        // --- Chat Stream ───────────────────────────────────────────────
-        ScrollView {
-            vertical-stretch: 1;
-            mouse-drag-pan-enabled: true;
-
-            VerticalLayout {
-                padding: AppTheme.sp-sm;
-                alignment: start;
-
-                for chat[i] in chats: ContactRow {
-                    name:         chat.name;
-                    initials:     chat.initials;
-                    last-message: chat.last-message;
-                    timestamp:    chat.timestamp;
-                    unread:       chat.unread;
-                    is-group:     chat.is-group;
-                    is-online:    chat.is-online;
-                    is-session-ready: chat.is-session-ready;
-                    is-relay:     chat.is-relay;
-                    is-queued:    chat.is-queued;
-                    is-verified:  chat.is-verified;
-                    clicked => {
-                        root.open-chat(
-                            chat.id,
-                            chat.name,
-                            chat.initials,
-                            chat.is-group,
-                            chat.is-online,
-                            chat.is-session-ready,
-                            chat.is-relay,
-                            chat.is-verified,
-                        );
-                    }
-                }
-
-                if chats.length == 0: Rectangle {
-                    height: 300px;
-                    VerticalLayout {
-                        alignment: center;
-                        spacing: AppTheme.sp-md;
-                        Text { text: "💬"; font-size: 48px; horizontal-alignment: center; }
-                        Text {
-                            text: "No chats yet. Share your ticket to start messaging:";
-                            font-size: 14px; color: AppTheme.text-tertiary;
-                            horizontal-alignment: center;
-                        }
-                        
-                        // --- Share Your Ticket Box ---
-                        Rectangle {
-                            height: 52px; width: 280px;
-                            background: AppTheme.surface-secondary;
-                            border-radius: AppTheme.radius-md;
-                            border-width: 1px; border-color: AppTheme.divider;
-                            
-                            HorizontalLayout {
-                                padding-left: 12px; padding-right: 4px; spacing: 8px;
-                                Text {
-                                    text: my-endpoint-ticket == "" ? "Generating ticket..." : my-endpoint-ticket;
-                                    font-size: 12px; font-family: "monospace"; color: AppTheme.text-primary;
-                                    vertical-alignment: center; horizontal-stretch: 1; overflow: elide;
-                                }
-                                TouchArea {
-                                    width: 80px; height: 36px;
-                                    clicked => { root.open-settings(); /* User can copy from settings/identity */ }
-                                    Rectangle {
-                                        background: AppTheme.surface-tertiary; border-radius: 4px;
-                                        Text { text: "DETAILS"; font-size: 11px; font-weight: 800; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- Bottom Navigation Navigation (Always on Sidebar) ────────────────────────────────
-        Rectangle {
-            height: 80px + root.safe-area-bottom;
-            background: AppTheme.surface-secondary;
-            
             Rectangle {
-                y: 0; width: 100%; height: 1px;
-                background: AppTheme.divider; 
+                height: 1px;
+                background: AppTheme.divider;
+            }
+            
+            // Header-to-list breathing room
+            Rectangle { height: AppTheme.space.sm; }
+        }
+
+        // --- Chat List Body ---
+        if chats.length == 0 && !compact: VerticalLayout {
+            alignment: center;
+            spacing: AppTheme.space.md;
+            vertical-stretch: 1;
+            padding: AppTheme.space.xl;
+
+            Text {
+                text: "💬";
+                font-size: 48px;
+                horizontal-alignment: center;
             }
 
-            HorizontalLayout {
-                padding-bottom: root.safe-area-bottom;
-                alignment: space-around;
-                padding-top: 10px;
+            Text {
+                text: "No conversations yet";
+                font-size: AppTheme.typo.header.size;
+                font-weight: AppTheme.typo.header.weight;
+                color: AppTheme.text-primary;
+                horizontal-alignment: center;
+            }
 
-                TouchArea {
-                    width: 70px;
-                    VerticalLayout {
-                        alignment: center;
-                        spacing: 8px;
-                        Text { text: "●"; font-size: 24px; color: AppTheme.accent; horizontal-alignment: center; }
-                        Text { text: "Chats"; font-size: 11px; font-weight: 800; color: AppTheme.accent; horizontal-alignment: center; }
-                    }
-                }
+            Text {
+                text: "Add a contact to start chatting.";
+                font-size: AppTheme.typo.body.size;
+                font-weight: AppTheme.typo.body.weight;
+                color: AppTheme.text-secondary;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+            Button {
+                text: "Add New Peer";
+                icon-svg: @image-url("../images/nav/add.svg");
+                kind: "primary";
+                clicked => { root.add-contact(); }
+            }
+        }
 
-                TouchArea {
-                    width: 70px;
-                    clicked => { root.open-contacts(); }
-                    VerticalLayout {
-                        alignment: center;
-                        spacing: 8px;
-                        Text { text: "○"; font-size: 24px; color: AppTheme.text-tertiary; horizontal-alignment: center; }
-                        Text { text: "Contacts"; font-size: 11px; font-weight: 600; color: AppTheme.text-tertiary; horizontal-alignment: center; }
-                    }
-                }
+        if chats.length > 0: VertScroll {
+            vertical-stretch: 1;
+            viewport-height: list-body.preferred-height;
 
-                TouchArea {
-                    width: 70px;
-                    clicked => { root.open-settings(); }
-                    VerticalLayout {
-                        alignment: center;
-                        spacing: 8px;
-                        Text { text: "⚙"; font-size: 24px; color: AppTheme.text-tertiary; horizontal-alignment: center; }
-                        Text { text: "Settings"; font-size: 11px; font-weight: 600; color: AppTheme.text-tertiary; horizontal-alignment: center; }
-                    }
+            list-body := VerticalLayout {
+                width: parent.width;
+                padding-left: AppTheme.space.sm;
+                padding-right: AppTheme.space.sm;
+                padding-top: compact ? 0 : AppTheme.space.sm;
+                padding-bottom: AppTheme.space.sm;
+                spacing: 2px;
+
+                for chat in root.chats: ActionRow {
+                    title: chat.name;
+                    subtitle: chat.last-message;
+                    initials: chat.initials;
+                    timestamp: chat.timestamp;
+                    member-count: chat.member-count;
+                    badge-count: chat.unread;
+                    is-online: chat.is-online;
+                    is-relay: chat.is-relay;
+                    is-verified: chat.is-verified;
+                    is-selected: chat.id == root.active-id;
+                    is-session-ready: chat.is-session-ready;
+                    has-queued-messages: chat.has-queued-messages;
+                    last-message-status: chat.last-message-status;
+                    is-last-message-outgoing: chat.is-last-message-outgoing;
+                    compact: root.compact;
+                    clicked => { root.open-chat(chat); }
                 }
             }
         }
     }
 }
-

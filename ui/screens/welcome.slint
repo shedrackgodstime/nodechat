@@ -25,7 +25,7 @@ export component WelcomeScreen inherits Rectangle {
         HorizontalLayout {
             alignment: center;
             VerticalLayout {
-                width: root.is-desktop ? 420px : parent.width;
+                max-width: 520px;
                 spacing: AppTheme.sp-xl;
                 padding: AppTheme.sp-xl;
 
@@ -66,7 +66,7 @@ export component WelcomeScreen inherits Rectangle {
                         
                         Rectangle {
                             height: 60px;
-                            width: root.is-desktop ? 400px : parent.width;
+                            width: 100%;
                             background: AppTheme.surface-secondary;
                             border-radius: AppTheme.radius-lg;
                             pin-input := TextInput {
@@ -85,7 +85,7 @@ export component WelcomeScreen inherits Rectangle {
 
                     Rectangle {
                         height: 60px;
-                        width: root.is-desktop ? 400px : parent.width;
+                        width: 100%;
                         background: @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%);
                         border-radius: 30px;
                         

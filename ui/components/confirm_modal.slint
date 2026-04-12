@@ -1,159 +1,206 @@
+// NodeChat New — Confirmation Modal
+// ---------------------------------------------------------
+// A high-impact modal for destructive or critical actions.
+// Supports: title, subtitle, checkbox confirmation, pin entry.
+// ---------------------------------------------------------
+
 import { AppTheme } from "../theme.slint";
 
 export component ConfirmModal inherits Rectangle {
-    in-out property <string> title: "Confirm Action";
-    in-out property <string> subtitle: "This action cannot be undone.";
-    in-out property <string> confirm-text: "Confirm";
-    in-out property <string> action-slug: ""; // passed to help UI toggle
-    in-out property <string> error-msg: "";
+    in property <string> title: "Are you sure?";
+    in property <string> subtitle: "This action cannot be undone.";
+    in property <string> confirm-text: "I Understand, Confirm";
+    in property <string> action-slug: ""; // Used to identify the operation successful
+    in property <string> error-msg: "";
+    in property <bool> requires-pin: false;
+    
     in-out property <string> pin: "";
     in-out property <bool> is-checked: false;
 
     callback confirm(string);
     callback cancel();
 
-    background: rgba(0, 0, 0, 0.7); // Backdrop dimming
+    // Full-screen backdrop
+    background: rgba(0, 0, 0, 0.7);
     
-    // --- Backdrop Dismissal ---
+    // Backdrop blur (Standard Slint Window property usually, but we simulate with opacity)
+    // Dismiss on backdrop click
     TouchArea {
         clicked => { root.cancel(); }
     }
 
+    // Centered Modal Card
     Rectangle {
-        width: 320px;
-        height: inner-layout.preferred-height + 40px;
+        width: 340px;
+        height: card-layout.preferred-height + AppTheme.sp-xl;
         background: AppTheme.surface-secondary;
-        border-radius: AppTheme.radius-lg;
+        border-radius: AppTheme.radius-xl;
         border-width: 1px;
         border-color: AppTheme.divider;
-        
-        // --- Consume Clicks Inside the Card ---
+        clip: true;
+
+        // Block clicks from passing through
         TouchArea { width: 100%; height: 100%; }
-        
-        inner-layout := VerticalLayout {
+
+        card-layout := VerticalLayout {
             padding: AppTheme.sp-lg;
             spacing: AppTheme.sp-lg;
             alignment: center;
 
-            // --- Header ---
+            // --- Icon/Header ---
             VerticalLayout {
-                spacing: AppTheme.sp-xs;
+                spacing: AppTheme.sp-sm;
+                Image {
+                    source: @image-url("../images/nav/warning.svg");
+                    width: 48px;
+                    height: 48px;
+                    colorize: AppTheme.accent-danger;
+                    horizontal-alignment: center;
+                }
                 Text {
                     text: root.title;
-                    font-size: 20px; font-weight: 800; color: AppTheme.text-primary;
+                    font-size: 20px;
+                    font-weight: 800;
+                    color: AppTheme.text-primary;
                     horizontal-alignment: center;
                 }
                 Text {
                     text: root.subtitle;
-                    font-size: 14px; color: AppTheme.text-tertiary;
-                    horizontal-alignment: center; wrap: word-wrap;
+                    font-size: 14px;
+                    color: AppTheme.text-secondary;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
                 }
             }
 
-            // --- Checkbox and Warning ---
-            VerticalLayout {
-                spacing: AppTheme.sp-sm;
-                
-                TouchArea {
-                    clicked => { root.is-checked = !root.is-checked; }
-                    HorizontalLayout {
-                        spacing: AppTheme.sp-md;
-                        alignment: start;
-                        Rectangle {
-                            width: 24px; height: 24px;
-                            background: root.is-checked ? AppTheme.accent-danger : AppTheme.surface-tertiary;
-                            border-radius: AppTheme.radius-sm;
-                            animate background { duration: AppTheme.dur-short; }
-                            
-                            if root.is-checked: Text {
-                                text: "✓"; font-size: 14px; font-weight: 900; color: #FFFFFF;
-                                vertical-alignment: center; horizontal-alignment: center;
-                            }
-                        }
-                        Text {
-                            text: "I confirm this action is IRREVERSIBLE";
-                            font-size: 13px; color: root.is-checked ? AppTheme.accent-danger : AppTheme.text-secondary;
-                            font-weight: 700;
+            // --- Confirmation Checkbox ---
+            TouchArea {
+                clicked => { root.is-checked = !root.is-checked; }
+                HorizontalLayout {
+                    spacing: AppTheme.sp-md;
+                    alignment: start;
+                    
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: AppTheme.radius-sm;
+                        background: root.is-checked ? AppTheme.accent-danger : AppTheme.surface-tertiary;
+                        border-color: root.is-checked ? AppTheme.accent-danger : AppTheme.border;
+                        border-width: 1px;
+                        animate background { duration: AppTheme.dur-short; }
+
+                        if root.is-checked : Image {
+                            source: @image-url("../images/nav/check.svg");
+                            width: 16px;
+                            height: 16px;
+                            colorize: #FFFFFF;
+                            horizontal-alignment: center;
                             vertical-alignment: center;
                         }
+                    }
+
+                    Text {
+                        text: "I confirm this action is IRREVERSIBLE";
+                        font-size: 13px;
+                        font-weight: 600;
+                        color: root.is-checked ? AppTheme.accent-danger : AppTheme.text-secondary;
+                        vertical-alignment: center;
                     }
                 }
             }
 
-            // --- Password Input (Only for high-risk system actions) ---
-    if root.action-slug == "delete-identity": VerticalLayout {
-        spacing: AppTheme.sp-sm;
-        Text { text: "ENTER VAULT PIN TO DESTROY"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; horizontal-alignment: center; }
-        
-        Rectangle {
-            height: 64px;
-            border-radius: AppTheme.radius-lg;
-            background: AppTheme.surface-secondary;
-            border-width: 1px;
-            border-color: root.error-msg != "" ? AppTheme.accent-danger : (pin-input.has-focus ? AppTheme.accent : AppTheme.divider);
-            animate border-color { duration: AppTheme.dur-short; }
-
-            TouchArea { width: 100%; height: 100%; clicked => { pin-input.focus(); } }
-
-            HorizontalLayout {
-                alignment: center;
-                pin-input := TextInput {
-                    width: self.text == "" ? 2px : parent.width;
-                    text <=> root.pin;
-                    font-size: 24px; font-weight: 800; color: #FFFFFF;
-                    vertical-alignment: center; single-line: true;
+            // --- PIN Input (destructive identity actions) ---
+            if requires-pin : VerticalLayout {
+                spacing: AppTheme.sp-sm;
+                
+                Text {
+                    text: "ENTER VAULT PIN";
+                    font-size: 11px;
+                    font-weight: 800;
+                    color: AppTheme.text-tertiary;
+                    letter-spacing: 1px;
                     horizontal-alignment: center;
-                    input-type: password;
-                    accepted => { if (root.is-checked && root.pin != "") { root.confirm(root.pin); } }
+                }
+
+                Rectangle {
+                    height: 54px;
+                    background: AppTheme.surface-tertiary;
+                    border-radius: AppTheme.radius-md;
+                    border-color: pin-input.has-focus ? AppTheme.accent : AppTheme.divider;
+                    border-width: 1px;
+
+                    HorizontalLayout {
+                        padding-left: AppTheme.sp-md;
+                        padding-right: AppTheme.sp-md;
+                        alignment: center;
+                        
+                        pin-input := TextInput {
+                            text <=> root.pin;
+                            font-size: 24px;
+                            font-weight: 700;
+                            color: AppTheme.text-primary;
+                            input-type: password;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    if pin-input.text == "" : Text {
+                        text: "••••";
+                        font-size: 24px;
+                        color: AppTheme.text-tertiary;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        opacity: 0.3;
+                    }
                 }
             }
 
-            if pin-input.text == "": Text {
-                width: 100%; height: 100%;
-                text: "••••"; font-size: 24px;
-                color: AppTheme.text-tertiary; vertical-alignment: center; horizontal-alignment: center; opacity: 0.3;
+            // --- Error Message ---
+            if root.error-msg != "" : Text {
+                text: root.error-msg;
+                font-size: 12px;
+                font-weight: 600;
+                color: AppTheme.accent-danger;
+                horizontal-alignment: center;
             }
-        }
-    }
-    
-    if root.error-msg != "": Text {
-        text: root.error-msg;
-        font-size: 12px; font-weight: 600; color: AppTheme.accent-danger;
-        horizontal-alignment: center;
-    }
 
-            // --- Actions ---
+            // --- Action Buttons ---
             VerticalLayout {
                 spacing: AppTheme.sp-md;
-                
-                // Confirm Button
-                Rectangle {
+
+                // Confirm Action
+                TouchArea {
                     height: 50px;
-                    background: root.is-checked ? AppTheme.accent-danger : AppTheme.surface-tertiary;
-                    border-radius: 25px;
-                    animate background { duration: AppTheme.dur-short; }
-                    
-                    TouchArea {
-                        width: 100%; height: 100%;
-                        enabled: root.is-checked;
-                        clicked => { root.confirm(root.pin); }
+                    enabled: root.is-checked;
+                    clicked => { root.confirm(root.pin); }
+
+                    Rectangle {
+                        border-radius: 25px;
+                        background: root.is-checked ? AppTheme.accent-danger : AppTheme.surface-tertiary;
+                        
                         Text {
                             text: root.confirm-text;
-                            font-size: 16px; font-weight: 800;
+                            font-size: 15px;
+                            font-weight: 700;
                             color: root.is-checked ? #FFFFFF : AppTheme.text-tertiary;
-                            horizontal-alignment: center; vertical-alignment: center;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
                         }
                     }
                 }
 
                 // Cancel Button
                 TouchArea {
-                    width: 100%; height: 32px;
+                    height: 32px;
                     clicked => { root.cancel(); }
                     Text {
                         text: "Cancel";
-                        font-size: 14px; font-weight: 600; color: AppTheme.text-tertiary;
-                        horizontal-alignment: center; vertical-alignment: center;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: AppTheme.text-tertiary;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
                     }
                 }
             }
