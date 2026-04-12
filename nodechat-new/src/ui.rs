@@ -155,7 +155,11 @@ pub fn run_app() -> anyhow::Result<()> {
     });
 
     let cmd = ui_bridge.clone();
+    let ui_handle = app.as_weak();
     app.on_accept_group_invite(move |id: slint::SharedString, topic: slint::SharedString, key: slint::SharedString| {
+        if let Some(ui) = ui_handle.upgrade() {
+            ui.set_pending_action_id(topic.clone());
+        }
         let _ = cmd.send(Command::AcceptGroupInvite { 
             conversation_id: id.to_string(), 
             topic_id: topic.to_string(), 

@@ -261,6 +261,14 @@ impl NetworkManager {
         Ok(())
     }
 
+    pub async fn unsubscribe_group(&self, topic_id: &str) -> Result<()> {
+        {
+            let mut inner = self.inner.lock().unwrap_or_else(|p| p.into_inner());
+            inner.subscribed_topics.remove(topic_id);
+        }
+        group::leave(self.clone(), topic_id).await
+    }
+
     /// Proactively dial a peer to establish a connection (RULES.md P-04).
     pub async fn dial_peer(&self, target_node_id: &str, ticket: Option<&str>) -> Result<()> {
         // We can just call send_direct with an empty payload?
@@ -302,19 +310,6 @@ impl NetworkManager {
         }
         self.spawn_direct_reader(target_node_id.to_owned(), conn);
         Ok(())
-    }
-
-    /// Emit a `NetworkEvent` to the core worker.
-    ///
-    /// # Errors
-    /// Returns an error if the event channel is closed.
-    pub(crate) async fn emit(&self, event: NetworkEvent) -> Result<()> {
-        let event_tx = {
-            let inner = self.inner.lock().unwrap_or_else(|p| p.into_inner());
-            inner.event_tx.clone()
-        };
-        event_tx.send(event).await
-            .map_err(|_| anyhow::anyhow!("network event channel closed"))
     }
 
     /// Returns the number of currently active peer connections.

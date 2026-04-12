@@ -3,7 +3,7 @@
 //! Implements ChaCha20-Poly1305 AEAD for group and direct encryption.
 //! Nonces are random 12-byte values prepended to ciphertext.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use chacha20poly1305::{
     aead::{Aead, KeyInit},
     ChaCha20Poly1305, Key, Nonce,

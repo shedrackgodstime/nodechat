@@ -79,7 +79,7 @@ pub(crate) async fn join_topic(
         inner.gossip.clone().ok_or_else(|| anyhow::anyhow!("gossip not initialised"))?
     };
     let id = derive_topic_id(topic_id);
-    let _Res = gossip.subscribe(id, bootstrap).await?;
+    let _res = gossip.subscribe(id, bootstrap).await?;
     Ok(())
 }
 
@@ -105,6 +105,28 @@ pub(crate) async fn broadcast(
     
     tracing::info!(topic = %topic_id, "Gossip: broadcast payload pushed to engine");
 
+    Ok(())
+}
+
+/// Leave the gossip swarm for `topic_id`.
+pub(crate) async fn leave(
+    manager: NetworkManager,
+    topic_id: &str,
+) -> Result<()> {
+    let _gossip = {
+        let inner = manager.inner.lock().unwrap_or_else(|p| p.into_inner());
+        inner.gossip.clone().ok_or_else(|| anyhow::anyhow!("gossip not initialised"))?
+    };
+    let _id = derive_topic_id(topic_id);
+    // Note: Iroh Gossip 0.97.0 handle typically manages lifecycles via the Subscription handle 
+    // which is dropped when the task ends. For now, we rely on clearing local state.
+    
+    // Clear neighbors locally
+    {
+        let mut inner = manager.inner.lock().unwrap_or_else(|p| p.into_inner());
+        inner.group_neighbors.insert(topic_id.to_string(), 0);
+    }
+    
     Ok(())
 }
 

@@ -226,6 +226,9 @@ impl RealBackend {
 
             Command::DeleteConversation { conversation_id, .. } => {
                 let is_group = queries::get_group(&self.conn, &conversation_id)?.is_some();
+                if is_group {
+                    let _ = self.network.unsubscribe_group(&conversation_id).await;
+                }
                 queries::delete_conversation(&self.conn, &conversation_id, is_group)?;
                 if self.active_conversation_id == conversation_id {
                     self.active_conversation_id.clear();
@@ -236,6 +239,7 @@ impl RealBackend {
                     AppEvent::ChatListUpdated(chat_list),
                     AppEvent::ContactListUpdated(contact_list),
                     AppEvent::ConversationUpdated(ConversationView::empty(ConversationKind::Direct)),
+                    AppEvent::OperationSuccess("delete-chat".to_string()),
                     AppEvent::StatusNotice("conversation deleted".to_string()),
                 ])
             }
@@ -341,6 +345,7 @@ impl RealBackend {
                     AppEvent::ChatListUpdated(chat_list),
                     AppEvent::GroupCandidatesUpdated(candidates),
                     AppEvent::ConversationUpdated(conv_view),
+                    AppEvent::OperationSuccess("create-group".to_string()),
                     AppEvent::StatusNotice(format!("group created: {}", name)),
                 ])
             }
@@ -393,6 +398,7 @@ impl RealBackend {
                 let candidates = self.build_group_candidates()?;
                 let mut events = vec![
                     AppEvent::GroupCandidatesUpdated(candidates),
+                    AppEvent::OperationSuccess("send-invites".to_string()),
                     AppEvent::StatusNotice(format!("Invites sent to {} peers.", chats_updated as u8)),
                 ];
                 
@@ -492,7 +498,10 @@ impl RealBackend {
                             }
 
                             let identity = self.build_identity_view()?;
-                            Ok(vec![AppEvent::IdentityUpdated(identity)])
+                            Ok(vec![
+                                AppEvent::IdentityUpdated(identity),
+                                AppEvent::OperationSuccess("unlock".to_string()),
+                            ])
                         } else {
                             Ok(vec![AppEvent::UserError("incorrect PIN".to_string())])
                         }
@@ -508,7 +517,12 @@ impl RealBackend {
                         let ok = id.pin_hash.is_empty() || id.pin_hash == hash_pin(&current_pin);
                         if ok {
                             queries::update_pin_hash(&self.conn, &hash_pin(&new_pin))?;
-                            Ok(vec![AppEvent::StatusNotice("password updated".to_string())])
+                            let identity = self.build_identity_view()?;
+                            Ok(vec![
+                                AppEvent::IdentityUpdated(identity),
+                                AppEvent::OperationSuccess("password-update".to_string()),
+                                AppEvent::StatusNotice("password updated".to_string())
+                            ])
                         } else {
                             Ok(vec![AppEvent::UserError("incorrect current PIN".to_string())])
                         }
@@ -597,6 +611,7 @@ impl RealBackend {
                     AppEvent::ChatListUpdated(vec![]),
                     AppEvent::ContactListUpdated(vec![]),
                     AppEvent::MessageListReplaced { conversation_id: String::new(), messages: vec![] },
+                    AppEvent::OperationSuccess("reset-identity".to_string()),
                     AppEvent::StatusNotice("identity reset".to_string()),
                 ])
             }
@@ -609,6 +624,7 @@ impl RealBackend {
                 Ok(vec![
                     AppEvent::ContactListUpdated(contact_list),
                     AppEvent::ChatListUpdated(chat_list),
+                    AppEvent::ConversationUpdated(self.build_conversation_view(&peer_id)?),
                 ])
             }
 
@@ -672,7 +688,8 @@ impl RealBackend {
                 let chat_list = self.build_chat_list()?;
                 Ok(vec![
                     AppEvent::ChatListUpdated(chat_list),
-                    AppEvent::StatusNotice(format!("Joined \"{}\"", group_name)),
+                    AppEvent::OperationSuccess("join-group".to_string()),
+                    AppEvent::StatusNotice(format!("Joined group: {}", group_name)),
                 ])
             }
 
@@ -695,6 +712,7 @@ impl RealBackend {
                         conversation_id: self.active_conversation_id.clone(),
                         messages: vec![],
                     },
+                    AppEvent::OperationSuccess("clear-history".to_string()),
                     AppEvent::StatusNotice("history cleared".to_string()),
                 ])
             }
@@ -1079,8 +1097,9 @@ impl RealBackend {
                 initials:        derive_initials(&id.display_name),
                 peer_id:         id.node_id_hex,
                 endpoint_ticket: id.endpoint_ticket,
-                is_locked:       !id.pin_hash.is_empty(), // Lock if PIN exists
+                is_locked:       !id.pin_hash.is_empty(),
                 has_identity:    true,
+                has_password:    !id.pin_hash.is_empty(),
             }),
         }
     }
@@ -1200,7 +1219,7 @@ impl RealBackend {
     }
 
     fn build_message_items(&self, target_id: &str) -> Result<Vec<MessageItem>> {
-        use chrono::{TimeZone, Utc, Datelike};
+        use chrono::{TimeZone, Utc};
         let messages = queries::list_messages(&self.conn, target_id)?;
         let mut items = Vec::new();
         let mut last_date = None;

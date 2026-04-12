@@ -253,34 +253,6 @@ export component InfoScreen inherits Rectangle {
                         clip: true;
 
                         VerticalLayout {
-                            row1 := TouchArea {
-                                clicked => { 
-                                    root.copy-text(is-group ? group.topic : contact.node-id); 
-                                    root.show-copied-row1 = true;
-                                }
-                                Rectangle {
-                                    background: row1.has-hover ? AppTheme.surface-hover : transparent;
-                                    VerticalLayout {
-                                        padding: AppTheme.sp-md;
-                                        spacing: 8px;
-                                        HorizontalLayout {
-                                            alignment: space-between;
-                                            Text { text: is-group ? "TOPIC / SWARM ID" : "NODE ID"; font-size: 10px; font-weight: 900; color: root.show-copied-row1 ? AppTheme.accent-success : AppTheme.accent; letter-spacing: 0.5px; }
-                                            Text { text: root.show-copied-row1 ? "COPIED ✅" : "COPY"; font-size: 10px; font-weight: 800; color: root.show-copied-row1 ? AppTheme.accent-success : AppTheme.text-tertiary; }
-                                        }
-                                        Text {
-                                            text: is-group ? group.topic : contact.node-id;
-                                            font-family: "monospace";
-                                            font-size: 13px;
-                                            color: AppTheme.text-primary;
-                                            wrap: char-wrap;
-                                        }
-                                    }
-                                }
-                            }
-
-                            Rectangle { height: 1px; background: AppTheme.divider; }
-
                             row2 := TouchArea {
                                 clicked => { 
                                     root.copy-text(is-group ? group.id : contact.ticket); 
