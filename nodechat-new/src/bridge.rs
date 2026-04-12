@@ -7,7 +7,6 @@ use tracing::field::{Field, Visit};
 
 use crate::backend::RealBackend;
 use crate::contract::{AppEvent, Command};
-use crate::MockBackend;
 
 #[derive(Clone)]
 pub struct UiBridge {
@@ -47,37 +46,7 @@ impl UiBridge {
     }
 }
 
-pub struct MockRuntime {
-    pub ui: UiBridge,
-}
 
-impl MockRuntime {
-    pub fn start() -> Self {
-        let (command_tx, command_rx) = mpsc::channel::<Command>();
-        let (event_tx, event_rx) = mpsc::channel::<AppEvent>();
-        let backend = MockBackend::new();
-
-        thread::spawn(move || {
-            let mut backend = backend;
-            let _ = event_tx.send(AppEvent::SnapshotReady(backend.snapshot()));
-
-            while let Ok(command) = command_rx.recv() {
-                for event in backend.handle_command(command) {
-                    if event_tx.send(event).is_err() {
-                        return;
-                    }
-                }
-            }
-        });
-
-        Self {
-            ui: UiBridge {
-                command_tx,
-                event_rx: Arc::new(Mutex::new(event_rx)),
-            },
-        }
-    }
-}  // end impl MockRuntime
 
 // ── UiLogLayer ───────────────────────────────────────────────────────────────
 // A tracing Layer that pipes log events to both:

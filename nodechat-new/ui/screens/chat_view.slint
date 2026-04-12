@@ -31,6 +31,7 @@ export component ChatViewScreen inherits Rectangle {
     callback send-message(string);
     callback open-contact-info();
     callback open-invite(string, string, string, bool);
+    callback add-contact(string);
     callback retry-queued();
     callback request-delete-conversation();
 
@@ -203,6 +204,9 @@ export component ChatViewScreen inherits Rectangle {
                     is-desktop: root.is-desktop;
                     open-invite(topic, name, key, joined) => {
                         root.open-invite(topic, name, key, joined);
+                    }
+                    add-contact(name, ticket) => {
+                        root.add-contact(ticket);
                     }
                 }
             }

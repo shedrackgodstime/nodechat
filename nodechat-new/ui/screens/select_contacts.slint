@@ -11,13 +11,8 @@ export component SelectContactsScreen inherits Rectangle {
     in property <string> group-name: "";
     in property <int> return-screen: 10;
     
-    // Derived selected count
-    pure function count_selected(items: [GroupCandidateItem]) -> int {
-        if items.length == 0 { return 0; }
-        // Note: Slint doesn't have list reduce, but we can do a loop or just drive from Rust
-        // For simplicity, we'll let Rust push the count or we can just count inside the UI block
-        return 0; // Placeholder, real logic below uses backend driven count if we added it
-    }
+    in property <int> selected-count: 0;
+    in property <string> active-intent: "create"; // "create", "invite", "share"
 
     callback back-clicked();
     callback toggled(string); 
@@ -57,12 +52,16 @@ export component SelectContactsScreen inherits Rectangle {
                 VerticalLayout {
                     alignment: center;
                     Text { 
-                        text: "Select Members"; 
+                        text: root.active-intent == "share" ? "Share Contact" : "Select Members"; 
                         font-size: is-desktop ? 24px : 18px; 
                         font-weight: 700; 
                         color: AppTheme.text-primary; 
                     }
-                    Text { text: "Adding to " + group-name; font-size: 13px; color: AppTheme.text-secondary; }
+                    Text { 
+                        text: root.selected-count + " selected" + (root.active-intent == "create" ? "" : " • " + group-name); 
+                        font-size: 13px; 
+                        color: AppTheme.text-secondary; 
+                    }
                 }
             }
         }
@@ -110,27 +109,41 @@ export component SelectContactsScreen inherits Rectangle {
     Rectangle {
         x: parent.width - self.width - 24px;
         y: parent.height - self.height - 24px;
-        width: 64px;
-        height: 64px;
-        border-radius: 32px;
+        width: 160px;
+        height: 56px;
+        border-radius: 28px;
         background: AppTheme.accent;
+        visible: root.active-intent == "create" || root.selected-count > 0;
         
         // Shadow (Simulated)
         Rectangle {
             z: -1;
             x: 4px; y: 4px;
             width: 100%; height: 100%;
-            border-radius: 32px;
+            border-radius: 28px;
             background: rgba(0, 122, 255, 0.3);
         }
 
-        Image {
-            source: @image-url("../images/nav/check.svg");
-            width: 28px;
-            height: 28px;
-            colorize: #FFFFFF;
-            horizontal-alignment: center;
-            vertical-alignment: center;
+        HorizontalLayout {
+            alignment: center;
+            spacing: AppTheme.sp-sm;
+            
+            Text {
+                text: root.active-intent == "share" ? "Send (" + root.selected-count + ")" :
+                      root.active-intent == "invite" ? "Invite (" + root.selected-count + ")" :
+                      root.selected-count > 0 ? "Create & Invite (" + root.selected-count + ")" : "Create Group";
+                font-size: 15px; font-weight: 700;
+                color: #FFFFFF;
+                vertical-alignment: center;
+            }
+
+            Image {
+                source: @image-url("../images/nav/check.svg");
+                width: 20px;
+                height: 20px;
+                colorize: #FFFFFF;
+                vertical-alignment: center;
+            }
         }
 
         TouchArea {

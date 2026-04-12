@@ -70,6 +70,7 @@ pub struct GroupRecord {
     /// Hex-encoded iroh TopicId — the primary key.
     pub topic_id:      String,
     pub group_name:    String,
+    pub description:   String,
     pub symmetric_key: Vec<u8>,
 }
 
@@ -283,9 +284,9 @@ pub fn delete_peer(conn: &Connection, node_id: &str) -> Result<()> {
 
 pub fn insert_group(conn: &Connection, r: &GroupRecord) -> Result<()> {
     conn.execute(
-        "INSERT OR IGNORE INTO groups (topic_id, group_name, symmetric_key)
-         VALUES (?1, ?2, ?3)",
-        params![r.topic_id, r.group_name, r.symmetric_key],
+        "INSERT OR IGNORE INTO groups (topic_id, group_name, description, symmetric_key)
+         VALUES (?1, ?2, ?3, ?4)",
+        params![r.topic_id, r.group_name, r.description, r.symmetric_key],
     )
     .context("insert_group failed")?;
     Ok(())
@@ -293,14 +294,15 @@ pub fn insert_group(conn: &Connection, r: &GroupRecord) -> Result<()> {
 
 pub fn get_group(conn: &Connection, topic_id: &str) -> Result<Option<GroupRecord>> {
     let mut stmt = conn
-        .prepare("SELECT topic_id, group_name, symmetric_key FROM groups WHERE topic_id = ?1")
+        .prepare("SELECT topic_id, group_name, description, symmetric_key FROM groups WHERE topic_id = ?1")
         .context("prepare get_group")?;
     let mut rows = stmt.query(params![topic_id])?;
     if let Some(row) = rows.next().context("read group row")? {
         Ok(Some(GroupRecord {
             topic_id:      row.get(0)?,
             group_name:    row.get(1)?,
-            symmetric_key: row.get(2)?,
+            description:   row.get(2)?,
+            symmetric_key: row.get(3)?,
         }))
     } else {
         Ok(None)
@@ -309,14 +311,15 @@ pub fn get_group(conn: &Connection, topic_id: &str) -> Result<Option<GroupRecord
 
 pub fn list_groups(conn: &Connection) -> Result<Vec<GroupRecord>> {
     let mut stmt = conn
-        .prepare("SELECT topic_id, group_name, symmetric_key FROM groups ORDER BY group_name ASC")
+        .prepare("SELECT topic_id, group_name, description, symmetric_key FROM groups ORDER BY group_name ASC")
         .context("prepare list_groups")?;
     let rows = stmt
         .query_map([], |row| {
             Ok(GroupRecord {
                 topic_id:      row.get(0)?,
                 group_name:    row.get(1)?,
-                symmetric_key: row.get(2)?,
+                description:   row.get(2)?,
+                symmetric_key: row.get(3)?,
             })
         })
         .context("query list_groups")?

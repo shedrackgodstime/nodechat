@@ -51,6 +51,7 @@ pub enum MessageKind {
     Standard,
     System,
     GroupInvite,
+    ContactShare,
 }
 
 impl MessageKind {
@@ -59,6 +60,7 @@ impl MessageKind {
             MessageKind::Standard => "standard",
             MessageKind::System => "system",
             MessageKind::GroupInvite => "group_invite",
+            MessageKind::ContactShare => "contact_share",
         }
     }
 }
@@ -261,7 +263,11 @@ pub enum Command {
     },
     CreateGroup {
         name: String,
+        description: String,
         member_contact_ids: Vec<String>,
+    },
+    InviteToGroup {
+        group_id: String,
     },
     ToggleGroupCandidate {
         contact_id: String,
@@ -283,7 +289,6 @@ pub enum Command {
     },
     ShareContact {
         contact_id: String,
-        target_contact_ids: Vec<String>,
     },
     UpdateDisplayName {
         display_name: String,
