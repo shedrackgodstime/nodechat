@@ -81,7 +81,7 @@ export component ChatListScreen inherits Rectangle {
                             width: 44px;
                             clicked => { root.add-contact(); }
                             Image {
-                                source: @image-url("../images/nav/add.svg");
+                                source: @image-url("../../assets/icons/add.svg");
                                 width: 22px;
                                 height: 22px;
                                 colorize: AppTheme.accent;
@@ -133,7 +133,7 @@ export component ChatListScreen inherits Rectangle {
             }
             Button {
                 text: "Add New Peer";
-                icon-svg: @image-url("../images/nav/add.svg");
+                icon-svg: @image-url("../../assets/icons/add.svg");
                 kind: "primary";
                 clicked => { root.add-contact(); }
             }

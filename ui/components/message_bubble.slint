@@ -268,7 +268,7 @@ export component MessageBubble inherits Rectangle {
                         if data.is-ephemeral: HorizontalLayout {
                                 spacing: 4px;
                                 Image {
-                                    source: @image-url("../images/nav/clock.svg");
+                                    source: @image-url("../../assets/icons/clock.svg");
                                     width: 12px;
                                     height: 12px;
                                     colorize: data.is-outgoing ? rgba(255, 255, 255, 0.8) : AppTheme.accent;
@@ -286,7 +286,7 @@ export component MessageBubble inherits Rectangle {
 
                             // SVG status indicator (outgoing only) — cross-platform safe
                         if data.is-outgoing && data.status == "delivered": Image {
-                                source: @image-url("../images/nav/check-check.svg");
+                                source: @image-url("../../assets/icons/check-check.svg");
                                 width: 14px;
                                 height: 14px;
                                 colorize: AppTheme.accent-success;
@@ -294,7 +294,7 @@ export component MessageBubble inherits Rectangle {
                             }
 
                             if data.is-outgoing && data.status == "sent": Image {
-                                source: @image-url("../images/nav/check.svg");
+                                source: @image-url("../../assets/icons/check.svg");
                                 width: 14px;
                                 height: 14px;
                                 colorize: rgba(255, 255, 255, 0.5);
@@ -302,7 +302,7 @@ export component MessageBubble inherits Rectangle {
                             }
 
                             if data.is-outgoing && data.status == "failed": Image {
-                                source: @image-url("../images/nav/failed.svg");
+                                source: @image-url("../../assets/icons/failed.svg");
                                 width: 14px;
                                 height: 14px;
                                 colorize: AppTheme.accent-danger;
@@ -310,7 +310,7 @@ export component MessageBubble inherits Rectangle {
                             }
 
                             if data.is-outgoing && data.status == "queued": Image {
-                                source: @image-url("../images/nav/clock.svg");
+                                source: @image-url("../../assets/icons/clock.svg");
                                 width: 14px;
                                 height: 14px;
                                 colorize: rgba(255, 255, 255, 0.5);

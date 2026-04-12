@@ -91,7 +91,7 @@ export component NavBar inherits Rectangle {
             alignment: space-around;
 
             NavItem {
-                icon: @image-url("../images/nav/chats.svg");
+                icon: @image-url("../../assets/icons/chats.svg");
                 text: "Chats";
                 compact: root.compact;
                 active: root.active-screen == 0 || root.active-screen == 1 || root.active-screen == 2;
@@ -99,7 +99,7 @@ export component NavBar inherits Rectangle {
             }
 
             NavItem {
-                icon: @image-url("../images/nav/contacts.svg");
+                icon: @image-url("../../assets/icons/contacts.svg");
                 text: "Contacts";
                 compact: root.compact;
                 active: root.active-screen == 4;
@@ -107,7 +107,7 @@ export component NavBar inherits Rectangle {
             }
 
             NavItem {
-                icon: @image-url("../images/nav/settings.svg");
+                icon: @image-url("../../assets/icons/settings.svg");
                 text: "Settings";
                 compact: root.compact;
                 active: root.active-screen == 3;
@@ -125,7 +125,7 @@ export component NavBar inherits Rectangle {
         // Tablet-only Add Button at the top of the rail
         NavItem {
             height: 54px;
-            icon: @image-url("../images/nav/add.svg");
+            icon: @image-url("../../assets/icons/add.svg");
             text: "Add";
             compact: root.compact;
             is-vertical: true;
@@ -138,7 +138,7 @@ export component NavBar inherits Rectangle {
 
         NavItem {
             height: 68px; // Increased height for vertical rail
-            icon: @image-url("../images/nav/chats.svg");
+            icon: @image-url("../../assets/icons/chats.svg");
             text: "Chats";
             compact: root.compact;
             is-vertical: true;
@@ -148,7 +148,7 @@ export component NavBar inherits Rectangle {
 
         NavItem {
             height: 68px;
-            icon: @image-url("../images/nav/contacts.svg");
+            icon: @image-url("../../assets/icons/contacts.svg");
             text: "Contacts";
             compact: root.compact;
             is-vertical: true;
@@ -158,7 +158,7 @@ export component NavBar inherits Rectangle {
 
         NavItem {
             height: 68px;
-            icon: @image-url("../images/nav/settings.svg");
+            icon: @image-url("../../assets/icons/settings.svg");
             text: "Settings";
             compact: root.compact;
             is-vertical: true;

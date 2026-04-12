@@ -41,7 +41,7 @@ export component Composer inherits Rectangle {
                     border-radius: 18px;
                     background: parent.has-hover ? AppTheme.surface-hover : transparent;
                     Image {
-                        source: @image-url("../images/nav/paperclip.svg");
+                        source: @image-url("../../assets/icons/paperclip.svg");
                         width: 20px;
                         height: 20px;
                         colorize: root.is-disabled ? AppTheme.text-tertiary : AppTheme.text-secondary;
@@ -144,7 +144,7 @@ export component Composer inherits Rectangle {
                     background: input.text == "" ? AppTheme.surface-hover : AppTheme.accent;
                     animate background { duration: 150ms; }
                     Image {
-                        source: @image-url("../images/nav/send.svg");
+                        source: @image-url("../../assets/icons/send.svg");
                         width: 18px;
                         height: 18px;
                         colorize: input.text == "" ? AppTheme.text-tertiary : #ffffff;

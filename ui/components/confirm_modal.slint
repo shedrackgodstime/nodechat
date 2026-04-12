@@ -51,7 +51,7 @@ export component ConfirmModal inherits Rectangle {
             VerticalLayout {
                 spacing: AppTheme.sp-sm;
                 Image {
-                    source: @image-url("../images/nav/warning.svg");
+                    source: @image-url("../../assets/icons/warning.svg");
                     width: 48px;
                     height: 48px;
                     colorize: AppTheme.accent-danger;
@@ -90,7 +90,7 @@ export component ConfirmModal inherits Rectangle {
                         animate background { duration: AppTheme.dur-short; }
 
                         if root.is-checked : Image {
-                            source: @image-url("../images/nav/check.svg");
+                            source: @image-url("../../assets/icons/check.svg");
                             width: 16px;
                             height: 16px;
                             colorize: #FFFFFF;
