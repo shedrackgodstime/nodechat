@@ -1,4 +1,7 @@
+materials/slint-ui_docs
 
+The debugging is still not scrollable on mobile 
+When I tried to scroll inside the whole page just scroll....
 
 Message should have delete and copy of each of them...
 
