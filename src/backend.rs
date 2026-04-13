@@ -812,13 +812,32 @@ impl RealBackend {
 
                         return events;
                     }
-                } else if payload.starts_with(&DIRECT_MAGIC) {
-                    if let Ok(frame) = DirectFrame::decode(&payload) {
-                        match frame {
-                            DirectFrame::Text { id, content } => {
-                                let text = String::from_utf8_lossy(&content).to_string();
-                                let msg_id = id.to_string();
-                                tracing::info!(peer=%from, id=%msg_id, "NC2D framed message received");
+                } else {
+                    let mut plaintext_payload = payload.clone();
+                    if let Ok(Some(peer)) = queries::get_peer(&self.conn, &from) {
+                        if let Ok(Some(me)) = queries::get_local_identity(&self.conn) {
+                            if peer.x25519_pubkey.len() == 64 {
+                                let mut peer_pubkey_bytes = [0u8; 32];
+                                if let Ok(bytes) = hex::decode(&peer.x25519_pubkey) {
+                                    peer_pubkey_bytes.copy_from_slice(&bytes[..32]);
+                                    let my_secret_bytes: [u8; 32] = me.x25519_secret.try_into().unwrap_or([0u8; 32]);
+                                    let (my_x_secret, _) = crate::crypto::derive_x25519_keypair(&my_secret_bytes);
+                                    let shared_key = crate::crypto::derive_shared_secret(&my_x_secret.to_bytes(), &peer_pubkey_bytes);
+                                    if let Ok(decrypted) = crate::crypto::decrypt(&payload, &shared_key) {
+                                        plaintext_payload = decrypted;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if plaintext_payload.starts_with(&DIRECT_MAGIC) {
+                        if let Ok(frame) = DirectFrame::decode(&plaintext_payload) {
+                            match frame {
+                                DirectFrame::Text { id, content } => {
+                                    let text = String::from_utf8_lossy(&content).to_string();
+                                    let msg_id = id.to_string();
+                                    tracing::info!(peer=%from, id=%msg_id, "NC2D framed message received");
 
                                 let mut kind = "standard".to_string();
                                 let mut invite_topic_id = String::new();
@@ -883,8 +902,7 @@ impl RealBackend {
                         return events;
                     }
                 }
-
-                if let Ok(text) = String::from_utf8(payload) {
+                if let Ok(text) = String::from_utf8(plaintext_payload) {
                                 let mut kind = "standard".to_string();
                                 let mut invite_topic_id = String::new();
                                 let mut invite_group_name = String::new();
@@ -927,8 +945,9 @@ impl RealBackend {
                             events.push(AppEvent::ChatListUpdated(chat_list));
                         }
                     }
+                    }
                 }
-            }
+            } // Close `else` branch
             NetworkEvent::GroupMessage { topic, payload, .. } => {
                 // 1. Get group key
                 if let Ok(Some(group)) = queries::get_group(&self.conn, &topic) {
@@ -1376,7 +1395,7 @@ impl RealBackend {
             
             // 2. Handshake Check: have we finished the handshake session?
             let peer = queries::get_peer(&conn, conversation_id)?;
-            let is_verified = peer.map(|p| p.verified).unwrap_or(false);
+            let is_verified = peer.as_ref().map(|p| p.verified).unwrap_or(false);
 
             if !is_group && (!is_online || !is_verified) {
                  // If we aren't online/verified, we trigger the handshake and STOP.
@@ -1449,7 +1468,27 @@ impl RealBackend {
                     }
                 }
             } else {
-                network.send_direct(conversation_id, ticket_hint.as_deref(), frame).await
+                let peer_pubkey_hex = peer.map(|p| p.x25519_pubkey).unwrap_or_default();
+                if peer_pubkey_hex.len() == 64 {
+                    let mut peer_pubkey_bytes = [0u8; 32];
+                    if let Ok(bytes) = hex::decode(&peer_pubkey_hex) {
+                        peer_pubkey_bytes.copy_from_slice(&bytes[..32]);
+                        
+                        let identity = queries::get_local_identity(&conn)?.ok_or_else(|| anyhow::anyhow!("No identity"))?;
+                        let my_secret_bytes: [u8; 32] = identity.x25519_secret.try_into().unwrap_or([0u8; 32]);
+                        let (my_x_secret, _) = crate::crypto::derive_x25519_keypair(&my_secret_bytes);
+                        let shared_key = crate::crypto::derive_shared_secret(&my_x_secret.to_bytes(), &peer_pubkey_bytes);
+                        
+                        match crate::crypto::encrypt(&frame, &shared_key) {
+                            Ok(ciphertext) => network.send_direct(conversation_id, ticket_hint.as_deref(), ciphertext).await,
+                            Err(_) => network.send_direct(conversation_id, ticket_hint.as_deref(), frame).await, // Fallback to plaintext if encryption fails entirely
+                        }
+                    } else {
+                        network.send_direct(conversation_id, ticket_hint.as_deref(), frame).await
+                    }
+                } else {
+                    network.send_direct(conversation_id, ticket_hint.as_deref(), frame).await
+                }
             };
 
             match result {
@@ -1604,8 +1643,7 @@ async fn perform_handshake_internal(
     let my_ticket = identity.endpoint_ticket;
     
     let secret_bytes: [u8; 32] = identity.x25519_secret.clone().try_into().unwrap_or([0u8; 32]);
-    let secret = iroh::SecretKey::from_bytes(&secret_bytes);
-    let my_pubkey: [u8; 32] = *secret.public().as_bytes();
+    let (_, my_pubkey) = crate::crypto::derive_x25519_keypair(&secret_bytes);
 
     // 2. Build the frame
     use crate::p2p::protocol::HandshakeFrame;

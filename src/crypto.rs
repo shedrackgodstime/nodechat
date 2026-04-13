@@ -9,6 +9,8 @@ use chacha20poly1305::{
     ChaCha20Poly1305, Key, Nonce,
 };
 use rand::RngCore;
+use sha2::{Digest, Sha256};
+use x25519_dalek::{PublicKey, StaticSecret};
 
 pub const KEY_SIZE: usize = 32;
 pub const NONCE_SIZE: usize = 12;
@@ -18,6 +20,41 @@ pub fn generate_group_key() -> Vec<u8> {
     let mut key = vec![0u8; KEY_SIZE];
     rand::thread_rng().fill_bytes(&mut key);
     key
+}
+
+/// Derive a 32-byte encryption key using X25519 Diffie-Hellman + SHA-256 KDF.
+pub fn derive_shared_secret(my_secret_bytes: &[u8; 32], peer_public_bytes: &[u8; 32]) -> [u8; 32] {
+    let my_secret = StaticSecret::from(*my_secret_bytes);
+    let peer_public = PublicKey::from(*peer_public_bytes);
+    
+    // Compute Diffie-Hellman shared secret
+    let shared_secret = my_secret.diffie_hellman(&peer_public);
+    
+    // Hash it using SHA-256 to ensure uniformly distributed key space and destroy structure
+    let mut hasher = Sha256::new();
+    hasher.update(shared_secret.as_bytes());
+    let result = hasher.finalize();
+    
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&result);
+    key
+}
+
+/// Derive an X25519 keypair from an Ed25519 seed (Iroh SecretKey bytes).
+/// This ensures we don't reuse the same raw bytes for different primitives.
+pub fn derive_x25519_keypair(seed: &[u8; 32]) -> (StaticSecret, [u8; 32]) {
+    let mut hasher = Sha256::new();
+    hasher.update(seed);
+    hasher.update(b"nodechat-x25519-derivation"); // Context separator
+    let result = hasher.finalize();
+    
+    let mut x_seed = [0u8; 32];
+    x_seed.copy_from_slice(&result);
+    
+    let secret = StaticSecret::from(x_seed);
+    let public = PublicKey::from(&secret);
+    
+    (secret, public.to_bytes())
 }
 
 /// Encrypt `plaintext` using a symmetric `key`.
