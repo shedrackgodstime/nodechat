@@ -11,6 +11,13 @@ export component EditNameScreen inherits Rectangle {
     
     callback back-clicked();
     callback confirm-name(string);
+    callback request-unfocus();
+
+    // Background Unfocus Catcher
+    TouchArea {
+        width: 100%; height: 100%;
+        clicked => { root.request-unfocus(); }
+    }
 
     background: AppTheme.surface-primary;
 

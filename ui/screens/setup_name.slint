@@ -9,6 +9,13 @@ export component SetupNameScreen inherits Rectangle {
     in property <length>     virtual-keyboard-height: 0px;
 
     callback confirm-name(string, string);
+    callback request-unfocus();
+
+    // Background Unfocus Catcher
+    TouchArea {
+        width: 100%; height: 100%;
+        clicked => { root.request-unfocus(); }
+    }
     callback go-back();
 
     property <bool> valid: display-name.character-count >= 1 && display-name.character-count <= 32;

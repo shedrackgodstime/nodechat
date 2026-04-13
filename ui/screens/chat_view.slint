@@ -35,8 +35,32 @@ export component ChatViewScreen inherits Rectangle {
     callback add-contact(string);
     callback retry-queued();
     callback request-delete-conversation();
+    callback request-unfocus();
 
     background: AppTheme.surface-primary;
+
+    // --- Scroll Control ---
+    public function scroll-to-bottom() {
+        if (msg-scroll.viewport-height > msg-scroll.height) {
+            msg-scroll.viewport-y = msg-scroll.height - msg-scroll.viewport-height;
+        }
+    }
+
+    // Auto-scroll when messages update (e.g. typing or receiving)
+    changed messages => {
+        root.scroll-to-bottom();
+    }
+
+    // Force scroll-to-bottom on entry (with slight delay for layout calculation)
+    property <bool> entry-scroll-pending: true;
+    Timer {
+        interval: 50ms;
+        running: root.entry-scroll-pending;
+        triggered => {
+            root.scroll-to-bottom();
+            root.entry-scroll-pending = false;
+        }
+    }
 
     VerticalLayout {
         spacing: 0;
@@ -158,9 +182,15 @@ export component ChatViewScreen inherits Rectangle {
         }
 
         // 2. MESSAGE LIST (vertical scroll only)
-        VertScroll {
+        msg-scroll := VertScroll {
             vertical-stretch: 1;
             viewport-height: msg-list.preferred-height;
+
+            // Background Unfocus Catcher
+            TouchArea {
+                width: 100%; height: 100%;
+                clicked => { root.request-unfocus(); }
+            }
 
             msg-list := VerticalLayout {
                 width: parent.width;
@@ -217,11 +247,15 @@ export component ChatViewScreen inherits Rectangle {
 
         // 3. COMPOSER (Keyboard-safe, anchored bottom)
         Composer {
-            is-disabled: false; // Always allow typing!
+            is-disabled: false;
             is-mobile: !root.is-desktop;
             safe-area-bottom: root.safe-area-bottom;
             placeholder: "Message...";
-            send-message(msg) => { root.send-message(msg); }
+            send-message(msg) => { 
+                root.send-message(msg);
+                // Instant follow-up jump
+                root.scroll-to-bottom();
+            }
         }
     }
 }

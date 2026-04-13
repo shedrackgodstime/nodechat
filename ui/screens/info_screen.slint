@@ -65,6 +65,13 @@ export component InfoScreen inherits Rectangle {
     callback request-delete();
     callback add-members();
     callback share-clicked();
+    callback request-unfocus();
+
+    // Background Unfocus Catcher
+    TouchArea {
+        width: 100%; height: 100%;
+        clicked => { root.request-unfocus(); }
+    }
 
     in property <bool> show-copied: false;
     property <bool> show-copied-row1: false;

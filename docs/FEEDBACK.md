@@ -1,32 +1,24 @@
-when added a contact and the contact is not online at that momment even when the contact comes online it still not do as it suppose to......
 
-Group message is showing direct message in the chatview header instead of group...
-And it showing online even when no one is connect at that moment.... Is it supposed to be showing online? 
 
-Observe the modal in each usage...
-And It doesn't close after operations successful
-And reset p2p ID, the modal shouldn't display password input when password is not enabled 
+Message should have delete and copy of each of them...
 
 
 
-When contact is removed or group is leaved successfully... The model close and take us to the rightful page at that moment.... 
+The input on composer I should be able to scroll inside... When the text are more and part of it are now hidden... I should be able to scroll the text..... Especially on mobile..... 
 
 
 
-The start up page and welcome page should be looked upon... 
-
-The password page should have enable and disable password toggle only shows the input section when password toggle is enabled... 
-
-The password flow should be planned carefully.... 
-
-
-Then the contact selection component, groups suppose to be among at some point... To share contact etc to group when needed... 
-
-
-The info page for group it has topic/swam I'd and it empty... If is not needed we can remove it... 
+Now before we do our first release we now look Into the write up, the whole app text visible to user... How simple it is? How general it is how pro it is? And most especially how consistent it is? 
 
 
 
-Message bubble... When group is invited and joined true the join button click on the bubble and the group was joined successfully it should take use to the group directly..
+Looking forward to add notifications feature so user get notifications especially on Android...
+
+And the we get it ready for Linux build release just like we did on Android, 
+And then we do on Windows 
 
 
+
+Version 0.2.0:
+*we add lock screen with pin password or using biometric if possible using the Android feature for bio... 
+*we add file transfer 

@@ -18,6 +18,14 @@ export component AboutScreen inherits Rectangle {
     callback back-clicked();
     callback open-url(string);
     callback copy-logs(string);
+    callback refresh-debug();
+    callback request-unfocus();
+
+    // Background Unfocus Catcher
+    TouchArea {
+        width: 100%; height: 100%;
+        clicked => { root.request-unfocus(); }
+    }
 
     background: AppTheme.surface-primary;
 
@@ -414,10 +422,14 @@ export component AboutScreen inherits Rectangle {
                         }
 
                         if root.show-debug: DebugView {
+                            is-desktop: root.is-desktop;
                             debug-logs: root.debug-logs;
                             show-copied: root.show-copied;
                             copy-clicked(logs) => {
                                 root.copy-logs(logs);
+                            }
+                            refresh-clicked => {
+                                root.refresh-debug();
                             }
                         }
                     }
