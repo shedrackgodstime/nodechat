@@ -19,6 +19,7 @@ slint     = { version = "=1.15.1", features = ["backend-winit"] }
 open      = "5.3.2"
 directories = "6.0.0"
 chrono = { version = "0.4.38", features = ["clock"] }
+thiserror = "2.0"
 
 # --- Networking & P2P ---
 iroh = "=0.97.0"
