@@ -270,8 +270,6 @@ fn map_message(m: MessageItem) -> MessageData {
         invite_desc: invite_desc.into(),
         invite_key: m.invite_key.into(),
         is_invite_joined: m.invite_is_joined,
-        is_ephemeral: m.is_ephemeral,
-        ttl_seconds: m.ttl_seconds,
         status: m.status.to_string().into(),
         received_timestamp: m.received_timestamp.into(),
         is_delayed: m.is_delayed,

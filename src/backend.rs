@@ -1264,8 +1264,6 @@ impl RealBackend {
                     invite_topic_id:   String::new(),
                     invite_key:        String::new(),
                     invite_is_joined:  false,
-                    is_ephemeral:      false,
-                    ttl_seconds:       0,
                 });
                 last_date = Some(date);
             }
@@ -1312,8 +1310,6 @@ impl RealBackend {
             invite_topic_id:   r.invite_topic_id.clone(),
             invite_key:        r.invite_key.clone(),
             invite_is_joined,
-            is_ephemeral:  false,
-            ttl_seconds:   0,
         })
     }
 
@@ -1566,14 +1562,16 @@ fn short_name(id: &str) -> String {
     }
 }
 
-/// Simple PIN hashing — replace with argon2 when P2P security layer lands.
+/// Secure PIN hashing using SHA-256.
 fn hash_pin(pin: &str) -> String {
     if pin.is_empty() {
-        String::new()
-    } else {
-        // Prefix differentiates an empty hash from "no PIN set"
-        format!("sha256_placeholder:{}", pin)
+        return String::new();
     }
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(b"nodechat-pin-v1:"); // Domain separation for security
+    hasher.update(pin.as_bytes());
+    hex::encode(hasher.finalize())
 }
 
 // ── Database Path Resolution ──────────────────────────────────────────────────
