@@ -7,9 +7,16 @@ export component WelcomeScreen inherits Rectangle {
 
     callback get-started();
     callback unlock(string);
+    callback request-unfocus();
 
     in property <bool> is-locked: false;
     property <string> pin: "";
+
+    // Background Unfocus Catcher
+    TouchArea {
+        width: 100%; height: 100%;
+        clicked => { root.request-unfocus(); }
+    }
 
     // --- Background Aesthetic ---
     Rectangle {

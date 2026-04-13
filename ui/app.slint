@@ -108,11 +108,13 @@ export component AppWindow inherits Window {
     }
 
     function push-screen(target: int) {
+        focus-scope.focus(); // Release the keyboard and clear cursors
         root.last-screen = root.current-screen;
         root.current-screen = target;
     }
 
     function back() {
+        focus-scope.focus(); // Release the keyboard and clear cursors
         root.current-screen = root.last-screen;
         root.last-screen = 0; // Default fallback to Chat List
     }
@@ -515,6 +517,9 @@ export component AppWindow inherits Window {
                             root.pending-action-id = root.active-conversation.id;
                             root.request-delete-conversation();
                         }
+                        request-unfocus => {
+                            focus-scope.focus();
+                        }
                     }
 
                     if root.current-screen == 3: SettingsScreen {
@@ -640,6 +645,12 @@ export component AppWindow inherits Window {
                             root.copy-to-clipboard(logs);
                             root.global-copied-active = true;
                         }
+                        refresh-debug => {
+                            root.refresh();
+                        }
+                        request-unfocus => {
+                            focus-scope.focus();
+                        }
                     }
 
                     if root.current-screen == 6: EditNameScreen {
@@ -652,6 +663,7 @@ export component AppWindow inherits Window {
                             root.confirm-name-change(name);
                             root.back();
                         }
+                        request-unfocus => { focus-scope.focus(); }
                     }
 
                     if root.current-screen == 8: PasswordScreen {
@@ -666,6 +678,7 @@ export component AppWindow inherits Window {
                         remove-password(cur) => {
                             root.submit-password(cur, "");
                         }
+                        request-unfocus => { focus-scope.focus(); }
                     }
 
                     if root.current-screen == 9: InfoScreen {
@@ -717,6 +730,9 @@ export component AppWindow inherits Window {
                         }
                         toggle-verify(v) => {
                             root.toggle-verify(root.active-conversation.id, v);
+                        }
+                        request-unfocus => {
+                            focus-scope.focus();
                         }
                     }
 
@@ -771,9 +787,10 @@ export component AppWindow inherits Window {
                 }
 
                 // Keyboard Spacer (Mobile only)
-                if root.device == DeviceType.mobile && root.kb-height > 0px: Rectangle {
+                if root.device == DeviceType.mobile : Rectangle {
                     height: root.kb-height;
                     vertical-stretch: 0;
+                    animate height { duration: AppTheme.dur-short; easing: ease-out; }
                 }
 
                 // Mobile Navigation Bar

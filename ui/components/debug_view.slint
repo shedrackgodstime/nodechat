@@ -2,15 +2,17 @@
 // ---------------------------------------------------------
 // 2-D scrollable console for diagnostic logs.
 // Vertical scroll: see all lines. Horizontal scroll: read long lines fully.
-// "Scroll to Bottom" button jumps to the latest entry.
+// ---------------------------------------------------------
 
 import { AppTheme } from "../theme.slint";
 
 export component DebugView inherits Rectangle {
+    in property <bool> is-desktop: false;
     in property <string> debug-logs: "Initializing P2P stack...\nWaiting for Iroh connection...";
+    in property <bool> show-copied: false;
 
     callback copy-clicked(string);
-    in property <bool> show-copied: false;
+    callback refresh-clicked();
 
     background: #000000;
     border-radius: AppTheme.radius-md;
@@ -27,7 +29,7 @@ export component DebugView inherits Rectangle {
             alignment: space-between;
 
             Text {
-                text: "REAL-TIME DIAGNOSTICS";
+                text: "SYSTEM DIAGNOSTICS";
                 font-size: 11px;
                 font-weight: 800;
                 color: AppTheme.accent;
@@ -38,25 +40,22 @@ export component DebugView inherits Rectangle {
                 spacing: AppTheme.sp-sm;
                 alignment: end;
 
-                // Scroll-to-bottom button
-                bottom-touch := TouchArea {
-                    width: 80px;
+                // Refresh Button (Replaces "Latest")
+                refresh-touch := TouchArea {
+                    width: 72px;
                     height: 26px;
-                    clicked => {
-                        // Jump viewport-y to its maximum so user sees latest logs
-                        scroll-area.viewport-y = -(scroll-area.viewport-height - scroll-area.height);
-                    }
+                    clicked => { root.refresh-clicked(); }
                     Rectangle {
-                        background: bottom-touch.pressed ? AppTheme.accent : AppTheme.surface-tertiary;
+                        background: refresh-touch.pressed ? AppTheme.accent-soft : AppTheme.surface-tertiary;
                         border-radius: 4px;
                         border-width: 1px;
                         border-color: AppTheme.accent;
                         animate background { duration: 100ms; }
                         Text {
-                            text: "↓ LATEST";
+                            text: "REFRESH";
                             font-size: 10px;
                             font-weight: 800;
-                            color: bottom-touch.pressed ? #000000 : AppTheme.accent;
+                            color: AppTheme.accent;
                             horizontal-alignment: center;
                             vertical-alignment: center;
                         }
@@ -91,46 +90,51 @@ export component DebugView inherits Rectangle {
             }
         }
 
-        // ── 2-D scroll console ───────────────────────────────────
-        // We use a raw Flickable (not VertScroll) because we explicitly
-        // need BOTH axes for this diagnostic console.
-        // Min height 300px; expands to fill available parent space.
+        // ── Optimized Console Area ──────────────────────────────
         Rectangle {
             vertical-stretch: 1;
-            min-height: 300px;
+            min-height: is-desktop ? 250px : 350px; // Larger touch target on mobile
             background: #09090B;
             border-radius: 4px;
             clip: true;
 
             scroll-area := Flickable {
                 x: 0; y: 0;
-                width: parent.width;
-                height: parent.height;
-                // Content always wider / taller than the visible area drives scrolling.
-                viewport-width: log-text.preferred-width + 32px;
+                width: 100%;
+                height: 100%;
+                viewport-width: Math.max(parent.width, log-text.preferred-width + 32px);
                 viewport-height: log-text.preferred-height + 24px;
+                
+                // CRITICAL FOR MOBILE: 
+                // We ensure it is interactive and has a background to catch touches
                 interactive: true;
 
+                Rectangle {
+                    width: scroll-area.viewport-width;
+                    height: scroll-area.viewport-height;
+                    background: transparent;
+                }
+
                 log-text := Text {
-                    x: 8px;
-                    y: 8px;
+                    x: 12px;
+                    y: 12px;
                     text: root.debug-logs;
                     font-size: 11px;
                     font-family: "monospace";
                     color: #A1A1AA;
-                    wrap: no-wrap; // No word-wrap → horizontal scrolling reveals full lines
+                    wrap: no-wrap; 
                 }
             }
         }
 
-        // ── Scroll hint (shown when there is content to scroll) ─
+        // ── Mobile UX Hint ─────────────────────────────────────
         HorizontalLayout {
             alignment: center;
+            opacity: 0.3;
             Text {
-                text: "← swipe horizontally • swipe up/down to scroll →";
+                text: "Double-finger swipe for horizontal view";
                 font-size: 9px;
                 color: AppTheme.text-tertiary;
-                opacity: 0.5;
                 horizontal-alignment: center;
             }
         }
