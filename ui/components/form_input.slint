@@ -15,9 +15,9 @@ export component FormInput inherits Rectangle {
         input.text = t;
     }
 
-    height: 56px;
+    height: 60px;
     background: AppTheme.surface-secondary;
-    border-radius: AppTheme.radius-md;
+    border-radius: AppTheme.radius-lg;
     border-width: 1px;
     border-color: input.has-focus ? AppTheme.accent : AppTheme.divider;
 
@@ -27,7 +27,7 @@ export component FormInput inherits Rectangle {
         
         input := TextInput {
             vertical-alignment: center;
-            font-size: 15px;
+            font-size: 16px;
             color: #FFFFFF;
             single-line: true;
             text: root.initial-text;

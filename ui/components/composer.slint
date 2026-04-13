@@ -10,6 +10,7 @@ export component Composer inherits Rectangle {
     // Component API
     in property <bool> is-disabled: false;
     in property <bool> is-mobile: false;
+    in property <length> safe-area-bottom: 0px;
     in property <string> placeholder: "Message...";
     in-out property <string> draft <=> input.text;
 
@@ -17,8 +18,8 @@ export component Composer inherits Rectangle {
     callback send-message(string);
     callback attach-file();
 
-    // Height calculation: grows from 52px to 140px
-    height: Math.min(140px, Math.max(52px, input.preferred-height + 16px));
+    // Height calculation: base 60px + safe area
+    height: Math.min(200px, Math.max(60px, input.preferred-height + 16px)) + root.safe-area-bottom;
     background: AppTheme.surface-secondary;
     border-color: AppTheme.divider;
     border-width: 0px; // Seamless look
@@ -27,7 +28,7 @@ export component Composer inherits Rectangle {
         padding-left: 10px;
         padding-right: 10px;
         padding-top: 8px;
-        padding-bottom: 15px;
+        padding-bottom: 8px + root.safe-area-bottom;
         spacing: 8px;
         // --- Attachment Button (Sticky at bottom) ---
         VerticalLayout {
@@ -61,7 +62,7 @@ export component Composer inherits Rectangle {
         Rectangle {
             horizontal-stretch: 1;
             background: AppTheme.surface-tertiary;
-            border-radius: 20px;
+            border-radius: AppTheme.radius-lg;
             border-width: 1px;
             border-color: input.has-focus ? AppTheme.accent : AppTheme.border;
             clip: true;
@@ -92,7 +93,7 @@ export component Composer inherits Rectangle {
                         width: parent.width - 28px;
                         height: 100%;
                         text: root.placeholder;
-                        font-size: 16px;
+                        font-size: 18px;
                         color: #777777;
                         vertical-alignment: center;
                     }
@@ -100,7 +101,7 @@ export component Composer inherits Rectangle {
                     input := TextInput {
                         x: 14px;
                         width: parent.width - 28px;
-                        font-size: 16px;
+                        font-size: 18px;
                         color: AppTheme.text-primary;
                         vertical-alignment: center;
                         single-line: false;
