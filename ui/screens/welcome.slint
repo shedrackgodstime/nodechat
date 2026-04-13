@@ -61,12 +61,12 @@ export component WelcomeScreen inherits Rectangle {
                     spacing: AppTheme.sp-md;
                     alignment: center;
 
-                    if is-locked: VerticalLayout {
-                        spacing: AppTheme.sp-md;
-                        
+                    if is-locked: HorizontalLayout {
+                        alignment: center;
                         Rectangle {
                             height: 60px;
                             width: 100%;
+                            max-width: 400px;
                             background: AppTheme.surface-secondary;
                             border-radius: AppTheme.radius-lg;
                             pin-input := TextInput {
@@ -83,34 +83,38 @@ export component WelcomeScreen inherits Rectangle {
                         }
                     }
 
-                    Rectangle {
-                        height: 60px;
-                        width: 100%;
-                        background: @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%);
-                        border-radius: 30px;
-                        
-                        // Background and Hover effect
+                    HorizontalLayout {
+                        alignment: center;
                         Rectangle {
-                            width: 100%; height: 100%;
-                            background: touch.has-hover ? rgba(255, 255, 255, 0.1) : transparent;
+                            height: 60px;
+                            width: 100%;
+                            max-width: 400px;
+                            background: @linear-gradient(90deg, AppTheme.accent 0%, #0056B3 100%);
                             border-radius: 30px;
-                            animate background { duration: AppTheme.dur-short; }
-                        }
+                            
+                            // Background and Hover effect
+                            Rectangle {
+                                width: 100%; height: 100%;
+                                background: touch.has-hover ? rgba(255, 255, 255, 0.1) : transparent;
+                                border-radius: 30px;
+                                animate background { duration: AppTheme.dur-short; }
+                            }
 
-                        Text {
-                            text: is-locked ? "Unlock Vault" : "Get Started";
-                            font-size: 18px; font-weight: 800; color: #FFFFFF;
-                            horizontal-alignment: center; vertical-alignment: center;
-                        }
+                            Text {
+                                text: is-locked ? "Unlock Vault" : "Get Started";
+                                font-size: 18px; font-weight: 800; color: #FFFFFF;
+                                horizontal-alignment: center; vertical-alignment: center;
+                            }
 
-                        // TouchArea MUST be at the top level to intercept events
-                        touch := TouchArea {
-                            width: 100%; height: 100%;
-                            clicked => {
-                                if (is-locked) {
-                                    if (root.pin != "") { root.unlock(root.pin); }
-                                } else {
-                                    root.get-started();
+                            // TouchArea MUST be at the top level to intercept events
+                            touch := TouchArea {
+                                width: 100%; height: 100%;
+                                clicked => {
+                                    if (is-locked) {
+                                        if (root.pin != "") { root.unlock(root.pin); }
+                                    } else {
+                                        root.get-started();
+                                    }
                                 }
                             }
                         }

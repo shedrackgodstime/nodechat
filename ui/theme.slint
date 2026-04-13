@@ -38,57 +38,63 @@ export global AppTheme {
 
     // --- 2. Typography System ---
     out property <TypoSystem> typo: {
-        label: { size: 11px, weight: 600 },
-        body:  { size: 14px, weight: 400 },
-        header: { size: 16px, weight: 700 },
-        title:  { size: 24px, weight: 800 }
+        label: { size: 12px, weight: 600 },
+        body:  { size: 15px, weight: 400 },
+        header: { size: 18px, weight: 700 },
+        title:  { size: 28px, weight: 900 }
     };
 
-    // --- 3. Color Palette (Simple & High Utility) ---
+    // --- 3. Color Palette (Premium Zinc/Onyx) ---
     // Base Surfaces
-    out property <color> surface-primary:   #09090B;   // Main Background
-    out property <color> surface-secondary: #121215;   // Headers / Secondary Cards
-    out property <color> surface-tertiary:  #1A1A1E;   // Inputs / Dividers
-    out property <color> surface-hover:     #242429;
+    out property <color> surface-primary:   #09090B;   // Deep Charcoal
+    out property <color> surface-secondary: #0F0F12;   // Offset Surface
+    out property <color> surface-tertiary:  #18181B;   // Card / Input Surface
+    out property <color> surface-hover:     #212126;
     
-    // Accents
-    out property <color> accent:          #3F8CFF;   // Branded Blue
-    out property <color> accent-soft:     rgba(63, 140, 255, 0.1);
-    out property <color> accent-success:  #22C55E;
+    // Accents (Electric Blue & Neo-Gradients)
+    out property <color> accent:          #3B82F6;   // Vivid Primary Blue
+    out property <color> accent-gradient: #6366F1;   // Indigo companion
+    out property <color> accent-soft:     rgba(59, 130, 246, 0.12);
+    out property <color> accent-success:  #10B981;
     out property <color> accent-warning:  #F59E0B;
     out property <color> accent-danger:   #EF4444;
 
     // Typography Colors
     out property <color> text-primary:   #FAFAFA;
-    out property <color> text-secondary: #A1A1AA;
-    out property <color> text-tertiary:  #52525B;
+    out property <color> text-secondary: #D4D4D8;
+    out property <color> text-tertiary:  #71717A;
     out property <color> text-inverted:  #000000;
 
+    // Glassmorphism (Modern Premium Effect)
+    out property <color> surface-glass:    rgba(24, 24, 27, 0.85);
+    out property <color> border-glass:     rgba(255, 255, 255, 0.05);
+
     // Chat Bubbles
-    out property <color> bubble-out:      #3F8CFF;
+    out property <color> bubble-out:      #3B82F6;
     out property <color> bubble-in:       #27272A;
 
     // Borders
-    out property <color> divider: #1E1E22;
+    out property <color> divider: #18181B;
     out property <color> border:  #27272A;
 
     // --- 4. Animation ---
     out property <duration> dur-short: 150ms;
     out property <duration> dur-md:    300ms;
+    out property <duration> dur-lg:    500ms;
 
-    // Legacy Aliases (to prevent breaking current components temporarily)
+    // Legacy Aliases
     out property <length> sp-xs: 4px;
     out property <length> sp-sm: 8px;
     out property <length> sp-md: 16px;
     out property <length> sp-lg: 24px;
     out property <length> sp-xl: 32px;
+
+    // Legacy Radius Aliases (required by existing components)
     out property <length> radius-sm: 4px;
     out property <length> radius-md: 8px;
     out property <length> radius-lg: 12px;
     out property <length> radius-xl: 16px;
     out property <length> radius-pill: 999px;
-    out property <color> surface-glass: #1A1A1E;
-    out property <color> accent-gradient: #3F8CFF;
 }
 
 // ---------------------------------------------------------

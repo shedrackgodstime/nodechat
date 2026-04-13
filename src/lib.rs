@@ -4,6 +4,7 @@ pub mod p2p;
 pub mod backend;
 pub mod bridge;
 pub mod crypto;
+pub mod error;
 pub mod ui;
 pub mod ui_models;
 

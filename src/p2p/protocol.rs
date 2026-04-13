@@ -1,13 +1,18 @@
-//! nodechat binary protocol (NC1H)
-//! ---------------------------------------------------------
-//! Handles the binary framing for P2P handshakes and display name exchange.
+//! nodechat binary protocol (NC-P2P) — Version 1.0 (Academic Build)
+//! -------------------------------------------------------------------
+//! This module defines the binary wire format for the NodeChat network.
+//! It uses a custom TLV-style (Type-Length-Value) framing to ensure 
+//! compatibility and strict validation of incoming P2P signals.
 
 use anyhow::{Result, bail};
 
 /// Magic bytes [0x4E, 0x43, 0x31, 0x48] -> "NC1H"
 pub const MAGIC: [u8; 4] = [0x4E, 0x43, 0x31, 0x48];
 
-/// Handshake Types
+/// Current Protocol Version
+pub const VERSION: u8 = 0x01;
+
+/// Handshake Frame Types
 pub const HELLO: u8     = 0x01;
 pub const HELLO_ACK: u8 = 0x02;
 
