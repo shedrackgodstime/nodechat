@@ -126,8 +126,8 @@ export component SettingsScreen inherits Rectangle {
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
                                 icon: "🔑";
-                                title: "Node ID / Ticket";
-                                subtitle: endpoint-ticket != "" ? endpoint-ticket : "Copy your unique join code";
+                                title: "My Unique Join Code";
+                                subtitle: endpoint-ticket != "" ? endpoint-ticket : "Copy your P2P connection code";
                                 accessory: "copy";
                                 show-copied: root.show-copied;
                                 clicked => { 
@@ -138,7 +138,7 @@ export component SettingsScreen inherits Rectangle {
                             ActionRow {
                                 icon: "🔐";
                                 title: root.has-password ? "Change Password/PIN" : "Setup Password/PIN";
-                                subtitle: root.has-password ? "Update security credentials" : "Lock your vault (Optional)";
+                                subtitle: root.has-password ? "Update security credentials" : "Lock your app (Optional)";
                                 clicked => { root.change-password(); }
                             }
                         }
@@ -185,7 +185,7 @@ export component SettingsScreen inherits Rectangle {
                             ActionRow {
                                 icon: "♻️";
                                 title: "Clear Message History";
-                                subtitle: "Delete all local chat history";
+                                subtitle: "Delete all messages from this device";
                                 is-danger: true;
                                 clicked => { root.request-clear-history(); }
                             }
@@ -193,7 +193,7 @@ export component SettingsScreen inherits Rectangle {
                             ActionRow {
                                 icon: "⚠️";
                                 title: "Reset P2P Identity";
-                                subtitle: "Irreversibly destroy vault keys";
+                                subtitle: "Permanently delete your identity & keys";
                                 is-danger: true;
                                 clicked => { root.request-reset-identity(); }
                             }

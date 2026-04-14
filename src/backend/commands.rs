@@ -430,6 +430,18 @@ impl RealBackend {
                     AppEvent::StatusNotice("history cleared".to_string()),
                 ])
             }
+            
+            Command::DeleteMessage { message_id } => {
+                queries::delete_message(&self.conn, &message_id)?;
+                let convo_id = self.active_conversation_id.clone();
+                let messages = self.build_message_items(&convo_id)?;
+                let chat_list = self.build_chat_list()?;
+                Ok(vec![
+                    AppEvent::MessageListReplaced { conversation_id: convo_id, messages },
+                    AppEvent::ChatListUpdated(chat_list),
+                    AppEvent::StatusNotice("Message deleted".to_string()),
+                ])
+            }
         }
     }
 }
