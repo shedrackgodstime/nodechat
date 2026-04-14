@@ -1,30 +1,115 @@
-# Contributing to NodeChat 💬
+# Contributing to NodeChat
 
-Thank you for your interest in contributing to NodeChat! As an open-source project and a Polytechnic Final Year Project, we welcome all kinds of contributions, from bug reports to new features.
+## Purpose
 
-## 🚀 How to Contribute
+This document explains how contributions should be approached in the NodeChat repository.
 
-### 1. Reporting Bugs
-- Use the **Report a Bug** link in the app or open a new issue on GitHub.
-- Clearly describe the issue and provide steps to reproduce it.
-- Include information about your operating system and environment.
+NodeChat is both:
 
-### 2. Feature Suggestions
-- We love new ideas! Use the **Share Suggestions** link in the app to open a feature request.
-- Explain why the feature would be useful and how you imagine it working.
+- a final-year academic project
+- a real software codebase with active implementation work
 
-### 3. Code Contributions
-- Fork the repository.
-- Create a new branch for your feature or fix.
-- Ensure your code follows the standards laid out in [RULES.md](./RULES.md).
-- Submit a Pull Request with a clear description of your changes.
+Because of that, contributions should improve the project in a way that is technically sound, professional, and aligned with the current app.
 
-## 🛠️ Tech Stack
-- **Backend:** Rust (Tokio, Iroh, Rusqlite)
-- **UI:** Slint (Declarative UI framework)
+## What Contributions Are Helpful
 
-## 🎓 Academic Note
-Please keep in mind that this is primarily a student research project. We value constructive feedback that helps us refine the decentralized P2P concepts being explored here.
+Useful contributions include:
 
----
-*Happy Coding!*
+- bug reports with clear reproduction steps
+- fixes for incorrect or inconsistent app behavior
+- improvements to code clarity, maintainability, and test coverage
+- UI refinements that match the current app direction
+- documentation updates based on implemented behavior
+
+The most valuable contributions are the ones that make the app more accurate, more reliable, and easier to defend.
+
+## Contribution Principles
+
+When contributing to NodeChat, follow these rules:
+
+- work from the implemented app, not from assumptions
+- avoid placeholder behavior, placeholder text, or unfinished stubs
+- keep comments, UI text, and docs professional in tone
+- do not overclaim features the app does not fully support
+- prefer small, clear, reviewable changes over broad unfocused edits
+
+## Reporting Bugs
+
+When reporting a bug, include:
+
+- what you expected to happen
+- what actually happened
+- the steps needed to reproduce it
+- platform or environment details when relevant
+
+Good bug reports save time and make the project easier to improve.
+
+## Suggesting Features
+
+Feature suggestions are welcome, but they should be grounded in the current project direction.
+
+A strong feature request should explain:
+
+- the problem being solved
+- why the feature fits NodeChat
+- whether it affects direct chat, group chat, identity, security, storage, or UX
+
+Suggestions are most useful when they extend the existing app clearly rather than changing the project into something unrelated.
+
+## Code Contributions
+
+If you want to contribute code:
+
+1. review the current app behavior first
+2. make sure your change matches the project’s existing structure and tone
+3. keep the implementation focused
+4. verify that the project still builds and tests cleanly after your changes
+
+When changing code, pay attention to:
+
+- Rust and Slint consistency
+- message and conversation state correctness
+- trust and handshake semantics
+- user-facing wording
+- destructive-action safety
+
+## Documentation Contributions
+
+Documentation should be written from the app as it currently works.
+
+That means:
+
+- app behavior comes first
+- docs follow the implementation
+- `/site` content should later grow from the docs, not invent a separate story
+
+If you update documentation, keep it:
+
+- accurate
+- concise
+- professional
+- clear about current scope versus future work
+
+## Pull Request Expectations
+
+A good pull request should:
+
+- explain the problem being addressed
+- summarize the change clearly
+- note any user-facing impact
+- mention verification such as `cargo check` or `cargo test` when relevant
+
+If a change affects app behavior, wording, or trust/security semantics, that should be stated explicitly.
+
+## Standards
+
+Contributors should also follow the project standards already captured in:
+
+- [RULES.md](/home/kristency/Projects/nodechat/docs/RULES.md)
+- [AGENT.md](/home/kristency/Projects/nodechat/docs/AGENT.md)
+
+These documents define the engineering expectations for the repository and should not be ignored during implementation work.
+
+## Final Note
+
+NodeChat should continue to read like a serious and well-reasoned project. Every contribution should help strengthen that outcome.

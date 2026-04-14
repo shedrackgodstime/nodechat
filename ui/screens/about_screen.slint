@@ -94,7 +94,7 @@ export component AboutScreen inherits Rectangle {
                 spacing: AppTheme.sp-lg;
                 alignment: start;
 
-                // Branding
+                // App summary
                 VerticalLayout {
                     spacing: AppTheme.sp-md;
                     padding-top: AppTheme.sp-lg;
@@ -126,15 +126,16 @@ export component AboutScreen inherits Rectangle {
                             font-size: 13px;
                             color: AppTheme.text-tertiary;
                             horizontal-alignment: center;
+                            wrap: word-wrap;
                         }
                     }
                 }
 
-                // Project background
+                // Project context
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text {
-                        text: "ACADEMIC RESEARCH & ORIGINS";
+                        text: "PROJECT";
                         font-size: 11px;
                         font-weight: 800;
                         color: AppTheme.text-tertiary;
@@ -150,14 +151,14 @@ export component AboutScreen inherits Rectangle {
                             padding: AppTheme.sp-lg;
                             spacing: AppTheme.sp-sm;
                             Text {
-                                text: "Final Year Polytechnic Project";
+                                text: "Final Year Project";
                                 font-size: 16px;
                                 font-weight: 700;
                                 color: AppTheme.text-primary;
                             }
 
                             Text {
-                                text: "This application explores private messaging through direct device-to-device communication, local storage, and encrypted transport.";
+                                text: "NodeChat is a final year software project focused on peer-to-peer messaging, local identity, encrypted transport, and a responsive native interface.";
                                 font-size: 14px;
                                 color: AppTheme.text-secondary;
                                 wrap: word-wrap;
@@ -166,11 +167,11 @@ export component AboutScreen inherits Rectangle {
                     }
                 }
 
-                // Open-source links
+                // Links
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text {
-                        text: "OPEN SOURCE COMMUNITY";
+                        text: "LINKS";
                         font-size: 11px;
                         font-weight: 800;
                         color: AppTheme.text-tertiary;
@@ -187,7 +188,7 @@ export component AboutScreen inherits Rectangle {
                             spacing: AppTheme.sp-md;
 
                             Text {
-                                text: root.app-info.name + " is an open-source project. Suggestions, feature requests, and code contributions are welcome.";
+                                text: "Use these links to view the repository, project site, or report issues.";
                                 font-size: 14px;
                                 color: AppTheme.text-secondary;
                                 wrap: word-wrap;
@@ -197,8 +198,8 @@ export component AboutScreen inherits Rectangle {
                                 spacing: 0;
                                 ActionRow {
                                     icon-svg: @image-url("../../assets/icons/globe.svg");
-                                    title: "Official Website";
-                                    subtitle: "Visit our site for news and documentation";
+                                    title: "Project Website";
+                                    subtitle: "Open the public project site";
                                     accessory: "arrow";
                                     clicked => {
                                         root.open-url(root.app-info.website);
@@ -212,8 +213,8 @@ export component AboutScreen inherits Rectangle {
 
                                 ActionRow {
                                     icon-svg: @image-url("../../assets/icons/github.svg");
-                                    title: "Source Code (GitHub)";
-                                    subtitle: "View the Rust and Slint source code";
+                                    title: "Source Code";
+                                    subtitle: "Open the project repository";
                                     accessory: "arrow";
                                     clicked => {
                                         root.open-url(root.app-info.repo);
@@ -227,41 +228,11 @@ export component AboutScreen inherits Rectangle {
 
                                 ActionRow {
                                     icon-svg: @image-url("../../assets/icons/bug.svg");
-                                    title: "Report a Bug";
-                                    subtitle: "Tell us if something isn't working right";
+                                    title: "Report an Issue";
+                                    subtitle: "Open the repository issue tracker";
                                     accessory: "arrow";
                                     clicked => {
-                                        root.open-url(root.app-info.repo + "/blob/main/nodechat-new/docs/bug_report.md");
-                                    }
-                                }
-
-                                Rectangle {
-                                    height: 1px;
-                                    background: AppTheme.divider;
-                                }
-
-                                ActionRow {
-                                    icon-svg: @image-url("../../assets/icons/bulb.svg");
-                                    title: "Share Suggestions";
-                                    subtitle: "We value your feedback and feature ideas";
-                                    accessory: "arrow";
-                                    clicked => {
-                                        root.open-url(root.app-info.repo + "/blob/main/nodechat-new/docs/feature_request.md");
-                                    }
-                                }
-
-                                Rectangle {
-                                    height: 1px;
-                                    background: AppTheme.divider;
-                                }
-
-                                ActionRow {
-                                    icon-svg: @image-url("../../assets/icons/users.svg");
-                                    title: "How to Contribute";
-                                    subtitle: "Contribute to the project";
-                                    accessory: "arrow";
-                                    clicked => {
-                                        root.open-url(root.app-info.repo + "/blob/main/nodechat-new/docs/contributing.md");
+                                        root.open-url(root.app-info.repo + "/issues");
                                     }
                                 }
                             }
@@ -269,11 +240,11 @@ export component AboutScreen inherits Rectangle {
                     }
                 }
 
-                // Technology stack
+                // Technology summary
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text {
-                        text: "BUILT WITH";
+                        text: "TECHNOLOGY";
                         font-size: 11px;
                         font-weight: 800;
                         color: AppTheme.text-tertiary;
@@ -290,7 +261,7 @@ export component AboutScreen inherits Rectangle {
                             spacing: AppTheme.sp-md;
 
                             Text {
-                                text: root.app-info.name + " is built on a foundation of modern, secure, and performant technologies that make decentralized communication possible.";
+                                text: "The app combines a native Slint interface with Rust backend services for storage, networking, and encryption.";
                                 font-size: 13px;
                                 color: AppTheme.text-tertiary;
                                 wrap: word-wrap;
@@ -309,7 +280,7 @@ export component AboutScreen inherits Rectangle {
                                     HorizontalLayout {
                                         padding-left: 18px;
                                         Text {
-                                            text: "Ensuring memory safety and high-performance cross-platform execution.";
+                                            text: "Core application language and runtime foundation.";
                                             font-size: 13px;
                                             color: AppTheme.text-secondary;
                                             wrap: word-wrap;
@@ -328,7 +299,7 @@ export component AboutScreen inherits Rectangle {
                                     HorizontalLayout {
                                         padding-left: 18px;
                                         Text {
-                                            text: "Powers our native, lightweight UI with smooth animations and minimal overhead.";
+                                            text: "Native UI framework used for the desktop and mobile interface.";
                                             font-size: 13px;
                                             color: AppTheme.text-secondary;
                                             wrap: word-wrap;
@@ -347,7 +318,7 @@ export component AboutScreen inherits Rectangle {
                                     HorizontalLayout {
                                         padding-left: 18px;
                                         Text {
-                                            text: "The transport layer used for direct connectivity and peer-to-peer messaging.";
+                                            text: "Peer-to-peer transport used for direct connectivity and group messaging.";
                                             font-size: 13px;
                                             color: AppTheme.text-secondary;
                                             wrap: word-wrap;
@@ -366,7 +337,7 @@ export component AboutScreen inherits Rectangle {
                                     HorizontalLayout {
                                         padding-left: 18px;
                                         Text {
-                                            text: "Providing a robust, SQL-driven local storage for your chat history.";
+                                            text: "Local embedded storage for identity, contacts, and messages.";
                                             font-size: 13px;
                                             color: AppTheme.text-secondary;
                                             wrap: word-wrap;
@@ -385,7 +356,7 @@ export component AboutScreen inherits Rectangle {
                                     HorizontalLayout {
                                         padding-left: 18px;
                                         Text {
-                                            text: "The fast networking system that handles multiple secure connections at once.";
+                                            text: "Asynchronous runtime used for background tasks and transport orchestration.";
                                             font-size: 13px;
                                             color: AppTheme.text-secondary;
                                             wrap: word-wrap;
@@ -397,7 +368,7 @@ export component AboutScreen inherits Rectangle {
                     }
                 }
 
-                // --- 5. SYSTEM DIAGNOSTICS ---
+                // Diagnostics
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text {
@@ -412,8 +383,8 @@ export component AboutScreen inherits Rectangle {
                         spacing: AppTheme.sp-md;
                         ActionRow {
                             icon-svg: @image-url("../../assets/icons/chart.svg");
-                            title: "Real-time Debug Mode";
-                            subtitle: "View low-level networking events";
+                            title: "Debug Console";
+                            subtitle: "View runtime logs and diagnostics";
                             accessory: "toggle";
                             is-toggle-on: root.show-debug;
                             toggled(on) => {
@@ -423,7 +394,7 @@ export component AboutScreen inherits Rectangle {
                     }
                 }
 
-                // --- FOOTER ---
+                // Footer
                 VerticalLayout {
                     padding-top: AppTheme.sp-xl;
                     padding-bottom: AppTheme.sp-xl;
@@ -437,11 +408,11 @@ export component AboutScreen inherits Rectangle {
 
                     TouchArea {
                         clicked => {
-                            root.open-url(root.app-info.website + "/team");
+                            root.open-url(root.app-info.repo);
                         }
                         mouse-cursor: pointer;
                         Text {
-                            text: "Developed by " + root.app-info.name + " Team";
+                            text: "View project repository";
                             font-size: 11px;
                             font-weight: 700;
                             color: AppTheme.accent; 
@@ -453,8 +424,7 @@ export component AboutScreen inherits Rectangle {
         }
     }
 
-    // --- 2. FULL-SCREEN DEBUG OVERLAY ---
-    // Decoupled from the main scroller to solve mobile touch conflicts
+    // Full-screen debug overlay
     if root.show-debug : Rectangle {
         background: AppTheme.surface-primary;
         
@@ -462,7 +432,6 @@ export component AboutScreen inherits Rectangle {
             padding: AppTheme.sp-md;
             spacing: AppTheme.sp-md;
 
-            // Debug Header
             HorizontalLayout {
                 height: 44px;
                 alignment: space-between;
@@ -486,7 +455,6 @@ export component AboutScreen inherits Rectangle {
                 }
             }
 
-            // The Console
             DebugView {
                 is-desktop: root.is-desktop;
                 debug-logs: root.debug-logs;
@@ -495,7 +463,7 @@ export component AboutScreen inherits Rectangle {
                 refresh-clicked => { root.refresh-debug(); }
             }
 
-            Rectangle { height: 10px; } // Bottom margin
+            Rectangle { height: 10px; }
         }
     }
 }
