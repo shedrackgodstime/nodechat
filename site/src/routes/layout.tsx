@@ -9,22 +9,52 @@ export default component$(() => {
       <div class="absolute inset-x-0 top-0 -z-10 h-[520px] bg-[radial-gradient(circle_at_top,_rgba(74,158,232,0.18),_transparent_58%)]" />
 
       <nav class="sticky top-0 z-50 border-b border-divider/80 bg-surface-primary/88 backdrop-blur-xl">
-        <div class="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
-          <Link href="/" class="flex items-center gap-3">
-            <img
-              src="/icons/app_logo_transparent_bg.png"
-              alt="NodeChat"
-              width={40}
-              height={40}
-              class="h-10 w-10"
-            />
-            <div class="flex flex-col">
-              <span class="text-lg font-semibold tracking-tight text-text-primary">NodeChat</span>
-              <span class="text-xs text-text-tertiary">Peer-to-peer messaging project</span>
-            </div>
-          </Link>
+        <div class="mx-auto max-w-6xl px-4 sm:px-6">
+          <div class="flex items-center justify-between gap-4 py-4">
+            <Link href="/" class="min-w-0 flex items-center gap-3">
+              <img
+                src="/icons/app_logo_transparent_bg.png"
+                alt="NodeChat"
+                width={40}
+                height={40}
+                class="h-10 w-10 shrink-0"
+              />
+              <div class="min-w-0 flex flex-col">
+                <span class="text-lg font-semibold tracking-tight text-text-primary">
+                  NodeChat
+                </span>
+                <span class="truncate text-xs text-text-tertiary">
+                  Peer-to-peer messaging project
+                </span>
+              </div>
+            </Link>
 
-          <div class="hidden items-center gap-6 text-sm md:flex">
+            <div class="hidden items-center gap-6 text-sm md:flex">
+              {navItems.map((item) =>
+                item.external ? (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    class="text-text-secondary transition-colors hover:text-accent"
+                  >
+                    {item.label}
+                  </a>
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    class="text-text-secondary transition-colors hover:text-accent"
+                  >
+                    {item.label}
+                  </Link>
+                ),
+              )}
+            </div>
+          </div>
+
+          <div class="no-scrollbar flex gap-2 overflow-x-auto pb-4 md:hidden">
             {navItems.map((item) =>
               item.external ? (
                 <a
@@ -32,7 +62,7 @@ export default component$(() => {
                   href={item.href}
                   target="_blank"
                   rel="noreferrer"
-                  class="text-text-secondary transition-colors hover:text-accent"
+                  class="shrink-0 rounded-full border border-divider bg-surface-secondary/70 px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-accent hover:text-accent"
                 >
                   {item.label}
                 </a>
@@ -40,7 +70,7 @@ export default component$(() => {
                 <Link
                   key={item.href}
                   href={item.href}
-                  class="text-text-secondary transition-colors hover:text-accent"
+                  class="shrink-0 rounded-full border border-divider bg-surface-secondary/70 px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-accent hover:text-accent"
                 >
                   {item.label}
                 </Link>
