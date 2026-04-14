@@ -103,6 +103,7 @@ pub struct ChatPreviewRecord {
     pub is_verified:         bool,
     pub is_session_ready:    bool,
     pub has_queued:          bool,
+    pub unread_count:        i32,
 }
 
 // ── Local Identity ────────────────────────────────────────────────────────────
@@ -468,6 +469,27 @@ pub fn advance_status(conn: &Connection, id: &Uuid, new_status: MessageStatus) -
     .context("advance_status update failed")?;
     Ok(())
 }
+ 
+/// Count incoming messages for a conversation that are not yet marked as 'read'.
+pub fn count_unread(conn: &Connection, target_id: &str, local_node_id: &str) -> Result<i32> {
+    let count: i32 = conn.query_row(
+        "SELECT COUNT(*) FROM messages 
+         WHERE target_id = ?1 AND sender_id != ?2 AND status != 'read'",
+        params![target_id, local_node_id],
+        |row| row.get(0),
+    ).context("count_unread failed")?;
+    Ok(count)
+}
+ 
+/// Mark all incoming messages in a conversation as 'read'.
+pub fn mark_as_read(conn: &Connection, target_id: &str, local_node_id: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE messages SET status = 'read' 
+         WHERE target_id = ?1 AND sender_id != ?2 AND status != 'read'",
+        params![target_id, local_node_id],
+    ).context("mark_as_read failed")?;
+    Ok(())
+}
 
 /// Delete all messages across all conversations.
 pub fn clear_messages(conn: &Connection) -> Result<()> {
@@ -529,6 +551,7 @@ pub fn list_chat_previews(
             is_verified:         peer.verified,
             is_session_ready:    !peer.x25519_pubkey.is_empty(),
             has_queued:          has_queued(conn, &peer.node_id)?,
+            unread_count:        count_unread(conn, &peer.node_id, local_node_id)?,
         });
     }
 
@@ -548,6 +571,7 @@ pub fn list_chat_previews(
             is_verified:         true,   // groups are always trusted locally
             is_session_ready:    true,   // groups don't need point-to-point handshake
             has_queued:          false,  // groups don't queue
+            unread_count:        count_unread(conn, &group.topic_id, local_node_id)?,
         });
     }
 

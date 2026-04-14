@@ -93,7 +93,7 @@ impl RealBackend {
                 is_last_message_outgoing: p.is_outgoing,
                 timestamp:                format_hms(p.timestamp),
                 member_count:             if p.is_group { (neighbor_count + 1) as i32 } else { 0 },     
-                unread_count:             0,     
+                unread_count:             p.unread_count,     
                 is_online,
                 is_relay:                 false, 
                 is_verified:              p.is_verified,

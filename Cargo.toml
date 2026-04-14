@@ -70,6 +70,7 @@ name = "android.permission.FOREGROUND_SERVICE"
 [[package.metadata.android.uses_permission]]
 name = "android.permission.POST_NOTIFICATIONS"
 
+
 [package.metadata.android.application.activity]
 launch_mode = "singleTop"
 always_retain_task_state = true
