@@ -7,6 +7,12 @@ import {
 } from "@builder.io/qwik-city";
 import { docs, findDocBySlug, getAdjacentDocs } from "../../../content/site-content";
 
+const rawDocs = import.meta.glob("/../docs/*.md", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
 interface LoadedDoc {
   slug: string;
   title: string;
@@ -21,23 +27,21 @@ export const useDocContent = routeLoader$(async ({ params }) => {
     return null;
   }
 
-  const { readFile } = await import("node:fs/promises");
-  const path = await import("node:path");
-  const docsRoot = path.resolve(process.cwd(), "..", "docs");
   const relativePath = doc.repoPath.replace(/^\/docs\//, "");
+  const key = `/../docs/${relativePath}`;
+  const content = rawDocs[key];
 
-  try {
-    const content = await readFile(path.join(docsRoot, relativePath), "utf8");
-    return {
-      slug: doc.slug,
-      title: doc.title,
-      description: doc.description,
-      category: doc.category,
-      content,
-    } satisfies LoadedDoc;
-  } catch {
+  if (!content) {
     return null;
   }
+
+  return {
+    slug: doc.slug,
+    title: doc.title,
+    description: doc.description,
+    category: doc.category,
+    content,
+  } satisfies LoadedDoc;
 });
 
 export const onStaticGenerate: StaticGenerateHandler = async () => {
