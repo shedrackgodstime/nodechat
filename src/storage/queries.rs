@@ -485,6 +485,13 @@ pub fn clear_conversation(conn: &Connection, target_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Delete a single message by its UUID.
+pub fn delete_message(conn: &Connection, id: &str) -> Result<()> {
+    conn.execute("DELETE FROM messages WHERE id = ?1", params![id])
+        .context("delete_message failed")?;
+    Ok(())
+}
+
 /// Delete a conversation and its peer or group row entirely.
 pub fn delete_conversation(conn: &Connection, target_id: &str, is_group: bool) -> Result<()> {
     clear_conversation(conn, target_id)?;

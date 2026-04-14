@@ -27,6 +27,7 @@ export component ChatViewScreen inherits Rectangle {
     in property <[MessageData]> messages: [];
     in property <length> virtual-keyboard-height: 0px;
     in property <length> safe-area-bottom: 0px;
+    in property <bool> show-copied: false;
 
     callback go-back();
     callback send-message(string);
@@ -36,6 +37,8 @@ export component ChatViewScreen inherits Rectangle {
     callback retry-queued();
     callback request-delete-conversation();
     callback request-unfocus();
+    callback copy-message(string);
+    callback delete-message(string);
 
     background: AppTheme.surface-primary;
 
@@ -80,7 +83,9 @@ export component ChatViewScreen inherits Rectangle {
                 // Back Button
                 TouchArea {
                     width: 44px;
-                    clicked => { root.go-back(); }
+                    clicked => {
+                        root.go-back();
+                    }
 
                     Text {
                         text: "←";
@@ -113,7 +118,7 @@ export component ChatViewScreen inherits Rectangle {
                         }
 
                         // Presence Dot (Only for 1:1 direct chats)
-                        if connection-mode != "group" && (is-online || is-relay) : Rectangle {
+                        if connection-mode != "group" && (is-online || is-relay): Rectangle {
                             width: 12px;
                             height: 12px;
                             border-radius: 6px;
@@ -142,26 +147,21 @@ export component ChatViewScreen inherits Rectangle {
                             color: AppTheme.text-primary;
                             overflow: elide;
                         }
-
                     }
 
                     Text {
-                        text: connection-mode == "group" ? "Group Conversation"
-                            : connection-stage != "" ? connection-stage
-                            : is-online ? (is-relay ? "via relay" : "direct")
-                            : "offline";
+                        text: connection-mode == "group" ? "Group Conversation" : connection-stage != "" ? connection-stage : is-online ? (is-relay ? "via relay" : "direct") : "offline";
                         font-size: 12px;
-                        color: connection-mode == "group" ? AppTheme.accent
-                            : is-online
-                            ? (is-relay ? AppTheme.accent-warning : AppTheme.accent-success)
-                            : AppTheme.text-tertiary;
+                        color: connection-mode == "group" ? AppTheme.accent : is-online ? (is-relay ? AppTheme.accent-warning : AppTheme.accent-success) : AppTheme.text-tertiary;
                     }
                 }
 
                 // Info Button
                 TouchArea {
                     width: 44px;
-                    clicked => { root.open-contact-info(); }
+                    clicked => {
+                        root.open-contact-info();
+                    }
 
                     Image {
                         source: @image-url("../../assets/icons/dots-vertical.svg");
@@ -188,8 +188,11 @@ export component ChatViewScreen inherits Rectangle {
 
             // Background Unfocus Catcher
             TouchArea {
-                width: 100%; height: 100%;
-                clicked => { root.request-unfocus(); }
+                width: 100%;
+                height: 100%;
+                clicked => {
+                    root.request-unfocus();
+                }
             }
 
             msg-list := VerticalLayout {
@@ -200,9 +203,11 @@ export component ChatViewScreen inherits Rectangle {
                 
                 // Vertical Spacer: Replaces expensive 'alignment: end'.
                 // It pushes messages to the bottom but is much faster for scrolling.
-                Rectangle { vertical-stretch: 1; }
+                Rectangle {
+                    vertical-stretch: 1;
+                }
 
-                if messages.length == 0 : VerticalLayout {
+                if messages.length == 0: VerticalLayout {
                     alignment: center;
                     spacing: AppTheme.sp-md;
                     padding: AppTheme.sp-xl;
@@ -222,9 +227,7 @@ export component ChatViewScreen inherits Rectangle {
                     }
 
                     Text {
-                        text: (connection-mode == "group") 
-                            ? "This p2p group is ready. Tap the header to share the invite ticket with others!"
-                            : "Messages are encrypted in transit.\nSay hello!";
+                        text: (connection-mode == "group") ? "This p2p group is ready. Tap the header to share the invite ticket with others!" : "Messages are encrypted in transit.\nSay hello!";
                         font-size: 13px;
                         color: AppTheme.text-secondary;
                         horizontal-alignment: center;
@@ -232,15 +235,27 @@ export component ChatViewScreen inherits Rectangle {
                     }
                 }
 
-                for msg in root.messages : MessageBubble {
+                for msg in root.messages: MessageBubble {
                     data: msg;
                     is-desktop: root.is-desktop;
+                    is-group: root.connection-mode == "group";
                     open-invite(topic, name, key, joined) => {
                         root.open-invite(topic, name, key, joined);
                     }
                     add-contact(name, ticket) => {
                         root.add-contact(ticket);
                     }
+                    copy-clicked(txt) => {
+                        root.copy-message(txt);
+                    }
+                    delete-clicked(id) => {
+                        root.delete-message(id);
+                    }
+                }
+
+                // --- BREATHING ROOM (Bottom Padding) ---
+                Rectangle {
+                    height: 50px;
                 }
             }
         }
@@ -251,11 +266,29 @@ export component ChatViewScreen inherits Rectangle {
             is-mobile: !root.is-desktop;
             safe-area-bottom: root.safe-area-bottom;
             placeholder: "Message...";
-            send-message(msg) => { 
+            send-message(msg) => {
                 root.send-message(msg);
                 // Instant follow-up jump
                 root.scroll-to-bottom();
             }
+        }
+    }
+
+    // --- TOAST NOTIFICATION (Top Float) ---
+    if root.show-copied: Rectangle {
+        background: AppTheme.accent-success;
+        y: 80px;
+        width: 140px;
+        height: 32px;
+        border-radius: 16px;
+        x: (parent.width - self.width) / 2;
+        Text {
+            text: "Copied ✅";
+            color: #FFFFFF;
+            font-size: 13px;
+            font-weight: 700;
+            horizontal-alignment: center;
+            vertical-alignment: center;
         }
     }
 }

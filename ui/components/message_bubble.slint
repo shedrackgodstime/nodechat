@@ -40,9 +40,14 @@ export component MessageBubble inherits Rectangle {
 
     in property <MessageData> data;
     in property <bool> is-desktop: false; // Tightens offset for narrow panels
+    in property <bool> is-group: false; 
 
     callback open-invite(string, string, string, bool);
     callback add-contact(string, string);
+    callback copy-clicked(string);
+    callback delete-clicked(string);
+
+    property <bool> show-actions: false;
 
     // Responsive offset: smaller on desktop panels, larger on mobile
     property <length> bubble-offset: is-desktop ? 48px : 72px;
@@ -81,64 +86,113 @@ export component MessageBubble inherits Rectangle {
         }
 
         // --- Group Invite Bubble ---
-    if data.is-invite && !data.is-system: HorizontalLayout {
+        if data.is-invite && !data.is-system: HorizontalLayout {
             alignment: data.is-outgoing ? end : start;
             padding-top: AppTheme.space.xs;
             padding-bottom: AppTheme.space.xs;
-            padding-left: data.is-outgoing ? AppTheme.space.xl : AppTheme.space.sm;
-            padding-right: data.is-outgoing ? AppTheme.space.sm : AppTheme.space.xl;
+            padding-left: data.is-outgoing ? bubble-offset : AppTheme.space.sm;
+            padding-right: data.is-outgoing ? AppTheme.space.sm : bubble-offset;
 
-            Rectangle {
-                max-width: 280px;
-                border-radius: AppTheme.space.radius-lg;
-                background: AppTheme.surface-tertiary;
-                border-color: AppTheme.accent-soft;
-                border-width: 1px;
+            VerticalLayout {
+                spacing: 2px;
+                
+                TouchArea {
+                    clicked => { root.show-actions = !root.show-actions; }
+                    Rectangle {
+                        max-width: 280px;
+                        border-radius: AppTheme.space.radius-lg;
+                        background: AppTheme.surface-tertiary;
+                        border-color: AppTheme.accent-soft;
+                        border-width: 1px;
 
-                VerticalLayout {
-                    padding: AppTheme.space.md;
-                    spacing: AppTheme.space.sm;
-
-                    Text {
-                        text: "📨 Group Invite";
-                        font-size: AppTheme.typo.label.size;
-                        font-weight: AppTheme.typo.label.weight;
-                        color: AppTheme.accent;
-                        letter-spacing: 0.5px;
-                    }
-
-                    Text {
-                        text: data.invite-name != "" ? data.invite-name : "Unnamed Group";
-                        font-size: AppTheme.typo.header.size;
-                        font-weight: AppTheme.typo.header.weight;
-                        color: AppTheme.text-primary;
-                        wrap: word-wrap;
-                    }
-
-                    if data.invite-desc != "": Text {
-                        text: data.invite-desc;
-                        font-size: 13px;
-                        color: AppTheme.text-secondary;
-                        wrap: word-wrap;
-                    }
-
-                    TouchArea {
-                        height: 36px;
-                        clicked => {
-                            root.open-invite(data.invite-topic, data.invite-name, data.invite-key, data.is-invite-joined);
-                        }
-
-                        Rectangle {
-                            border-radius: AppTheme.space.radius-md;
-                            background: data.is-invite-joined ? AppTheme.surface-hover : AppTheme.accent;
+                        VerticalLayout {
+                            padding: AppTheme.space.md;
+                            spacing: AppTheme.space.sm;
 
                             Text {
-                                text: data.is-invite-joined ? "View Group" : "Join Group";
+                                text: "📨 Group Invite";
                                 font-size: AppTheme.typo.label.size;
                                 font-weight: AppTheme.typo.label.weight;
-                                color: data.is-invite-joined ? AppTheme.text-primary : AppTheme.text-inverted;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
+                                color: AppTheme.accent;
+                                letter-spacing: 0.5px;
+                            }
+
+                            Text {
+                                text: data.invite-name != "" ? data.invite-name : "Unnamed Group";
+                                font-size: AppTheme.typo.header.size;
+                                font-weight: AppTheme.typo.header.weight;
+                                color: AppTheme.text-primary;
+                                wrap: word-wrap;
+                            }
+
+                            if data.invite-desc != "": Text {
+                                text: data.invite-desc;
+                                font-size: 13px;
+                                color: AppTheme.text-secondary;
+                                wrap: word-wrap;
+                            }
+
+                            TouchArea {
+                                height: 36px;
+                                clicked => {
+                                    root.open-invite(data.invite-topic, data.invite-name, data.invite-key, data.is-invite-joined);
+                                }
+
+                                Rectangle {
+                                    border-radius: AppTheme.space.radius-md;
+                                    background: data.is-invite-joined ? AppTheme.surface-hover : AppTheme.accent;
+
+                                    Text {
+                                        text: data.is-invite-joined ? "View Group" : "Join Group";
+                                        font-size: AppTheme.typo.label.size;
+                                        font-weight: AppTheme.typo.label.weight;
+                                        color: data.is-invite-joined ? AppTheme.text-primary : AppTheme.text-inverted;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Action Bar for Invites
+                if root.show-actions : HorizontalLayout {
+                    alignment: data.is-outgoing ? end : start;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+                    spacing: 8px;
+
+                    // Copy Invite Link
+                    TouchArea {
+                        width: 32px; height: 28px;
+                        clicked => { root.copy-clicked(data.invite-topic + "|" + data.invite-key); root.show-actions = false; }
+                        Rectangle {
+                            background: AppTheme.surface-tertiary;
+                            border-radius: 6px;
+                            border-width: 1px; border-color: AppTheme.divider;
+                            Image {
+                                source: @image-url("../../assets/icons/clipboard.svg");
+                                width: 14px; height: 14px;
+                                colorize: AppTheme.text-secondary;
+                                horizontal-alignment: center; vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Delete Invite
+                    TouchArea {
+                        width: 32px; height: 28px;
+                        clicked => { root.delete-clicked(data.id); root.show-actions = false; }
+                        Rectangle {
+                            background: AppTheme.surface-tertiary;
+                            border-radius: 6px;
+                            border-width: 1px; border-color: AppTheme.divider;
+                            Image {
+                                source: @image-url("../../assets/icons/delete.svg");
+                                width: 14px; height: 14px;
+                                colorize: AppTheme.accent-danger;
+                                horizontal-alignment: center; vertical-alignment: center;
                             }
                         }
                     }
@@ -151,52 +205,101 @@ export component MessageBubble inherits Rectangle {
             alignment: data.is-outgoing ? end : start;
             padding-top: AppTheme.space.xs;
             padding-bottom: AppTheme.space.xs;
-            padding-left: data.is-outgoing ? AppTheme.space.xl : AppTheme.space.sm;
-            padding-right: data.is-outgoing ? AppTheme.space.sm : AppTheme.space.xl;
+            padding-left: data.is-outgoing ? bubble-offset : AppTheme.space.sm;
+            padding-right: data.is-outgoing ? AppTheme.space.sm : bubble-offset;
 
-            Rectangle {
-                max-width: 280px;
-                border-radius: AppTheme.space.radius-lg;
-                background: AppTheme.surface-tertiary;
-                border-color: AppTheme.accent-soft;
-                border-width: 1px;
+            VerticalLayout {
+                spacing: 2px;
+                
+                TouchArea {
+                    clicked => { root.show-actions = !root.show-actions; }
+                    Rectangle {
+                        max-width: 280px;
+                        border-radius: AppTheme.space.radius-lg;
+                        background: AppTheme.surface-tertiary;
+                        border-color: AppTheme.accent-soft;
+                        border-width: 1px;
 
-                VerticalLayout {
-                    padding: AppTheme.space.md;
-                    spacing: AppTheme.space.sm;
+                        VerticalLayout {
+                            padding: AppTheme.space.md;
+                            spacing: AppTheme.space.sm;
 
-                    Text {
-                        text: "👤 Shared Contact";
-                        font-size: AppTheme.typo.label.size;
-                        font-weight: AppTheme.typo.label.weight;
-                        color: AppTheme.accent;
-                        letter-spacing: 0.5px;
-                    }
-
-                    Text {
-                        text: data.share-name != "" ? data.share-name : "Unknown Peer";
-                        font-size: AppTheme.typo.header.size;
-                        font-weight: AppTheme.typo.header.weight;
-                        color: AppTheme.text-primary;
-                        wrap: word-wrap;
-                    }
-
-                    TouchArea {
-                        height: 36px;
-                        clicked => {
-                            root.add-contact(data.share-name, data.share-ticket != "" ? data.share-ticket : data.share-node-id);
-                        }
-
-                        Rectangle {
-                            border-radius: AppTheme.space.radius-md;
-                            background: AppTheme.accent;
                             Text {
-                                text: "Add Peer";
+                                text: "👤 Shared Contact";
                                 font-size: AppTheme.typo.label.size;
                                 font-weight: AppTheme.typo.label.weight;
-                                color: AppTheme.text-inverted;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
+                                color: AppTheme.accent;
+                                letter-spacing: 0.5px;
+                            }
+
+                            Text {
+                                text: data.share-name != "" ? data.share-name : "Unknown Peer";
+                                font-size: AppTheme.typo.header.size;
+                                font-weight: AppTheme.typo.header.weight;
+                                color: AppTheme.text-primary;
+                                wrap: word-wrap;
+                            }
+
+                            TouchArea {
+                                height: 36px;
+                                clicked => {
+                                    root.add-contact(data.share-name, data.share-ticket != "" ? data.share-ticket : data.share-node-id);
+                                }
+
+                                Rectangle {
+                                    border-radius: AppTheme.space.radius-md;
+                                    background: AppTheme.accent;
+                                    Text {
+                                        text: "Add Peer";
+                                        font-size: AppTheme.typo.label.size;
+                                        font-weight: AppTheme.typo.label.weight;
+                                        color: AppTheme.text-inverted;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Action Bar for Contact Shares
+                if root.show-actions : HorizontalLayout {
+                    alignment: data.is-outgoing ? end : start;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+                    spacing: 8px;
+
+                    // Copy Contact Ticket
+                    TouchArea {
+                        width: 32px; height: 28px;
+                        clicked => { root.copy-clicked(data.share-ticket != "" ? data.share-ticket : data.share-node-id); root.show-actions = false; }
+                        Rectangle {
+                            background: AppTheme.surface-tertiary;
+                            border-radius: 6px;
+                            border-width: 1px; border-color: AppTheme.divider;
+                            Image {
+                                source: @image-url("../../assets/icons/clipboard.svg");
+                                width: 14px; height: 14px;
+                                colorize: AppTheme.text-secondary;
+                                horizontal-alignment: center; vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Delete Contact Share
+                    TouchArea {
+                        width: 32px; height: 28px;
+                        clicked => { root.delete-clicked(data.id); root.show-actions = false; }
+                        Rectangle {
+                            background: AppTheme.surface-tertiary;
+                            border-radius: 6px;
+                            border-width: 1px; border-color: AppTheme.divider;
+                            Image {
+                                source: @image-url("../../assets/icons/delete.svg");
+                                width: 14px; height: 14px;
+                                colorize: AppTheme.accent-danger;
+                                horizontal-alignment: center; vertical-alignment: center;
                             }
                         }
                     }
@@ -218,7 +321,7 @@ export component MessageBubble inherits Rectangle {
                 spacing: 2px;
 
                 // Sender name — incoming group messages only
-            if !data.is-outgoing && data.sender != "": HorizontalLayout {
+                if !data.is-outgoing && data.sender != "" && root.is-group: HorizontalLayout {
                     padding-left: AppTheme.space.sm;
 
                     Text {
@@ -230,70 +333,111 @@ export component MessageBubble inherits Rectangle {
                 }
 
                 // The bubble body
-            Rectangle {
-                    border-radius: AppTheme.space.radius-lg;
-                    background: data.is-outgoing ? AppTheme.bubble-out : AppTheme.bubble-in;
+                bubble-body := TouchArea {
+                    clicked => {
+                        root.show-actions = !root.show-actions;
+                    }
 
-                    VerticalLayout {
-                        padding-left: AppTheme.space.md;
-                        padding-right: AppTheme.space.md;
-                        padding-top: AppTheme.space.sm;
-                        padding-bottom: AppTheme.space.sm;
-                        spacing: AppTheme.space.xs;
+                    Rectangle {
+                        max-width: root.is-desktop ? 600px : 10000px; // Cap at 600px on desktop
+                        border-radius: AppTheme.space.radius-lg;
+                        background: data.is-outgoing ? AppTheme.bubble-out : AppTheme.bubble-in;
 
-                        Text {
-                            text: data.text;
-                            font-size: AppTheme.typo.body.size;
-                            font-weight: AppTheme.typo.body.weight;
-                            color: data.is-outgoing ? #FFFFFF : AppTheme.text-primary;
-                            wrap: word-wrap;
-                        }
-
-                        // Timestamp + status row
-                    HorizontalLayout {
-                            alignment: end;
+                        VerticalLayout {
+                            padding-left: AppTheme.space.md;
+                            padding-right: AppTheme.space.md;
+                            padding-top: AppTheme.space.sm;
+                            padding-bottom: AppTheme.space.sm;
                             spacing: AppTheme.space.xs;
 
                             Text {
-                                text: data.timestamp;
-                                font-size: AppTheme.typo.label.size;
-                                font-weight: AppTheme.typo.label.weight;
-                                color: data.is-outgoing ? rgba(255, 255, 255, 0.7) : AppTheme.text-tertiary;
-                                vertical-alignment: center;
+                                text: data.text;
+                                font-size: AppTheme.typo.body.size;
+                                font-weight: AppTheme.typo.body.weight;
+                                color: data.is-outgoing ? #FFFFFF : AppTheme.text-primary;
+                                wrap: word-wrap;
                             }
 
+                            // Timestamp + status row
+                            HorizontalLayout {
+                                alignment: end;
+                                spacing: AppTheme.space.xs;
 
-                            // SVG status indicator (outgoing only) — cross-platform safe
-                        if data.is-outgoing && data.status == "delivered": Image {
-                                source: @image-url("../../assets/icons/check-check.svg");
-                                width: 14px;
-                                height: 14px;
-                                colorize: AppTheme.accent-success;
-                                y: (parent.height - self.height) / 2;
+                                Text {
+                                    text: data.timestamp;
+                                    font-size: AppTheme.typo.label.size;
+                                    font-weight: AppTheme.typo.label.weight;
+                                    color: data.is-outgoing ? rgba(255, 255, 255, 0.7) : AppTheme.text-tertiary;
+                                    vertical-alignment: center;
+                                }
+
+                                // SVG status indicators...
+                                if data.is-outgoing && data.status == "delivered": Image {
+                                    source: @image-url("../../assets/icons/check-check.svg");
+                                    width: 14px; height: 14px;
+                                    colorize: AppTheme.accent-success;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                                if data.is-outgoing && data.status == "sent": Image {
+                                    source: @image-url("../../assets/icons/check.svg");
+                                    width: 14px; height: 14px;
+                                    colorize: rgba(255, 255, 255, 0.5);
+                                    y: (parent.height - self.height) / 2;
+                                }
+                                if data.is-outgoing && data.status == "failed": Image {
+                                    source: @image-url("../../assets/icons/failed.svg");
+                                    width: 14px; height: 14px;
+                                    colorize: AppTheme.accent-danger;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                                if data.is-outgoing && data.status == "queued": Image {
+                                    source: @image-url("../../assets/icons/clock.svg");
+                                    width: 14px; height: 14px;
+                                    colorize: rgba(255, 255, 255, 0.5);
+                                    y: (parent.height - self.height) / 2;
+                                }
                             }
+                        }
+                    }
+                }
 
-                            if data.is-outgoing && data.status == "sent": Image {
-                                source: @image-url("../../assets/icons/check.svg");
-                                width: 14px;
-                                height: 14px;
-                                colorize: rgba(255, 255, 255, 0.5);
-                                y: (parent.height - self.height) / 2;
+                // --- NEW ACTION BAR (Appears on Tap/Hover) ---
+                if root.show-actions : HorizontalLayout {
+                    alignment: data.is-outgoing ? end : start;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+                    spacing: 8px;
+
+                    // Copy Button
+                    TouchArea {
+                        width: 32px; height: 28px;
+                        clicked => { root.copy-clicked(data.text); root.show-actions = false; }
+                        Rectangle {
+                            background: AppTheme.surface-tertiary;
+                            border-radius: 6px;
+                            border-width: 1px; border-color: AppTheme.divider;
+                            Image {
+                                source: @image-url("../../assets/icons/clipboard.svg");
+                                width: 14px; height: 14px;
+                                colorize: AppTheme.text-secondary;
+                                horizontal-alignment: center; vertical-alignment: center;
                             }
+                        }
+                    }
 
-                            if data.is-outgoing && data.status == "failed": Image {
-                                source: @image-url("../../assets/icons/failed.svg");
-                                width: 14px;
-                                height: 14px;
+                    // Delete Button
+                    TouchArea {
+                        width: 32px; height: 28px;
+                        clicked => { root.delete-clicked(data.id); root.show-actions = false; }
+                        Rectangle {
+                            background: AppTheme.surface-tertiary;
+                            border-radius: 6px;
+                            border-width: 1px; border-color: AppTheme.divider;
+                            Image {
+                                source: @image-url("../../assets/icons/delete.svg");
+                                width: 14px; height: 14px;
                                 colorize: AppTheme.accent-danger;
-                                y: (parent.height - self.height) / 2;
-                            }
-
-                            if data.is-outgoing && data.status == "queued": Image {
-                                source: @image-url("../../assets/icons/clock.svg");
-                                width: 14px;
-                                height: 14px;
-                                colorize: rgba(255, 255, 255, 0.5);
-                                y: (parent.height - self.height) / 2;
+                                horizontal-alignment: center; vertical-alignment: center;
                             }
                         }
                     }

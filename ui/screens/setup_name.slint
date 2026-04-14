@@ -89,7 +89,7 @@ export component SetupNameScreen inherits Rectangle {
                         VerticalLayout {
                             spacing: AppTheme.sp-sm;
                             Text { text: "What's your name?"; font-size: 32px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px; horizontal-alignment: center; }
-                            Text { text: "This will be your local display name. It's stored encrypted on your device and only shared during P2P handshakes."; font-size: 15px; color: AppTheme.text-tertiary; wrap: word-wrap; horizontal-alignment: center; }
+                            Text { text: "This is your display name. It stays on your device and is only shared with peers you choose to talk to."; font-size: 15px; color: AppTheme.text-tertiary; wrap: word-wrap; horizontal-alignment: center; }
                         }
 
                         // --- Input Fields ---
@@ -154,7 +154,7 @@ export component SetupNameScreen inherits Rectangle {
                                         root.confirm-name(root.display-name, ""); 
                                     }
                                     Text {
-                                        text: "Create My Private Vault";
+                                        text: "Create Identity & Start";
                                         font-size: 17px; font-weight: 800;
                                         color: root.valid ? #FFFFFF : AppTheme.text-tertiary;
                                         horizontal-alignment: center; vertical-alignment: center;

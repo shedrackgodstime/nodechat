@@ -127,7 +127,7 @@ fn apply_chats(ui: &AppWindow, chats: Vec<ChatListItem>) {
         id: c.conversation_id.clone().into(),
         name: c.title.clone().into(),
         initials: c.initials.clone().into(),
-        last_message: c.last_message.clone().into(),
+        last_message: c.last_message.replace('\n', " ").replace('\r', "").trim().into(),
         timestamp: c.timestamp.clone().into(),
         unread: c.unread_count,
         is_group: matches!(c.kind, crate::contract::ConversationKind::Group),

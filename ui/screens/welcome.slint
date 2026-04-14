@@ -52,12 +52,12 @@ export component WelcomeScreen inherits Rectangle {
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text {
-                        text: is-locked ? "Vault Locked" : "Privacy by Design";
+                        text: is-locked ? "PIN Protection" : "Secure P2P Messenger";
                         font-size: 20px; font-weight: 700; color: AppTheme.text-primary;
                         horizontal-alignment: center;
                     }
                     Text {
-                        text: is-locked ? "Enter your PIN to resume chats" : "Decentralized. Peer-to-Peer. Encrypted.";
+                        text: is-locked ? "Enter your PIN to resume chats" : "Decentralized • Peer-to-Peer • Encrypted";
                         font-size: 15px; color: AppTheme.text-tertiary;
                         horizontal-alignment: center;
                     }
@@ -108,7 +108,7 @@ export component WelcomeScreen inherits Rectangle {
                             }
 
                             Text {
-                                text: is-locked ? "Unlock Vault" : "Get Started";
+                                text: is-locked ? "Unlock & Enter" : "Get Started";
                                 font-size: 18px; font-weight: 800; color: #FFFFFF;
                                 horizontal-alignment: center; vertical-alignment: center;
                             }

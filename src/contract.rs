@@ -311,6 +311,9 @@ pub enum Command {
         scope: HistoryScope,
         confirmation_pin: Option<String>,
     },
+    DeleteMessage {
+        message_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

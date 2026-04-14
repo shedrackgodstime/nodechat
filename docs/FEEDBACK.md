@@ -1,18 +1,8 @@
-materials/slint-ui_docs
-
-The debugging is still not scrollable on mobile 
-When I tried to scroll inside the whole page just scroll....
-
-Message should have delete and copy of each of them...
-
-
-
-The input on composer I should be able to scroll inside... When the text are more and part of it are now hidden... I should be able to scroll the text..... Especially on mobile..... 
-
 
 
 Now before we do our first release we now look Into the write up, the whole app text visible to user... How simple it is? How general it is how pro it is? And most especially how consistent it is? 
 
+and then we works on the comments too.. the whole app.. the comments need to stay pro and to help me defend better
 
 
 Looking forward to add notifications feature so user get notifications especially on Android...

@@ -198,6 +198,11 @@ pub fn run_app() -> anyhow::Result<()> {
     });
 
     let cmd = ui_bridge.clone();
+    app.on_delete_single_message(move |id| {
+        let _ = cmd.send(Command::DeleteMessage { message_id: id.to_string() });
+    });
+
+    let cmd = ui_bridge.clone();
     app.on_share_contact(move |id, _targets| {
         let _ = cmd.send(Command::ShareContact { 
             contact_id: id.to_string(), 

@@ -196,6 +196,8 @@ export component AppWindow inherits Window {
     callback open-chat(ChatPreview);
     callback add-peer(string);
     callback refresh();
+    callback copy-to-clipboard(string);
+    callback delete-single-message(string);
 
     open-settings => {
         root.push-screen(3);
@@ -235,7 +237,6 @@ export component AppWindow inherits Window {
     callback request-clear-history();
     callback request-reset-identity();
     callback open-url(string);
-    callback copy-to-clipboard(string);
     
     // Missing P2P Callbacks
     callback unlock-app(string);
@@ -486,6 +487,7 @@ export component AppWindow inherits Window {
                         messages: root.active-messages;
                         virtual-keyboard-height: root.kb-height;
                         safe-area-bottom: root.safe-area-bottom;
+                        show-copied: root.global-copied-active;
                         go-back => {
                             root.back();
                         }
@@ -516,6 +518,13 @@ export component AppWindow inherits Window {
                         request-delete-conversation => {
                             root.pending-action-id = root.active-conversation.id;
                             root.request-delete-conversation();
+                        }
+                        copy-message(txt) => {
+                            root.copy-to-clipboard(txt);
+                            root.global-copied-active = true;
+                        }
+                        delete-message(id) => {
+                            root.delete-single-message(id);
                         }
                         request-unfocus => {
                             focus-scope.focus();
@@ -555,7 +564,7 @@ export component AppWindow inherits Window {
                         }
                         request-reset-identity => {
                             root.confirm-modal-slug = "delete-identity";
-                            root.confirm-modal-title = "Nuke Identity";
+                            root.confirm-modal-title = "Reset Identity";
                             root.confirm-modal-subtitle = "WARNING: You will lose your Peer ID and Contacts forever.";
                             root.confirm-modal-show = true;
                         }
@@ -714,7 +723,7 @@ export component AppWindow inherits Window {
                         }
                         request-delete => {
                             root.pending-action-id = root.active-conversation.id;
-                            root.confirm-modal-title = root.active-conversation.kind == "group" ? "Leave Swarm" : "Remove Contact";
+                            root.confirm-modal-title = root.active-conversation.kind == "group" ? "Leave Group" : "Remove Contact";
                             root.confirm-modal-subtitle = root.active-conversation.kind == "group" ? "Exit this P2P conversation topic." : "Disconnect from peer and delete history.";
                             root.confirm-modal-slug = root.active-conversation.kind == "group" ? "leave-group" : "delete-chat";
                             root.confirm-modal-show = true;
