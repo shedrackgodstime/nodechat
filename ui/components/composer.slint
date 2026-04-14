@@ -76,42 +76,42 @@ export component Composer inherits Rectangle {
                 }
             }
 
-            scroll := Flickable {
+                scroll := Flickable {
                 width: 100%;
                 height: 100%;
                 interactive: true;
                 viewport-width: self.width;
-                viewport-height: Math.max(parent.height, input.preferred-height);
+                viewport-height: Math.max(self.height, input.preferred-height + 16px);
 
                 Rectangle {
                     width: 100%;
-                    height: input.preferred-height;
+                    height: Math.max(parent.height, input.preferred-height);
                     
                     // Manual Placeholder
                     if input.text == "": Text {
                         x: 14px;
+                        y: 8px;
                         width: parent.width - 28px;
-                        height: 100%;
                         text: root.placeholder;
                         font-size: 18px;
                         color: #777777;
-                        vertical-alignment: center;
                     }
 
                     input := TextInput {
                         x: 14px;
+                        y: 8px;
                         width: parent.width - 28px;
                         font-size: 18px;
                         color: AppTheme.text-primary;
-                        vertical-alignment: center;
+                        vertical-alignment: top;
                         single-line: false;
                         wrap: word-wrap;
                         enabled: !root.is-disabled;
 
-                        // --- THE MAGIC: Auto-scroll to cursor ---
+                        // --- THE MAGIC: Smooth Auto-scroll to cursor ---
                         cursor-position-changed(cursor-pos) => {
-                            if (cursor-pos.y + scroll.viewport-y < 8px) {
-                                scroll.viewport-y = - cursor-pos.y + 8px;
+                            if (cursor-pos.y + scroll.viewport-y < 12px) {
+                                scroll.viewport-y = - cursor-pos.y + 12px;
                             } else if (cursor-pos.y + scroll.viewport-y > scroll.height - 32px) {
                                 scroll.viewport-y = scroll.height - cursor-pos.y - 32px;
                             }
