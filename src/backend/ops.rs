@@ -84,11 +84,14 @@ async fn process_queued_messages(
     for msg in queued {
         let is_online = network.has_connection(conversation_id);
         let peer = queries::get_peer(&conn, conversation_id)?;
-        let is_verified = peer.as_ref().map(|p| p.verified).unwrap_or(false);
+        let has_session_key = peer
+            .as_ref()
+            .map(|p| p.x25519_pubkey.len() == 64)
+            .unwrap_or(false);
 
-        if !is_group && (!is_online || !is_verified) {
+        if !is_group && (!is_online || !has_session_key) {
              if let Some(ticket) = ticket_hint.clone() {
-                 if !is_verified {
+                 if !has_session_key {
                      let net = network.clone();
                      let db = db_path.to_path_buf();
                      let target = conversation_id.to_string();

@@ -1,7 +1,4 @@
-//! Iroh Gossip — encrypted group broadcast swarm.
-//!
-//! Implements `NetworkManager::broadcast_group` and `NetworkManager::subscribe_group`.
-//! Wired for Iroh 0.97.0 (RULES.md P-02).
+//! Group transport built on Iroh Gossip subscriptions and broadcasts.
 
 use anyhow::Result;
 use iroh_gossip::proto::TopicId;
@@ -11,7 +8,7 @@ use super::{NetworkManager, NetworkEvent};
 
 /// Subscribe to the gossip swarm for `topic_id`.
 ///
-/// Idempotency is enforced by the caller in `NetworkManager::subscribe_group` (RULES.md P-05).
+/// The caller is responsible for ensuring repeated subscriptions are treated idempotently.
 ///
 /// # Errors
 /// Returns an error if the gossip subscription fails.
@@ -30,7 +27,7 @@ pub(crate) async fn subscribe(
     let id = derive_topic_id(topic_id);
     let topic_id_owned = topic_id.to_owned();
 
-    // Join the topic swarm with bootstrap peers (RULES.md P-02)
+    // Start receiving traffic for this topic and forward events into the backend.
     let res = gossip.subscribe(id, bootstrap).await?;
     let (_sender, mut receiver) = res.split();
 
@@ -68,7 +65,7 @@ pub(crate) async fn subscribe(
 }
 
 /// Join the gossip swarm for `topic_id` with additional bootstrap peers.
-/// Does not spawn a receiver task. Use this to update an existing subscription.
+/// This variant does not spawn a receiver task and is used to refresh bootstrap peers.
 pub(crate) async fn join_topic(
     manager: NetworkManager,
     topic_id: &str,
@@ -83,7 +80,7 @@ pub(crate) async fn join_topic(
     Ok(())
 }
 
-/// Broadcast `payload` to all members of `topic_id` gossip swarm.
+/// Broadcast `payload` to the gossip topic identified by `topic_id`.
 pub(crate) async fn broadcast(
     manager: NetworkManager,
     topic_id: &str,
@@ -96,9 +93,8 @@ pub(crate) async fn broadcast(
 
     let id = derive_topic_id(topic_id);
     
-    // We attempt to broadcast regardless of local neighbor count.
-    // The Gossip engine will handle propagation if/when neighbors appear.
-    // This prevents the flush loop from failing and allows the message to reach the engine.
+    // Submit the payload even if no neighbors are currently visible. Gossip handles fan-out
+    // once peers are available and this keeps the caller's send path simple.
     let res = gossip.subscribe(id, vec![]).await?;
     let (sender, _) = res.split();
     sender.broadcast(payload.into()).await?;
@@ -118,10 +114,8 @@ pub(crate) async fn leave(
         inner.gossip.clone().ok_or_else(|| anyhow::anyhow!("gossip not initialised"))?
     };
     let _id = derive_topic_id(topic_id);
-    // Note: Iroh Gossip 0.97.0 handle typically manages lifecycles via the Subscription handle 
-    // which is dropped when the task ends. For now, we rely on clearing local state.
-    
-    // Clear neighbors locally
+    // Subscription lifetime is currently managed by the spawned receiver task, so local
+    // neighbor state is the only bookkeeping cleared here.
     {
         let mut inner = manager.inner.lock().unwrap_or_else(|p| p.into_inner());
         inner.group_neighbors.insert(topic_id.to_string(), 0);
@@ -130,7 +124,7 @@ pub(crate) async fn leave(
     Ok(())
 }
 
-/// Helper to derive a 32-byte TopicId from a string name (RULES.md P-02).
+/// Derives a deterministic 32-byte gossip topic identifier from the application topic string.
 fn derive_topic_id(name: &str) -> TopicId {
     let mut hasher = Sha256::new();
     hasher.update(name.as_bytes());

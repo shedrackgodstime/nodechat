@@ -687,10 +687,10 @@ mod tests {
     #[test]
     fn peer_upsert_updates_name() {
         let conn = open_in_memory().unwrap();
-        insert_peer(&conn, &peer()).unwrap();
+        upsert_peer(&conn, &peer()).unwrap();
         let mut updated = peer();
         updated.display_name = "Bobby".to_string();
-        insert_peer(&conn, &updated).unwrap(); // upsert
+        upsert_peer(&conn, &updated).unwrap();
         let got = get_peer(&conn, "ddeeff334455").unwrap().expect("should exist");
         assert_eq!(got.display_name, "Bobby");
     }
@@ -698,7 +698,7 @@ mod tests {
     #[test]
     fn verified_toggle() {
         let conn = open_in_memory().unwrap();
-        insert_peer(&conn, &peer()).unwrap();
+        upsert_peer(&conn, &peer()).unwrap();
         set_peer_verified(&conn, "ddeeff334455", true).unwrap();
         assert!(get_peer(&conn, "ddeeff334455").unwrap().unwrap().verified);
     }
@@ -706,7 +706,7 @@ mod tests {
     #[test]
     fn message_insert_and_list() {
         let conn = open_in_memory().unwrap();
-        insert_peer(&conn, &peer()).unwrap();
+        upsert_peer(&conn, &peer()).unwrap();
         let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Queued);
         insert_message(&conn, &msg).unwrap();
         let msgs = list_messages(&conn, "ddeeff334455").unwrap();
@@ -717,7 +717,7 @@ mod tests {
     #[test]
     fn message_idempotent_insert() {
         let conn = open_in_memory().unwrap();
-        insert_peer(&conn, &peer()).unwrap();
+        upsert_peer(&conn, &peer()).unwrap();
         let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Sent);
         insert_message(&conn, &msg).unwrap();
         insert_message(&conn, &msg).unwrap(); // second insert must be ignored
@@ -727,7 +727,7 @@ mod tests {
     #[test]
     fn status_advances_forward() {
         let conn = open_in_memory().unwrap();
-        insert_peer(&conn, &peer()).unwrap();
+        upsert_peer(&conn, &peer()).unwrap();
         let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Queued);
         insert_message(&conn, &msg).unwrap();
         advance_status(&conn, &msg.id, MessageStatus::Sent).unwrap();
@@ -739,7 +739,7 @@ mod tests {
     #[test]
     fn status_backward_transition_rejected() {
         let conn = open_in_memory().unwrap();
-        insert_peer(&conn, &peer()).unwrap();
+        upsert_peer(&conn, &peer()).unwrap();
         let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Delivered);
         insert_message(&conn, &msg).unwrap();
         assert!(advance_status(&conn, &msg.id, MessageStatus::Queued).is_err());
@@ -748,7 +748,7 @@ mod tests {
     #[test]
     fn has_queued_reflects_status() {
         let conn = open_in_memory().unwrap();
-        insert_peer(&conn, &peer()).unwrap();
+        upsert_peer(&conn, &peer()).unwrap();
         let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Queued);
         insert_message(&conn, &msg).unwrap();
         assert!(has_queued(&conn, "ddeeff334455").unwrap());
@@ -760,7 +760,7 @@ mod tests {
     #[test]
     fn delete_conversation_removes_peer_and_messages() {
         let conn = open_in_memory().unwrap();
-        insert_peer(&conn, &peer()).unwrap();
+        upsert_peer(&conn, &peer()).unwrap();
         let msg = message("ddeeff334455", "aabbcc001122", MessageStatus::Sent);
         insert_message(&conn, &msg).unwrap();
         delete_conversation(&conn, "ddeeff334455", false).unwrap();
@@ -775,8 +775,8 @@ mod tests {
         let mut p2 = peer();
         p2.node_id = "ffffff000000".to_string();
         p2.display_name = "Carol".to_string();
-        insert_peer(&conn, &p1).unwrap();
-        insert_peer(&conn, &p2).unwrap();
+        upsert_peer(&conn, &p1).unwrap();
+        upsert_peer(&conn, &p2).unwrap();
 
         let mut m1 = message("ddeeff334455", "aabbcc001122", MessageStatus::Sent);
         m1.timestamp = 1_000;

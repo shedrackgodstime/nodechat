@@ -1,8 +1,4 @@
-// NodeChat Design System — Simple & Systemic
-// ---------------------------------------------------------
-// This theme system borrows best-practices from Slint's
-// official demos (Printer Demo, Energy Monitor).
-// ---------------------------------------------------------
+// Shared theme tokens for typography, spacing, color, and motion.
 
 export struct Font {
     size: length,
@@ -30,13 +26,13 @@ export struct MeasurementSystem {
 }
 
 export global AppTheme {
-    // --- 1. Measurement System (8pt Grid) ---
+    // Measurement system based on an 8-point spacing scale.
     out property <MeasurementSystem> space: {
         xs: 4px, sm: 8px, md: 16px, lg: 24px, xl: 32px,
         radius-sm: 4px, radius-md: 8px, radius-lg: 12px, radius-xl: 16px, radius-pill: 999px
     };
 
-    // --- 2. Typography System ---
+    // Typography system.
     out property <TypoSystem> typo: {
         label: { size: 12px, weight: 600 },
         body:  { size: 15px, weight: 400 },
@@ -44,14 +40,13 @@ export global AppTheme {
         title:  { size: 28px, weight: 900 }
     };
 
-    // --- 3. Color Palette (Premium Zinc/Onyx) ---
-    // Base Surfaces
+    // Base surfaces.
     out property <color> surface-primary:   #09090B;   // Deep Charcoal
     out property <color> surface-secondary: #0F0F12;   // Offset Surface
     out property <color> surface-tertiary:  #18181B;   // Card / Input Surface
     out property <color> surface-hover:     #212126;
     
-    // Accents (Electric Blue & Neo-Gradients)
+    // Accent colors.
     out property <color> accent:          #3B82F6;   // Vivid Primary Blue
     out property <color> accent-gradient: #6366F1;   // Indigo companion
     out property <color> accent-soft:     rgba(59, 130, 246, 0.12);
@@ -59,37 +54,37 @@ export global AppTheme {
     out property <color> accent-warning:  #F59E0B;
     out property <color> accent-danger:   #EF4444;
 
-    // Typography Colors
+    // Text colors.
     out property <color> text-primary:   #FAFAFA;
     out property <color> text-secondary: #D4D4D8;
     out property <color> text-tertiary:  #71717A;
     out property <color> text-inverted:  #000000;
 
-    // Glassmorphism (Modern Premium Effect)
+    // Glass-style overlays.
     out property <color> surface-glass:    rgba(24, 24, 27, 0.85);
     out property <color> border-glass:     rgba(255, 255, 255, 0.05);
 
-    // Chat Bubbles
+    // Chat bubble colors.
     out property <color> bubble-out:      #3B82F6;
     out property <color> bubble-in:       #27272A;
 
-    // Borders
+    // Borders.
     out property <color> divider: #18181B;
     out property <color> border:  #27272A;
 
-    // --- 4. Animation ---
+    // Animation timings.
     out property <duration> dur-short: 150ms;
     out property <duration> dur-md:    300ms;
     out property <duration> dur-lg:    500ms;
 
-    // Legacy Aliases
+    // Legacy aliases retained for existing components.
     out property <length> sp-xs: 4px;
     out property <length> sp-sm: 8px;
     out property <length> sp-md: 16px;
     out property <length> sp-lg: 24px;
     out property <length> sp-xl: 32px;
 
-    // Legacy Radius Aliases (required by existing components)
+    // Legacy radius aliases retained for existing components.
     out property <length> radius-sm: 4px;
     out property <length> radius-md: 8px;
     out property <length> radius-lg: 12px;
@@ -97,14 +92,12 @@ export global AppTheme {
     out property <length> radius-pill: 999px;
 }
 
-// ---------------------------------------------------------
-// VertScroll — The ONE way to scroll in NodeChat
-// ---------------------------------------------------------
+// Wrapper component that exposes the vertical-only scroll behavior used across the app.
 export component VertScroll inherits Rectangle {
     in-out property <length> viewport-height <=> flick.viewport-height;
     in-out property <length> viewport-y <=> flick.viewport-y;
 
-    clip: true; // Allowed here because we inherit from Rectangle
+    clip: true; // Clips child content because this wrapper inherits from `Rectangle`.
 
     flick := Flickable {
         width: 100%;

@@ -30,6 +30,8 @@ impl RealBackend {
     }
 
     pub(super) fn build_snapshot(&self) -> Result<AppSnapshot> {
+        let network_status = self.network.connection_status();
+        let group_neighbors = self.network.total_group_neighbors();
         let identity = self.build_identity_view().unwrap_or_else(|e| {
             tracing::error!("Snapshot: failed to build identity view: {}", e);
             IdentityView::empty()
@@ -53,7 +55,11 @@ impl RealBackend {
         Ok(AppSnapshot {
             identity,
             app_info:            AppInfoView::current(),
-            app_flags:           AppFlags { direct_peer_count: 0, relay_peer_count: 0, is_offline: true },
+            app_flags:           AppFlags {
+                direct_peer_count: network_status.direct as i32,
+                relay_peer_count: network_status.relay as i32,
+                is_offline: network_status.direct == 0 && network_status.relay == 0 && group_neighbors == 0,
+            },
             chat_list,
             contact_list,
             group_candidates,
@@ -88,7 +94,7 @@ impl RealBackend {
                 kind:                     if p.is_group { ConversationKind::Group } else { ConversationKind::Direct },
                 title:                    p.title,
                 initials:                 p.initials,
-                last_message:             if !p.is_session_ready && p.last_message.is_empty() { "Waiting for handshake...".to_string() } else { p.last_message },
+                last_message:             if !p.is_session_ready && p.last_message.is_empty() { "Awaiting secure handshake".to_string() } else { p.last_message },
                 last_message_status:      p.last_message_status,
                 is_last_message_outgoing: p.is_outgoing,
                 timestamp:                format_hms(p.timestamp),
@@ -136,7 +142,7 @@ impl RealBackend {
     }
 
     pub(super) fn build_conversation_view(&self, conversation_id: &str) -> Result<ConversationView> {
-        // Group check first
+        // Group conversation
         if let Some(group) = queries::get_group(&self.conn, conversation_id)? {
             let neighbor_count = self.network.group_neighbor_count(conversation_id);
             return Ok(ConversationView {
@@ -150,19 +156,19 @@ impl RealBackend {
                 is_relay:         false,
                 is_verified:      true,
                 is_session_ready: neighbor_count > 0,
-                connection_stage: if neighbor_count > 0 { "Swarm Active".to_string() } else { "Connecting to Swarm...".to_string() },
+                connection_stage: if neighbor_count > 0 { "Group transport connected".to_string() } else { "Joining group transport".to_string() },
                 member_count:     (neighbor_count + 1) as i32,
                 return_screen:    0,
             });
         }
-        // Direct peer
+        // Direct conversation
         if let Some(peer) = queries::get_peer(&self.conn, conversation_id)? {
             let is_online = self.network.has_connection(&peer.node_id);
             let is_session_ready = !peer.x25519_pubkey.is_empty();
             let connection_stage = if is_online {
-                if peer.verified { "Secure P2P session active" } else { "Handshaking..." }
+                if is_session_ready { "Secure session established" } else { "Handshake in progress" }
             } else {
-                "Peer offline"
+                "Peer not connected"
             }.to_string();
 
             return Ok(ConversationView {

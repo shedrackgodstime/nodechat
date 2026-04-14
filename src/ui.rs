@@ -6,7 +6,7 @@ use std::thread;
 pub fn run_app() -> anyhow::Result<()> {
     let app = AppWindow::new().context("failed to create Slint window")?;
     
-    // Wire the Hardware Back Button (Android/Mobile)
+    // Route Android close requests through the in-app back-navigation handler first.
     #[cfg(target_os = "android")]
     {
         let ui_handle = app.as_weak();
@@ -23,12 +23,12 @@ pub fn run_app() -> anyhow::Result<()> {
     let runtime = RealRuntime::start().context("failed to open local database")?;
     let ui_bridge = runtime.ui.clone();
 
-    // --- 1. Event Listener (Backend -> UI) ---
+    // Pump backend events onto the Slint event loop so UI state updates stay thread-safe.
     let ui_handle = app.as_weak();
     let event_bridge = runtime.ui.clone();
     thread::spawn(move || {
         loop {
-            // Drain events and apply them to Slint properties
+            // Apply all pending backend events in one pass to reduce UI wakeups.
             for event in event_bridge.drain_events() {
                 let h = ui_handle.clone();
                 let _ = slint::invoke_from_event_loop(move || {
@@ -37,14 +37,12 @@ pub fn run_app() -> anyhow::Result<()> {
                     }
                 });
             }
-            // Avoid tight loop
+            // Keep the bridge responsive without spinning continuously.
             thread::sleep(std::time::Duration::from_millis(16));
         }
     });
 
-    // --- 2. Callback Wiring (UI -> Backend Commands) ---
-    
-    // Identity & Global Settings
+    // UI callbacks forward user actions into the backend command channel.
     let cmd = ui_bridge.clone();
     app.on_confirm_name_change(move |name| {
         let _ = cmd.send(Command::UpdateDisplayName { display_name: name.to_string() });
@@ -81,13 +79,11 @@ pub fn run_app() -> anyhow::Result<()> {
         let _ = cmd.send(Command::Refresh);
     });
 
-    // Navigation and Context Loading
     let cmd = ui_bridge.clone();
     app.on_load_conversation(move |id, _is_group| {
         let _ = cmd.send(Command::LoadConversation { conversation_id: id.to_string() });
     });
 
-    // Chat Actions
     let cmd = ui_bridge.clone();
     let ui_handle = app.as_weak();
     app.on_send_message(move |text| {
@@ -125,7 +121,6 @@ pub fn run_app() -> anyhow::Result<()> {
         }
     });
 
-    // Utils & Platform Integration
     app.on_open_url(|url| {
         #[cfg(target_os = "android")]
         { let _ = open_url_android(url.as_str()); }
@@ -188,7 +183,6 @@ pub fn run_app() -> anyhow::Result<()> {
         });
     });
 
-    // ... additional UI hooks
     let handle = app.as_weak();
     app.on_copy_to_clipboard(move |text| {
         if let Some(ui) = handle.upgrade() {

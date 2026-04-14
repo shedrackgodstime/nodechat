@@ -1,5 +1,4 @@
-// NodeChat New — Create P2P Group Screen
-// ---------------------------------------------------------
+// Screen for creating a new group conversation.
 
 import { AppTheme } from "../theme.slint";
 import { Button } from "../components/button.slint";
@@ -20,7 +19,7 @@ export component CreateGroupScreen inherits Rectangle {
         height: 100%;
         spacing: 0;
 
-        // 1. Header (Consistent with InfoScreen)
+        // Header
         Rectangle {
             height: is-desktop ? 80px : 64px;
             background: AppTheme.surface-secondary;
@@ -46,19 +45,19 @@ export component CreateGroupScreen inherits Rectangle {
                 VerticalLayout {
                     alignment: center;
                     Text { text: "New Group"; font-size: is-desktop ? 24px : 18px; font-weight: 700; color: AppTheme.text-primary; }
-                    Text { text: "Establish a new P2P swarm"; font-size: 13px; color: AppTheme.text-secondary; }
+                    Text { text: "Create a shared group conversation"; font-size: 13px; color: AppTheme.text-secondary; }
                 }
             }
         }
 
-        // 2. Body
+        // Body
         VerticalLayout {
             padding: AppTheme.sp-lg;
             padding-top: AppTheme.sp-xl;
             spacing: AppTheme.sp-lg;
             alignment: start;
 
-            // Notice Box
+            // Introductory note
             Rectangle {
                 background: AppTheme.accent-soft;
                 border-radius: AppTheme.radius-md;
@@ -68,7 +67,7 @@ export component CreateGroupScreen inherits Rectangle {
                 VerticalLayout {
                     padding: AppTheme.sp-md;
                     Text {
-                        text: "Groups in " + root.app-info.name + " are decentralized swarms. Once created, you can share the Join Ticket with others to invite them.";
+                        text: "Groups in " + root.app-info.name + " use peer-to-peer group transport. After creation, selected members receive invitations through direct messages.";
                         font-size: 13px;
                         color: AppTheme.text-secondary;
                         wrap: word-wrap;
@@ -76,7 +75,7 @@ export component CreateGroupScreen inherits Rectangle {
                 }
             }
 
-            // Inputs
+            // Group fields
             VerticalLayout {
                 spacing: AppTheme.sp-sm;
                 Text { text: "GROUP NAME"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1.5px; }
@@ -92,13 +91,13 @@ export component CreateGroupScreen inherits Rectangle {
                     placeholder: "What is this group about?";
                 }
                 Text { 
-                    text: "This helps others identify the swarm purpose."; 
+                    text: "This helps invited members recognize the group."; 
                     font-size: 11px; 
                     color: AppTheme.text-tertiary; 
                 }
             }
 
-            // Next Button
+            // Continue to member selection
             Button {
                 text: "Next: Select Members";
                 kind: "primary";

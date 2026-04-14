@@ -1,13 +1,6 @@
-// NodeChat New — Message Bubble Component
-// ---------------------------------------------------------
-// Renders a single chat message.
-// Supports: outgoing vs incoming, timestamps, status,
-// invite bubbles, system messages.
-//
-// Width strategy: asymmetric padding (not max-width) to avoid
-// ScrollView binding loops while keeping bubbles ~70% wide.
-// The 'is-desktop' flag tightens the offset for narrow panels.
-// ---------------------------------------------------------
+// Message bubble component for standard messages, invites, shared contacts, and system rows.
+// Uses asymmetric padding instead of a fixed max-width to avoid layout loops while
+// keeping bubbles at a readable width across desktop and mobile layouts.
 
 import { AppTheme } from "../theme.slint";
 
@@ -35,11 +28,10 @@ export struct MessageData {
 }
 
 export component MessageBubble inherits Rectangle {
-    // Ensure bubbles adapt correctly to screen size
     width: 100%;
 
     in property <MessageData> data;
-    in property <bool> is-desktop: false; // Tightens offset for narrow panels
+    in property <bool> is-desktop: false; // Uses a smaller side offset in narrower desktop panels.
     in property <bool> is-group: false; 
 
     callback open-invite(string, string, string, bool);
@@ -49,13 +41,13 @@ export component MessageBubble inherits Rectangle {
 
     property <bool> show-actions: false;
 
-    // Responsive offset: smaller on desktop panels, larger on mobile
+    // Adjust side padding so bubble width stays balanced across layouts.
     property <length> bubble-offset: is-desktop ? 48px : 72px;
 
     VerticalLayout {
         spacing: 0;
 
-        // --- System Message ---
+        // System message row
         if data.is-system: HorizontalLayout {
             alignment: center;
             padding-top: AppTheme.space.sm;
@@ -85,7 +77,7 @@ export component MessageBubble inherits Rectangle {
             }
         }
 
-        // --- Group Invite Bubble ---
+        // Group invite bubble
         if data.is-invite && !data.is-system: HorizontalLayout {
             alignment: data.is-outgoing ? end : start;
             padding-top: AppTheme.space.xs;
@@ -156,14 +148,14 @@ export component MessageBubble inherits Rectangle {
                     }
                 }
 
-                // Action Bar for Invites
+                // Inline actions for invite messages
                 if root.show-actions : HorizontalLayout {
                     alignment: data.is-outgoing ? end : start;
                     padding-top: 4px;
                     padding-bottom: 4px;
                     spacing: 8px;
 
-                    // Copy Invite Link
+                    // Copy invite data
                     TouchArea {
                         width: 32px; height: 28px;
                         clicked => { root.copy-clicked(data.invite-topic + "|" + data.invite-key); root.show-actions = false; }
@@ -180,7 +172,7 @@ export component MessageBubble inherits Rectangle {
                         }
                     }
 
-                    // Delete Invite
+                    // Delete invite message
                     TouchArea {
                         width: 32px; height: 28px;
                         clicked => { root.delete-clicked(data.id); root.show-actions = false; }
@@ -200,7 +192,7 @@ export component MessageBubble inherits Rectangle {
             }
         }
 
-        // --- Contact Share Bubble ---
+        // Shared contact bubble
         if data.is-contact-share && !data.is-system: HorizontalLayout {
             alignment: data.is-outgoing ? end : start;
             padding-top: AppTheme.space.xs;

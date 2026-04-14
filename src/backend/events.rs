@@ -8,7 +8,7 @@ use super::RealBackend;
 use super::utils::current_timestamp;
 
 impl RealBackend {
-    /// Process incoming background P2P events.
+    /// Processes transport-layer events and translates them into persisted state and UI updates.
     pub async fn handle_network_event(&mut self, event: NetworkEvent) -> Vec<AppEvent> {
         let mut events = vec![];
         match event {
@@ -45,12 +45,17 @@ impl RealBackend {
                 if payload.starts_with(&MAGIC) {
                     if let Ok(frame) = HandshakeFrame::decode(&payload) {
                         tracing::info!(peer=%from, kind=%frame.kind, name=%frame.display_name, "NC1H handshake received");
+                        let existing_verified = queries::get_peer(&self.conn, &from)
+                            .ok()
+                            .flatten()
+                            .map(|peer| peer.verified)
+                            .unwrap_or(false);
                         let _ = queries::upsert_peer(&self.conn, &PeerRecord {
                             node_id:         from.clone(),
                             display_name:    frame.display_name.clone(),
                             endpoint_ticket: frame.ticket.clone(),
                             x25519_pubkey:   hex::encode(frame.x25519_public),
-                            verified:        true,
+                            verified:        existing_verified,
                         });
 
                         if frame.kind == HELLO {
@@ -182,8 +187,8 @@ impl RealBackend {
                                                     invite_topic_id: String::new(), invite_group_name: String::new(), invite_key: String::new(),
                                                 });
                                                 
-                                                // Note: We don't notify for every single synced message to avoid spamming the user.
-                                                // We only notify for the latest one if it's new.
+                                                // Sync replies may contain many historical messages, so the UI is
+                                                // refreshed once after insertion instead of per message.
                                             }
                                         }
                                         if self.active_conversation_id == topic {

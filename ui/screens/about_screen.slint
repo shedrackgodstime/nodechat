@@ -1,5 +1,4 @@
-// NodeChat New — About & Diagnostics Screen
-// ---------------------------------------------------------
+// About screen with project information and diagnostics access.
 
 import { AppTheme, VertScroll } from "../theme.slint";
 import { ActionRow } from "../components/action_row.slint";
@@ -10,7 +9,7 @@ export component AboutScreen inherits Rectangle {
     in property <AppInfo> app-info;
     in property <bool> is-desktop: false;
     
-    // State to toggle debug view
+    // Toggles the diagnostics overlay.
     property <bool> show-debug: false;
     in property <bool> show-copied: false;
     in property <string> debug-logs: "[NodeChat] Waiting for events...";
@@ -21,7 +20,7 @@ export component AboutScreen inherits Rectangle {
     callback refresh-debug();
     callback request-unfocus();
 
-    // Background Unfocus Catcher
+    // Capture taps outside focused controls.
     TouchArea {
         width: 100%; height: 100%;
         clicked => { root.request-unfocus(); }
@@ -29,7 +28,6 @@ export component AboutScreen inherits Rectangle {
 
     background: AppTheme.surface-primary;
 
-    // --- 1. MAIN CONTENT (Scrollable info) ---
     VerticalLayout {
         width: 100%;
         height: 100%;
@@ -37,7 +35,7 @@ export component AboutScreen inherits Rectangle {
         opacity: root.show-debug ? 0 : 1;
         visible: self.opacity > 0;
 
-        // 1. Header
+        // Header
         Rectangle {
             height: is-desktop ? 80px : 64px;
             background: AppTheme.surface-secondary;
@@ -85,7 +83,7 @@ export component AboutScreen inherits Rectangle {
             }
         }
 
-        // 2. Body
+        // Body
         VertScroll {
             vertical-stretch: 1;
             viewport-height: about-body.preferred-height;
@@ -96,7 +94,7 @@ export component AboutScreen inherits Rectangle {
                 spacing: AppTheme.sp-lg;
                 alignment: start;
 
-                // --- 1. PREMIUM BRANDING ---
+                // Branding
                 VerticalLayout {
                     spacing: AppTheme.sp-md;
                     padding-top: AppTheme.sp-lg;
@@ -132,7 +130,7 @@ export component AboutScreen inherits Rectangle {
                     }
                 }
 
-                // --- 2. PROJECT ORIGINS (AUCHI POLY) ---
+                // Project background
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text {
@@ -159,7 +157,7 @@ export component AboutScreen inherits Rectangle {
                             }
 
                             Text {
-                                text: "This application explored how to make messaging truly private. Based on Auchi Polytechnic research, it connects devices directly to each other using advanced P2P technology and encryption.";
+                                text: "This application explores private messaging through direct device-to-device communication, local storage, and encrypted transport.";
                                 font-size: 14px;
                                 color: AppTheme.text-secondary;
                                 wrap: word-wrap;
@@ -168,7 +166,7 @@ export component AboutScreen inherits Rectangle {
                     }
                 }
 
-                // --- 3. OPEN SOURCE & CONTRIBUTIONS ---
+                // Open-source links
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text {
@@ -189,7 +187,7 @@ export component AboutScreen inherits Rectangle {
                             spacing: AppTheme.sp-md;
 
                             Text {
-                                text: root.app-info.name + " is an open-source initiative. We are always open to suggestions, feature requests, and code contributions from the community to help make P2P communication accessible to everyone.";
+                                text: root.app-info.name + " is an open-source project. Suggestions, feature requests, and code contributions are welcome.";
                                 font-size: 14px;
                                 color: AppTheme.text-secondary;
                                 wrap: word-wrap;
@@ -260,7 +258,7 @@ export component AboutScreen inherits Rectangle {
                                 ActionRow {
                                     icon-svg: @image-url("../../assets/icons/users.svg");
                                     title: "How to Contribute";
-                                    subtitle: "Help us build the future of P2P chat";
+                                    subtitle: "Contribute to the project";
                                     accessory: "arrow";
                                     clicked => {
                                         root.open-url(root.app-info.repo + "/blob/main/nodechat-new/docs/contributing.md");
@@ -271,7 +269,7 @@ export component AboutScreen inherits Rectangle {
                     }
                 }
 
-                // --- 4. BUILT WITH (TECHNOLOGIES) ---
+                // Technology stack
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text {
@@ -349,7 +347,7 @@ export component AboutScreen inherits Rectangle {
                                     HorizontalLayout {
                                         padding-left: 18px;
                                         Text {
-                                            text: "The P2P engine that connects you to others without using any central servers.";
+                                            text: "The transport layer used for direct connectivity and peer-to-peer messaging.";
                                             font-size: 13px;
                                             color: AppTheme.text-secondary;
                                             wrap: word-wrap;
