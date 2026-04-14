@@ -106,13 +106,17 @@ impl RealBackend {
                                         }
                                     }
 
+                                    let status = if self.active_conversation_id == from { MessageStatus::Read } else { MessageStatus::Delivered };
+
                                     let record = MessageRecord {
                                         id, kind, target_id: from.clone(), sender_id: from.clone(), content: text,
                                         timestamp: current_timestamp(), received_at: current_timestamp(),
-                                        status: MessageStatus::Delivered, invite_topic_id, invite_group_name, invite_key,
+                                        status, invite_topic_id, invite_group_name, invite_key,
                                     };
                                     let _ = queries::insert_message(&self.conn, &record);
-                                    let _ = self.send_receipt(from.clone(), id, false);
+                                    let _ = self.send_receipt(from.clone(), id, status == MessageStatus::Read);
+
+
                                     
                                     if let Ok(msg) = self.to_message_item(&record) {
                                         events.push(AppEvent::MessageAppended { conversation_id: from.clone(), message: msg });
@@ -135,12 +139,16 @@ impl RealBackend {
                         if plaintext.starts_with(&crate::p2p::protocol::GROUP_MAGIC) {
                             if let Ok(frame) = crate::p2p::protocol::GroupFrame::decode(&plaintext) {
                                 if let Ok(text) = String::from_utf8(frame.content) {
+                                    let status = if self.active_conversation_id == topic { MessageStatus::Read } else { MessageStatus::Delivered };
+
                                     let record = MessageRecord {
                                         id: frame.id, kind: "standard".to_string(), target_id: topic.clone(), sender_id: frame.sender_id.clone(),
-                                        content: text, timestamp: frame.timestamp, received_at: current_timestamp(), status: MessageStatus::Delivered,
+                                        content: text, timestamp: frame.timestamp, received_at: current_timestamp(), status,
                                         invite_topic_id: String::new(), invite_group_name: String::new(), invite_key: String::new(),
                                     };
                                     let _ = queries::insert_message(&self.conn, &record);
+
+
                                     if let Ok(msg) = self.to_message_item(&record) {
                                         events.push(AppEvent::MessageAppended { conversation_id: topic.clone(), message: msg });
                                         if let Ok(chat_list) = self.build_chat_list() { events.push(AppEvent::ChatListUpdated(chat_list)); }
@@ -173,6 +181,9 @@ impl RealBackend {
                                                     content: text, timestamp: frame.timestamp, received_at: current_timestamp(), status: MessageStatus::Delivered,
                                                     invite_topic_id: String::new(), invite_group_name: String::new(), invite_key: String::new(),
                                                 });
+                                                
+                                                // Note: We don't notify for every single synced message to avoid spamming the user.
+                                                // We only notify for the latest one if it's new.
                                             }
                                         }
                                         if self.active_conversation_id == topic {

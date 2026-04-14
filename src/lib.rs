@@ -7,6 +7,7 @@ pub mod crypto;
 pub mod error;
 pub mod ui;
 pub mod ui_models;
+pub mod notifications;
 
 slint::include_modules!();
 

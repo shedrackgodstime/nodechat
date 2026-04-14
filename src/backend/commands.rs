@@ -17,6 +17,12 @@ impl RealBackend {
 
             Command::LoadConversation { conversation_id } => {
                 self.active_conversation_id = conversation_id.clone();
+                
+                // --- UNREAD MANAGEMENT ---
+                queries::mark_as_read(&self.conn, &conversation_id, &self.local_node_id)?;
+                let chat_list = self.build_chat_list()?;
+                // -------------------------
+
                 let view = self.build_conversation_view(&conversation_id)?;
                 let messages = self.build_message_items(&conversation_id)?;
                 Ok(vec![
@@ -25,6 +31,7 @@ impl RealBackend {
                         conversation_id: view.conversation_id,
                         messages,
                     },
+                    AppEvent::ChatListUpdated(chat_list), // Refresh counters on home screen
                 ])
             }
 
