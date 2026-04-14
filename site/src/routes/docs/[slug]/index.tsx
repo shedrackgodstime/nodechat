@@ -1,93 +1,270 @@
 import { component$ } from "@builder.io/qwik";
-import { routeLoader$ } from "@builder.io/qwik-city";
+import {
+  Link,
+  routeLoader$,
+  type DocumentHead,
+  type StaticGenerateHandler,
+} from "@builder.io/qwik-city";
+import { docs, findDocBySlug, getAdjacentDocs } from "../../../content/site-content";
+
+interface LoadedDoc {
+  slug: string;
+  title: string;
+  description: string;
+  category: string;
+  content: string;
+}
 
 export const useDocContent = routeLoader$(async ({ params }) => {
-  const slug = params.slug;
-  const repoOwner = "shedrackgodstime";
-  const repoName = "nodechat";
-  const rawUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/main/docs/${slug}.md`;
+  const doc = findDocBySlug(params.slug);
+  if (!doc) {
+    return null;
+  }
+
+  const { readFile } = await import("node:fs/promises");
+  const path = await import("node:path");
+  const docsRoot = path.resolve(process.cwd(), "..", "docs");
+  const relativePath = doc.repoPath.replace(/^\/docs\//, "");
 
   try {
-    const response = await fetch(rawUrl);
-    if (!response.ok) return null;
-    const content = await response.text();
-    return content;
+    const content = await readFile(path.join(docsRoot, relativePath), "utf8");
+    return {
+      slug: doc.slug,
+      title: doc.title,
+      description: doc.description,
+      category: doc.category,
+      content,
+    } satisfies LoadedDoc;
   } catch {
     return null;
   }
 });
 
-export default component$(() => {
-  const content = useDocContent();
+export const onStaticGenerate: StaticGenerateHandler = async () => {
+  return {
+    params: docs.map((doc) => ({ slug: doc.slug })),
+  };
+};
 
-  if (!content.value) {
+export default component$(() => {
+  const loaded = useDocContent();
+
+  if (!loaded.value) {
     return (
-      <div class="max-w-6xl mx-auto px-6 py-12">
-        <a href="/docs" class="text-accent hover:underline">
-          ← Back to docs
-        </a>
-        <h1 class="text-2xl font-bold text-text-primary mt-4">Document not found</h1>
+      <div class="px-6 py-16">
+        <div class="mx-auto max-w-4xl rounded-[2rem] border border-divider bg-surface-secondary/55 p-8">
+          <Link href="/docs" class="text-sm font-semibold text-accent transition-colors hover:text-accent/80">
+            ← Back to docs
+          </Link>
+          <h1 class="mt-5 text-3xl font-semibold tracking-tight text-text-primary">
+            Document not found
+          </h1>
+          <p class="mt-4 text-sm leading-6 text-text-secondary">
+            The requested document is not part of the current site documentation set.
+          </p>
+        </div>
       </div>
     );
   }
 
-  const renderMarkdown = (md: string) => {
-    const lines = md.split("\n");
-    const elements: string[] = [];
-    let inCodeBlock = false;
-    let codeContent = "";
-
-    for (const line of lines) {
-      if (line.startsWith("```")) {
-        if (!inCodeBlock) {
-          inCodeBlock = true;
-          codeContent = "";
-        } else {
-          elements.push(`<pre class="bg-surface-tertiary p-4 rounded-lg overflow-x-auto mb-4"><code class="text-sm text-text-primary">${escapeHtml(codeContent)}</code></pre>`);
-          inCodeBlock = false;
-        }
-        continue;
-      }
-
-      if (inCodeBlock) {
-        codeContent += line + "\n";
-        continue;
-      }
-
-      if (line.startsWith("# ")) {
-        elements.push(`<h1 class="text-3xl font-bold text-text-primary mb-6">${escapeHtml(line.slice(2))}</h1>`);
-      } else if (line.startsWith("## ")) {
-        elements.push(`<h2 class="text-2xl font-semibold text-text-primary mt-8 mb-4">${escapeHtml(line.slice(3))}</h2>`);
-      } else if (line.startsWith("### ")) {
-        elements.push(`<h3 class="text-xl font-semibold text-text-primary mt-6 mb-3">${escapeHtml(line.slice(4))}</h3>`);
-      } else if (line.startsWith("- ")) {
-        elements.push(`<li class="text-text-secondary ml-4 mb-2">${escapeHtml(line.slice(2))}</li>`);
-      } else if (line.match(/^\d+\.\s/)) {
-        elements.push(`<li class="text-text-secondary ml-4 mb-2">${escapeHtml(line.replace(/^\d+\.\s/, ""))}</li>`);
-      } else if (line.trim() === "") {
-        elements.push("<br/>");
-      } else {
-        elements.push(`<p class="text-text-secondary mb-4">${escapeHtml(line)}</p>`);
-      }
-    }
-
-    return elements.join("");
-  };
+  const adjacent = getAdjacentDocs(loaded.value.slug);
+  const rendered = renderMarkdown(loaded.value.content);
 
   return (
-    <div class="max-w-6xl mx-auto px-6 py-12">
-      <a href="/docs" class="text-accent hover:underline mb-6 inline-block">
-        ← Back to all docs
-      </a>
-      <article class="prose prose-invert max-w-none">
-        <div
-          class="bg-surface-secondary rounded-lg p-8 border border-divider"
-          dangerouslySetInnerHTML={renderMarkdown(content.value)}
+    <div class="px-6 py-16">
+      <div class="mx-auto max-w-5xl">
+        <Link
+          href="/docs"
+          class="text-sm font-semibold text-accent transition-colors hover:text-accent/80"
+        >
+          ← Back to docs
+        </Link>
+
+        <div class="mt-6 rounded-[2rem] border border-divider bg-surface-secondary/55 p-8 sm:p-10">
+          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+            {loaded.value.category}
+          </p>
+          <h1 class="mt-4 text-4xl font-semibold tracking-tight text-text-primary sm:text-5xl">
+            {loaded.value.title}
+          </h1>
+          <p class="mt-5 max-w-3xl text-base leading-7 text-text-secondary">
+            {loaded.value.description}
+          </p>
+        </div>
+
+        <article
+          class="doc-content mt-8 rounded-[2rem] border border-divider bg-surface-secondary/45 p-8 sm:p-10"
+          dangerouslySetInnerHTML={rendered}
         />
-      </article>
+
+        <div class="mt-8 grid gap-4 sm:grid-cols-2">
+          {adjacent.previous ? (
+            <Link
+              href={`/docs/${adjacent.previous.slug}`}
+              class="rounded-[1.5rem] border border-divider bg-surface-secondary/50 p-6 transition-colors hover:border-accent/40"
+            >
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+                Previous
+              </p>
+              <p class="mt-3 text-lg font-semibold tracking-tight text-text-primary">
+                {adjacent.previous.title}
+              </p>
+            </Link>
+          ) : (
+            <div />
+          )}
+
+          {adjacent.next ? (
+            <Link
+              href={`/docs/${adjacent.next.slug}`}
+              class="rounded-[1.5rem] border border-divider bg-surface-secondary/50 p-6 text-left transition-colors hover:border-accent/40"
+            >
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+                Next
+              </p>
+              <p class="mt-3 text-lg font-semibold tracking-tight text-text-primary">
+                {adjacent.next.title}
+              </p>
+            </Link>
+          ) : (
+            <div />
+          )}
+        </div>
+      </div>
     </div>
   );
 });
+
+export const head: DocumentHead = {
+  title: "NodeChat Doc | In-Site Documentation",
+  meta: [
+    {
+      name: "description",
+      content:
+        "Read NodeChat documentation directly inside the site, including overview, features, user flows, limitations, security, message lifecycle, and architecture.",
+    },
+  ],
+};
+
+function renderMarkdown(markdown: string): string {
+  const lines = markdown.split("\n");
+  const html: string[] = [];
+  let inCodeBlock = false;
+  let codeLines: string[] = [];
+  let listType: "ul" | "ol" | null = null;
+  let paragraphLines: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraphLines.length === 0) return;
+    const text = paragraphLines.join(" ").trim();
+    if (text) {
+      html.push(`<p>${renderInline(text)}</p>`);
+    }
+    paragraphLines = [];
+  };
+
+  const closeList = () => {
+    if (listType) {
+      html.push(listType === "ul" ? "</ul>" : "</ol>");
+      listType = null;
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+
+    if (line.startsWith("```")) {
+      flushParagraph();
+      closeList();
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        codeLines = [];
+      } else {
+        html.push(
+          `<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`,
+        );
+        inCodeBlock = false;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeLines.push(rawLine);
+      continue;
+    }
+
+    if (line === "") {
+      flushParagraph();
+      closeList();
+      continue;
+    }
+
+    if (line.startsWith("# ")) {
+      flushParagraph();
+      closeList();
+      html.push(`<h1>${renderInline(line.slice(2))}</h1>`);
+      continue;
+    }
+
+    if (line.startsWith("## ")) {
+      flushParagraph();
+      closeList();
+      html.push(`<h2>${renderInline(line.slice(3))}</h2>`);
+      continue;
+    }
+
+    if (line.startsWith("### ")) {
+      flushParagraph();
+      closeList();
+      html.push(`<h3>${renderInline(line.slice(4))}</h3>`);
+      continue;
+    }
+
+    if (line.startsWith("- ")) {
+      flushParagraph();
+      if (listType !== "ul") {
+        closeList();
+        html.push("<ul>");
+        listType = "ul";
+      }
+      html.push(`<li>${renderInline(line.slice(2))}</li>`);
+      continue;
+    }
+
+    if (/^\d+\.\s/.test(line)) {
+      flushParagraph();
+      if (listType !== "ol") {
+        closeList();
+        html.push("<ol>");
+        listType = "ol";
+      }
+      html.push(`<li>${renderInline(line.replace(/^\d+\.\s/, ""))}</li>`);
+      continue;
+    }
+
+    closeList();
+    paragraphLines.push(line);
+  }
+
+  flushParagraph();
+  closeList();
+
+  if (inCodeBlock) {
+    html.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+  }
+
+  return html.join("");
+}
+
+function renderInline(text: string): string {
+  let output = escapeHtml(text);
+  output = output.replace(/`([^`]+)`/g, "<code>$1</code>");
+  output = output.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noreferrer">$1</a>',
+  );
+  return output;
+}
 
 function escapeHtml(text: string): string {
   return text
