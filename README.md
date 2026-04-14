@@ -1,106 +1,141 @@
-# NodeChat 💬 🔒
+# NodeChat
 
-**Secure Decentralized Chat Application**
+NodeChat is a peer-to-peer messaging application built in Rust with a Slint user interface. It is developed as a final-year school project and focuses on local identity ownership, direct messaging, group messaging, encrypted transport, and clear application-level state handling.
 
-NodeChat is a purely peer-to-peer (P2P), serverless chat application built natively in Rust. Designed from the ground up for total data sovereignty and privacy, it requires no central servers, no cloud databases, and no user registration whatsoever.
+The project should be understood as a serious academic prototype with real application behavior. It is not presented as a finished commercial messaging platform.
 
-*This project is built as a Polytechnic Final Year Project, evolving protocol concepts from the Artemis P2P research framework into a legitimate, secure consumer application.*
+## Overview
 
----
+NodeChat is designed to show how a messaging application can operate around peer-to-peer communication, local persistence, and security-aware interaction design without depending on a traditional central messaging workflow.
 
-## ✨ Key Features
+The current implementation already behaves like a real app:
 
-- **True Decentralization:** Uses `iroh` and `pkarr` for direct peer-to-peer connections and NAT hole-punching. Falls back silently to DERP relay servers on aggressive networks — the relay only ever touches ciphertext it cannot decrypt.
+- users create and keep a local identity
+- peers connect through a shareable connection ticket
+- direct and group conversations are stored locally
+- the interface reflects connection state, trust state, and message progress
 
-- **Zero-Server Identity:** Users mathematically own their identity via locally generated X25519 cryptographic keypairs. No emails, no usernames, no registration APIs.
+## What NodeChat Does
 
-- **End-to-End Encryption (E2EE):**
-  - *1:1 Direct Chat:* Secured via Iroh's Noise protocol transport, augmented with an application-layer X25519 Diffie-Hellman exchange + SHA-256 Hash Ratcheting for verifiable **Forward Secrecy**.
-  - *Group Chat:* `iroh-gossip` broadcast swarms secured via distributed ChaCha20 symmetric group keys.
+The current app supports:
 
-- **Smart Offline Queueing:** Messages sent to offline peers are stored securely in a local embedded SQLite database and flushed to the network the moment the peer is discovered online.
+- local identity creation and optional app unlock protection
+- direct peer-to-peer conversations
+- group conversations over peer-to-peer group transport
+- local storage for contacts, groups, identity, and message history
+- visible message states such as `queued`, `sent`, `delivered`, and `read`
+- manual contact verification as a separate trust action
+- in-app notices, status indicators, and confirmation flows
 
-- **Robust Actor Model Architecture:** An asynchronous Tokio background worker handles all network and crypto IO, communicating via channels to a smooth, responsive Slint UI frontend. The UI never blocks.
+One of the important design points in the current app is that secure-session readiness and manual trust verification are treated as different things. A peer can be ready for secure communication without being automatically marked as trusted.
 
-- **Polished Cross-Platform UI:** Built with Slint — a declarative `.slint` markup UI framework that produces a native, production-quality interface on both desktop and Android from a single codebase.
+## Project Positioning
 
----
+NodeChat is intended to demonstrate how a decentralized chat application can be structured as a complete app rather than as an isolated networking experiment.
 
-## 🛠️ Technology Stack
+The project combines:
 
-| Layer | Technology |
-|---|---|
-| P2P Networking | `iroh` 0.97.0, `iroh-gossip` 0.97.0, `pkarr` 5.0.4 |
-| Cryptography | `x25519-dalek` 2.0.1, `chacha20poly1305` 0.10.1, `sha2` 0.10.9, `rand` 0.10.0 |
-| Async Runtime | `tokio` 1.50.0 |
-| Local Storage | `rusqlite` 0.39.0 |
-| UI Framework | `slint` 1.15.1 (declarative markup + Rust bindings) |
-| Utilities | `uuid` 1.23.0, `anyhow` 1.0.102 |
-| Platform | Desktop (Windows, Linux, macOS) + Android (stretch goal) |
+- user interface design
+- local persistence
+- peer-to-peer communication
+- message lifecycle handling
+- security-oriented interaction design
 
-> **Note:** See [ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md) for the complete dependency list with versions.
+That combination is what makes it suitable for project defense and for future extension into a broader product and documentation story.
 
----
+## Design Principles
 
-## 📖 Architecture & Documentation
+The current project direction is guided by a few clear principles:
 
-| Document | Purpose |
-|---|---|
-| [ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md) | Full system design, module hierarchy, cryptographic decisions, implementation phases |
-| [UX_FLOW.md](./docs/architecture/UX_FLOW.md) | Complete UX flow, screen designs, component specifications |
-| [RULES.md](./docs/RULES.md) | Strict engineering and testing standards — binding for all contributors |
-| [AGENT.md](./docs/AGENT.md) | Rules for AI agent interactions with this codebase |
+- the app defines the story first, then the docs follow it
+- user trust is treated separately from transport success
+- local state and message progress should be visible and understandable
+- claims should stay aligned with implemented behavior
 
----
+These principles matter because they keep the project easier to explain, defend, and extend.
 
-## 🗂️ Project Structure
+## Technology Stack
 
-```
-nodechat/
-├── src/               ← Rust backend
-│   ├── backend.rs     ← Async I/O, core loop, command handler
-│   ├── bridge.rs      ← Event/Channel bridge between Slint UI and Tokio
-│   ├── crypto.rs      ← X25519 DH, ChaCha20, hash ratchet
-│   ├── p2p/           ← Iroh networking (unicast + gossip)
-│   ├── storage/       ← SQLite schema and queries
-│   ├── ui.rs          ← Slint definitions and view models
-│   └── ui_models.rs   ← Structs binding backend state to the Slint UI
-├── ui/                ← .slint UI markup files
-│   ├── components/    ← High-level UI sub-components
-│   └── screens/       ← Full screen layouts (ChatView, Settings, etc.)
-├── assets/            ← Icons & App Logos
-└── docs/              ← Architecture diagrams and project history
-```
+NodeChat is currently built with:
 
----
+- Rust
+- Slint
+- Tokio
+- Iroh
+- Iroh Gossip
+- SQLite via `rusqlite`
+- `x25519-dalek`
+- `chacha20poly1305`
 
-## 🚀 Getting Started
+## Getting Started
 
-*(Note: Project is currently entering Phase 1 implementation)*
+Clone the repository and run the desktop app:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/nodechat.git
+git clone https://github.com/shedrackgodstime/nodechat.git
 cd nodechat
-
-# Build and run the desktop client
-cargo run --release
+cargo run
 ```
 
----
+For a local verification pass:
 
-## 📋 Implementation Status
+```bash
+cargo check
+cargo test
+```
 
-| Phase | Description | Status |
-|---|---|---|
-| Phase 1 | Cargo workspace, Slint window, SQLite schema, Actor Model channels | ✅ Complete |
-| Phase 2 | Iroh endpoint, Pkarr discovery, LAN unicast | ✅ Complete |
-| Phase 3 | X25519 identity, ChaCha20 E2EE, hash ratchet, offline queue | ✅ Complete |
-| Phase 4 | Full Slint UI, all screens wired | ✅ Complete |
-| Phase 5 | iroh-gossip group chat, symmetric key distribution | ✅ Complete |
-| Phase 6 | Polish, UI reduction compilation, Android compilation testing | ✅ Complete |
+If you want the broader project context before going deeper into the code, start with the documentation index linked below.
 
----
+## Project Structure
 
-*NodeChat — Final Year Project*
-*Built with Slint 1.15.1 · Powered by Iroh 0.97.0 · Secured by X25519 + ChaCha20*
+```text
+nodechat/
+├── src/            Rust application code
+├── ui/             Slint screens and shared UI components
+├── assets/         Icons and image assets
+├── docs/           Current project documentation
+└── site/           Placeholder site that will later be driven by the docs
+```
+
+## Documentation
+
+The current documentation is organized around the implemented app, not around placeholder claims.
+
+Start here:
+
+- [Documentation Index](./docs/index.md)
+- [Overview](./docs/overview.md)
+- [Features](./docs/features.md)
+- [User Flows](./docs/user-flows.md)
+- [Limitations](./docs/limitations.md)
+- [Security](./docs/security.md)
+- [Architecture](./docs/architecture.md)
+
+Older architecture and archive material still exists in the repository, but the newer app-based docs should now be treated as the primary source of truth.
+
+## Contributing
+
+If you want to contribute, read:
+
+- [Contributing Guide](./docs/contributing.md)
+- [Rules](./docs/RULES.md)
+- [Agent Guidance](./docs/AGENT.md)
+
+Contributions should stay aligned with the implemented app, the current documentation direction, and the project’s professional tone.
+
+## Current Scope
+
+NodeChat currently presents itself as:
+
+- a peer-to-peer messaging application
+- a final-year academic project
+- a working software system with real UI, storage, transport, and messaging behavior
+
+It should not currently be described as a finished large-scale consumer platform.
+
+That scope is intentional. The project is strongest when it is described precisely and defended from the behavior the app actually implements today.
+
+## Repository Links
+
+- Website: <https://nodechat.pages.dev>
+- Repository: <https://github.com/shedrackgodstime/nodechat>
