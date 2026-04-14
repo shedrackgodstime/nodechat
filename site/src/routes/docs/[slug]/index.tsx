@@ -7,7 +7,7 @@ import {
 } from "@builder.io/qwik-city";
 import { docs, findDocBySlug, getAdjacentDocs } from "../../../content/site-content";
 
-const rawDocs = import.meta.glob("/../docs/*.md", {
+const rawDocs = import.meta.glob("../../../../../docs/*.md", {
   query: "?raw",
   import: "default",
   eager: true,
@@ -28,8 +28,8 @@ export const useDocContent = routeLoader$(async ({ params }) => {
   }
 
   const relativePath = doc.repoPath.replace(/^\/docs\//, "");
-  const key = `/../docs/${relativePath}`;
-  const content = rawDocs[key];
+  const entry = Object.entries(rawDocs).find(([key]) => key.endsWith(`/${relativePath}`));
+  const content = entry?.[1];
 
   if (!content) {
     return null;
