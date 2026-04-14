@@ -1,12 +1,4 @@
-// NodeChat New — Root Application Shell
-// ---------------------------------------------------------
-// This file serves as the primary layout controller.
-// It manages:
-//   - Responsive breakpoints (Mobile vs Tablet vs Desktop)
-//   - Safe areas for mobile/keyboard
-//   - Navigation state (Routing)
-//   - Theme token application
-// ---------------------------------------------------------
+// Root application shell responsible for layout, navigation, and shared UI state.
 
 import { AppTheme } from "./theme.slint";
 import {
@@ -59,11 +51,21 @@ export component AppWindow inherits Window {
     }
 
     property <bool> global-copied-active: false;
+    in-out property <bool> global-notice-visible: false;
+    in-out property <bool> global-notice-is-error: false;
+    in-out property <string> global-notice-text: "";
     Timer {
         interval: 2000ms;
         running: root.global-copied-active;
         triggered => {
             root.global-copied-active = false;
+        }
+    }
+    Timer {
+        interval: 2800ms;
+        running: root.global-notice-visible;
+        triggered => {
+            root.global-notice-visible = false;
         }
     }
 
@@ -79,19 +81,17 @@ export component AppWindow inherits Window {
         }
     }
 
-    // --- Window Constraints ---
     min-width: 0px;
     min-height: 0px;
     preferred-width: 1080px;
     preferred-height: 800px;
     background: AppTheme.surface-primary;
 
-    // --- Shell State ---
-    // Breakpoints: Mobile (< 700px), Tablet (700px - 1000px), Desktop (> 1000px)
+    // Breakpoints: mobile < 700px, tablet 700px-1000px, desktop > 1000px.
     out property <DeviceType> device: root.width > 1000px ? DeviceType.desktop : root.width > 700px ? DeviceType.tablet : DeviceType.mobile;
     out property <bool> is-desktop: root.device == DeviceType.desktop || root.device == DeviceType.tablet;
     
-    // Decoupled width property to prevent binding loops in layout negotiation
+    // Use a fixed computed sidebar width to avoid layout binding loops.
     property <length> concrete-sidebar-width: (root.device == DeviceType.desktop) ? 320px : (root.device == DeviceType.tablet ? 170px : 0px);
     in-out property <int> current-screen: 0;
     property <int> last-screen: 0;
@@ -108,40 +108,38 @@ export component AppWindow inherits Window {
     }
 
     function push-screen(target: int) {
-        focus-scope.focus(); // Release the keyboard and clear cursors
+        focus-scope.focus(); // Release the keyboard and clear transient focus state.
         root.last-screen = root.current-screen;
         root.current-screen = target;
     }
 
     function back() {
-        focus-scope.focus(); // Release the keyboard and clear cursors
+        focus-scope.focus(); // Release the keyboard and clear transient focus state.
         root.current-screen = root.last-screen;
-        root.last-screen = 0; // Default fallback to Chat List
+        root.last-screen = 0; // Default fallback to the chat list.
     }
 
-    // This is the bridge for the Android Hardware Back Button + Desktop Escape key
+    // Shared back-navigation entry point for Android close requests and desktop Escape.
     public function request-back() -> bool {
-        // 1. Close Modals First
+        // Close modal flows before navigating away from the current screen.
         if (root.confirm-modal-show) {
             root.confirm-modal-show = false;
             return true;
         }
 
-        // 2. Tab Navigation - Allow system to exit from primary tabs
-        // Screen 0 (Chats), 3 (Settings), 4 (Contacts) are the root tabs.
+        // The primary tabs are exit points; defer to the platform from those screens.
         if (root.current-screen == 0 || root.current-screen == 3 || root.current-screen == 4) {
-            return false; // Let OS minimize the app
+            return false;
         }
 
-        // 3. Sub-Screen Navigation
         root.back();
-        return true; // Successfully navigated back
+        return true;
     }
     in-out property <bool> has-password: false;
     in-out property <bool> has-identity: false;
     in-out property <bool> is-locked: false;
 
-    // --- App Data (Driven by Rust) ---
+    // Shared application state populated from Rust.
     in property <string> display-name: "";
     in property <string> initials: "";
     in property <string> endpoint-ticket: "";
@@ -153,7 +151,7 @@ export component AppWindow inherits Window {
     property <bool> confirm-modal-requires-pin: false;
     in-out property <GroupData> active-group: { id: "", name: "", initials: "", topic: "", secret-key: "", member-count: 0 };
 
-    // --- Temporary State for Flows ---
+    // Temporary state for multi-step flows.
     property <string> temp-group-name: "";
     property <string> temp-group-desc: "";
     property <string> inviting-group-id: "";
@@ -181,7 +179,7 @@ export component AppWindow inherits Window {
     in property <[GroupCandidateItem]> group-candidates: [];
     in property <int> group-candidates-selected: 0;
 
-    // --- Modal State ---
+    // Modal state.
     in-out property <bool> confirm-modal-show: false;
     in-out property <string> confirm-modal-title: "Confirm Action";
     in-out property <string> confirm-modal-subtitle: "Are you sure you want to do this?";
@@ -189,7 +187,7 @@ export component AppWindow inherits Window {
     in-out property <string> confirm-modal-err: "";
     in-out property <bool> confirm-modal-checked: false;
 
-    // --- Callbacks ---
+    // Callbacks implemented in Rust.
     callback open-settings;
     callback open-contacts;
     callback add-contact;
@@ -209,7 +207,7 @@ export component AppWindow inherits Window {
         root.push-screen(5);
     }
     open-chat(chat) => {
-        // Rust handles full state population via Command::LoadConversation
+        // Rust resolves the full conversation snapshot after the screen changes.
         root.load-conversation(chat.id, chat.is-group);
         root.push-screen(chat.is-group ? 2 : 1);
     }
@@ -238,14 +236,19 @@ export component AppWindow inherits Window {
     callback request-reset-identity();
     callback open-url(string);
     
-    // Missing P2P Callbacks
+    // Application lifecycle and runtime callbacks.
     callback unlock-app(string);
     callback do-operation-success();
     do-operation-success => {
         root.confirm-modal-show = false;
+        root.confirm-modal-err = "";
+        root.confirm-modal-checked = false;
         root.pending-action-id = "";
         if (root.operation-success-slug == "unlock") {
             root.is-locked = false;
+        }
+        if (root.operation-success-slug == "add-contact") {
+            root.back();
         }
         if (root.operation-success-slug == "reset-identity" || root.operation-success-slug == "delete-identity") {
             root.current-screen = 2; // Setup/Welcome
@@ -559,13 +562,19 @@ export component AppWindow inherits Window {
                         request-clear-history => {
                             root.confirm-modal-slug = "clear-history";
                             root.confirm-modal-title = "Clear History";
-                            root.confirm-modal-subtitle = "Wipe all messages locally. This cannot be undone.";
+                            root.confirm-modal-subtitle = "Delete all local message history. This cannot be undone.";
+                            root.confirm-modal-requires-pin = root.has-password;
+                            root.confirm-modal-err = "";
+                            root.confirm-modal-checked = false;
                             root.confirm-modal-show = true;
                         }
                         request-reset-identity => {
                             root.confirm-modal-slug = "delete-identity";
                             root.confirm-modal-title = "Reset Identity";
-                            root.confirm-modal-subtitle = "WARNING: You will lose your Peer ID and Contacts forever.";
+                            root.confirm-modal-subtitle = "This removes your local identity, contacts, and message history from this device.";
+                            root.confirm-modal-requires-pin = root.has-password;
+                            root.confirm-modal-err = "";
+                            root.confirm-modal-checked = false;
                             root.confirm-modal-show = true;
                         }
                     }
@@ -631,7 +640,6 @@ export component AppWindow inherits Window {
                         }
                         add-ticket(t) => {
                             root.add-peer(t);
-                            root.back();
                         }
                         copy-ticket(t) => {
                             root.copy-to-clipboard(t);
@@ -717,15 +725,21 @@ export component AppWindow inherits Window {
                         }
                         request-clear-history => {
                             root.confirm-modal-title = "Clear Chat History";
-                            root.confirm-modal-subtitle = "Wipe messages for this peer locally.";
+                            root.confirm-modal-subtitle = "Delete messages for this conversation from this device.";
                             root.confirm-modal-slug = "clear-chat";
+                            root.confirm-modal-requires-pin = root.has-password;
+                            root.confirm-modal-err = "";
+                            root.confirm-modal-checked = false;
                             root.confirm-modal-show = true;
                         }
                         request-delete => {
                             root.pending-action-id = root.active-conversation.id;
                             root.confirm-modal-title = root.active-conversation.kind == "group" ? "Leave Group" : "Remove Contact";
-                            root.confirm-modal-subtitle = root.active-conversation.kind == "group" ? "Exit this P2P conversation topic." : "Disconnect from peer and delete history.";
+                            root.confirm-modal-subtitle = root.active-conversation.kind == "group" ? "Remove this group conversation from this device." : "Remove this contact and its local conversation history from this device.";
                             root.confirm-modal-slug = root.active-conversation.kind == "group" ? "leave-group" : "delete-chat";
+                            root.confirm-modal-requires-pin = root.has-password;
+                            root.confirm-modal-err = "";
+                            root.confirm-modal-checked = false;
                             root.confirm-modal-show = true;
                         }
                         add-members => {
@@ -866,9 +880,35 @@ export component AppWindow inherits Window {
         is-checked <=> root.confirm-modal-checked;
         cancel => {
             root.confirm-modal-show = false;
+            root.confirm-modal-err = "";
+            root.confirm-modal-checked = false;
         }
         confirm(pin) => {
             root.confirm-modal-confirmed(root.confirm-modal-slug, pin);
+        }
+    }
+
+    if root.global-notice-visible: Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: root.safe-area-top + 12px;
+        width: Math.min(parent.width - 24px, 420px);
+        height: notice-text.preferred-height + 20px;
+        z: 2000;
+        border-radius: 12px;
+        background: root.global-notice-is-error ? AppTheme.accent-danger : AppTheme.surface-secondary;
+        border-width: 1px;
+        border-color: root.global-notice-is-error ? AppTheme.accent-danger : AppTheme.divider;
+
+        notice-text := Text {
+            x: 12px;
+            y: 10px;
+            width: parent.width - 24px;
+            text: root.global-notice-text;
+            font-size: 13px;
+            font-weight: 600;
+            color: #FFFFFF;
+            wrap: word-wrap;
+            horizontal-alignment: center;
         }
     }
 
@@ -882,13 +922,13 @@ export component AppWindow inherits Window {
     }
     request-clear-history => {
         root.confirm-modal-title = "Clear All History";
-        root.confirm-modal-subtitle = "Irreversibly delete all local messages from ALL conversations.";
+        root.confirm-modal-subtitle = "Delete all local messages from every conversation on this device.";
         root.confirm-modal-slug = "clear-history";
         root.confirm-modal-requires-pin = root.has-password;
         root.confirm-modal-show = true;
     }
     request-reset-identity => {
-        root.confirm-modal-title = "Nuke Identity";
+        root.confirm-modal-title = "Reset Identity";
         root.confirm-modal-subtitle = "This will destroy your Peer keys and all contact links permanently.";
         root.confirm-modal-slug = "reset-identity";
         root.confirm-modal-requires-pin = root.has-password;

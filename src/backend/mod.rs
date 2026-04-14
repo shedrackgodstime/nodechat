@@ -1,8 +1,4 @@
-//! NodeChat Backend — Modular Actor Implementation
-//! ---------------------------------------------------------
-//! This module coordinates the application state, database,
-//! and P2P network. It is partitioned into sub-modules for
-//! better maintainability and architectural clarity.
+//! Backend coordinator for application state, storage, and network activity.
 
 use std::path::PathBuf;
 use anyhow::Result;
@@ -76,7 +72,7 @@ impl RealBackend {
             event_tx: event_channel.clone(),
         };
 
-        // If an identity exists, begin proactive social background tasks
+        // Start the recurring network and UI maintenance loops once an identity exists.
         if let Some(sk) = secret_key {
             let net = network_manager.clone();
             let dp = database_path.clone();
@@ -89,7 +85,7 @@ impl RealBackend {
                     tracing::info!("P2P subsystem ready — active watchdog online");
                     loop {
                         if let Ok(conn) = crate::storage::initialize(&dp) {
-                            // 1. Peer Re-dial Loop
+                            // Reconnect to known peers so queued work can resume automatically.
                             if let Ok(peers) = queries::list_peers(&conn) {
                                 for peer in peers {
                                     let n = net.clone();
@@ -99,7 +95,7 @@ impl RealBackend {
                                 }
                             }
 
-                            // 2. Refresh UI State (Proactive synchronization)
+                            // Refresh derived UI lists from the latest storage and transport state.
                             if let Ok(chats) = RealBackend::build_chat_list_static(&conn, &net, &local_id) {
                                 let _ = etc_tx.send(AppEvent::ChatListUpdated(chats));
                             }
@@ -110,7 +106,7 @@ impl RealBackend {
                                 let _ = etc_tx.send(AppEvent::GroupCandidatesUpdated(candidates));
                             }
 
-                            // 3. Group Topic Synchronization
+                            // Rejoin saved group topics after startup or transient disconnects.
                             if let Ok(groups) = queries::list_groups(&conn) {
                                 for group in groups {
                                     let _ = net.subscribe_group(&group.topic_id, vec![]).await;
@@ -152,7 +148,7 @@ impl RealBackend {
                 kind:                     if p.is_group { crate::contract::ConversationKind::Group } else { crate::contract::ConversationKind::Direct },
                 title:                    p.title,
                 initials:                 p.initials,
-                last_message:             if !p.is_session_ready && p.last_message.is_empty() { "Waiting for handshake...".to_string() } else { p.last_message },
+                last_message:             if !p.is_session_ready && p.last_message.is_empty() { "Awaiting secure handshake".to_string() } else { p.last_message },
                 last_message_status:      p.last_message_status,
                 is_last_message_outgoing: p.is_outgoing,
                 timestamp:                utils::format_hms(p.timestamp),
@@ -181,7 +177,7 @@ impl RealBackend {
             is_online: network.has_connection(&c.node_id),
             is_relay: false,
             is_verified: c.verified,
-            is_session_ready: network.has_connection(&c.node_id), // Assumption: if connected at iroh level, session is likely ready or pending
+            is_session_ready: !c.x25519_pubkey.is_empty(),
             direct_conversation_id: c.node_id,
         }).collect())
     }

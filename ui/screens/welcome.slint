@@ -12,13 +12,13 @@ export component WelcomeScreen inherits Rectangle {
     in property <bool> is-locked: false;
     property <string> pin: "";
 
-    // Background Unfocus Catcher
+    // Capture taps outside focused inputs.
     TouchArea {
         width: 100%; height: 100%;
         clicked => { root.request-unfocus(); }
     }
 
-    // --- Background Aesthetic ---
+    // Soft radial background treatment.
     Rectangle {
         background: @radial-gradient(circle, rgba(10, 132, 255, 0.08) 0%, transparent 70%);
         width: 100%; height: 100%;
@@ -28,7 +28,7 @@ export component WelcomeScreen inherits Rectangle {
         alignment: center;
         padding-bottom: Math.max(root.safe-area-bottom, AppTheme.sp-xl);
 
-        // Standardized Content Width Constraint
+        // Keep the onboarding content readable on large screens.
         HorizontalLayout {
             alignment: center;
             VerticalLayout {
@@ -36,7 +36,7 @@ export component WelcomeScreen inherits Rectangle {
                 spacing: AppTheme.sp-xl;
                 padding: AppTheme.sp-xl;
 
-                // --- App Branding ---
+                // Branding block.
                 VerticalLayout {
                     spacing: AppTheme.sp-md;
                     HorizontalLayout {
@@ -52,18 +52,18 @@ export component WelcomeScreen inherits Rectangle {
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text {
-                        text: is-locked ? "PIN Protection" : "Secure P2P Messenger";
+                        text: is-locked ? "PIN Protection" : "Secure Peer-to-Peer Messenger";
                         font-size: 20px; font-weight: 700; color: AppTheme.text-primary;
                         horizontal-alignment: center;
                     }
                     Text {
-                        text: is-locked ? "Enter your PIN to resume chats" : "Decentralized • Peer-to-Peer • Encrypted";
+                        text: is-locked ? "Enter your PIN to resume chats" : "Peer-to-peer messaging with encrypted transport";
                         font-size: 15px; color: AppTheme.text-tertiary;
                         horizontal-alignment: center;
                     }
                 }
 
-                // ── Main Action ──────────────────────────────────────────────────────
+                // Primary onboarding action area.
                 VerticalLayout {
                     spacing: AppTheme.sp-md;
                     alignment: center;
@@ -128,7 +128,7 @@ export component WelcomeScreen inherits Rectangle {
                     }
 
                     Text {
-                        text: "No central servers. Ever.";
+                        text: "Local-first and peer-to-peer by design.";
                         font-size: 12px; color: AppTheme.text-tertiary; horizontal-alignment: center;
                         opacity: 0.6;
                     }

@@ -11,7 +11,7 @@ export component SetupNameScreen inherits Rectangle {
     callback confirm-name(string, string);
     callback request-unfocus();
 
-    // Background Unfocus Catcher
+    // Capture taps outside focused controls.
     TouchArea {
         width: 100%; height: 100%;
         clicked => { root.request-unfocus(); }
@@ -26,7 +26,7 @@ export component SetupNameScreen inherits Rectangle {
         padding-top: root.safe-area-top;
         padding-bottom: root.safe-area-bottom;
 
-        // --- Header (Full Width) ---
+        // Header
         Rectangle {
             height: 64px;
             background: AppTheme.surface-primary;
@@ -64,7 +64,7 @@ export component SetupNameScreen inherits Rectangle {
             }
         }
 
-        // --- Content Area (Centered) ---
+        // Centered onboarding content
         Rectangle {
             vertical-stretch: 1;
             
@@ -82,7 +82,7 @@ export component SetupNameScreen inherits Rectangle {
                         padding-top: AppTheme.sp-lg;
                         alignment: center;
                         
-                        // Push layout up when soft keyboard appears (Mobile)
+                        // Lift the content when the on-screen keyboard is visible.
                         padding-bottom: Math.max(AppTheme.sp-xl, root.virtual-keyboard-height + 20px);
                         animate padding-bottom { duration: AppTheme.dur-short; }
 
@@ -92,14 +92,13 @@ export component SetupNameScreen inherits Rectangle {
                             Text { text: "This is your display name. It stays on your device and is only shared with peers you choose to talk to."; font-size: 15px; color: AppTheme.text-tertiary; wrap: word-wrap; horizontal-alignment: center; }
                         }
 
-                        // --- Input Fields ---
+                        // Display name input
                         HorizontalLayout {
                             alignment: center;
                             VerticalLayout {
                                 width: 100%;
                                 spacing: AppTheme.sp-xl; 
                                 
-                                // --- Name Field ---
                                 VerticalLayout {
                                     spacing: AppTheme.sp-md;
                                     Text { text: "DISPLAY NAME"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; horizontal-alignment: center; }
@@ -136,7 +135,7 @@ export component SetupNameScreen inherits Rectangle {
                             }
                         }
 
-                        // --- Action Button ---
+                        // Continue action
                         HorizontalLayout {
                             alignment: center;
                             Rectangle {

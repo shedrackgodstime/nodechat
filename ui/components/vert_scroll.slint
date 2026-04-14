@@ -1,26 +1,6 @@
-// NodeChat — VertScroll (Vertical-Only Scroll Container)
-// ---------------------------------------------------------
-// THE RULE: Every scrollable area in this app MUST use this
-// component. Never use ScrollView from std-widgets directly.
-//
-// Why: std-widgets ScrollView allows both-axis panning on
-// mobile even when viewport-width is capped, causing the
-// page to "shake" horizontally. A raw Flickable with
-// viewport-width == self.width has zero horizontal scroll
-// space, making drift physically impossible.
-//
-// Also eliminates the visible scrollbar that ScrollView
-// renders on screen — no scrollbar, cleaner mobile UI.
-//
-// Usage:
-//   VertScroll {
-//       vertical-stretch: 1;
-//       @children     // Your scrollable content here
-//   }
-// ---------------------------------------------------------
+// Vertical-only scroll container used across the app to prevent horizontal drift on mobile.
 
 export component VertScroll inherits Flickable {
-    // Viewport height is driven by the tallest child.
-    // Callers override this: viewport-height: content.preferred-height;
-    viewport-width: self.width;   // ← The key rule. Zero horizontal space.
+    // Callers provide `viewport-height`; locking the width removes horizontal panning.
+    viewport-width: self.width;
 }

@@ -1,6 +1,4 @@
-// NodeChat New — UI Data Mapping
-// ---------------------------------------------------------
-// Maps Rust contract types to Slint UI properties and models.
+//! Maps backend contract types into the Slint models consumed by the UI.
 
 use slint::{VecModel, Model};
 use crate::{AppWindow, ChatPreview, ContactData, MessageData, GroupData, GroupCandidateItem, AppInfo};
@@ -11,6 +9,7 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         AppEvent::SnapshotReady(snapshot) => {
             apply_identity(ui, snapshot.identity);
             apply_app_info(ui, snapshot.app_info);
+            apply_app_flags(ui, snapshot.app_flags);
             apply_chats(ui, snapshot.chat_list);
             apply_contacts(ui, snapshot.contact_list);
             apply_conversation(ui, snapshot.active_conversation);
@@ -45,7 +44,7 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
             ui.set_debug_logs(text.into());
         }
         AppEvent::Log { level: _, message } => {
-            // Append to the rolling debug log (max 500 lines displayed)
+            // Keep the in-app debug console bounded so repeated logs do not grow without limit.
             let current = ui.get_debug_logs().to_string();
             let mut lines: Vec<String> = current.lines().map(|s| s.to_string()).collect();
             lines.push(message);
@@ -57,9 +56,15 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
         }
         AppEvent::StatusNotice(msg) => {
             eprintln!("[STATUS] {}", msg);
+            ui.set_global_notice_text(msg.into());
+            ui.set_global_notice_is_error(false);
+            ui.set_global_notice_visible(true);
         }
         AppEvent::UserError(err) => {
             eprintln!("[ERROR] {}", err);
+            ui.set_global_notice_text(err.into());
+            ui.set_global_notice_is_error(true);
+            ui.set_global_notice_visible(true);
         }
         AppEvent::MessageStatusChanged { conversation_id, message_id, status } => {
             update_message_status(ui, &conversation_id, &message_id, status);
@@ -72,7 +77,7 @@ pub fn apply_event(ui: &AppWindow, event: AppEvent) {
 }
 
 fn update_message_status(ui: &AppWindow, conversation_id: &str, message_id: &str, status: crate::contract::MessageStatus) {
-    // 1. Update active conversation messages if visible
+    // Update the visible message list first so delivery state changes appear immediately.
     let active = ui.get_active_conversation();
     if active.id == conversation_id {
         let model = ui.get_active_messages();
@@ -87,14 +92,13 @@ fn update_message_status(ui: &AppWindow, conversation_id: &str, message_id: &str
         }
     }
 
-    // 2. Update chat list preview status
+    // Mirror the same status in the chat preview row.
     let chats_model = ui.get_chats();
     for i in 0..chats_model.row_count() {
         if let Some(mut chat) = chats_model.row_data(i) {
             if chat.id == conversation_id {
                 chat.last_message_status = status.to_string().into();
-                // If this was the last message, we might also want to update has_queued_messages
-                // but that's better handled by a full chat list refresh if needed.
+                // Queue badges are refreshed from a full chat list rebuild when needed.
                 chats_model.set_row_data(i, chat);
                 break;
             }
@@ -122,7 +126,26 @@ fn apply_app_info(ui: &AppWindow, info: AppInfoView) {
     });
 }
 
+fn apply_app_flags(ui: &AppWindow, flags: crate::contract::AppFlags) {
+    ui.set_direct_peers(flags.direct_peer_count);
+    ui.set_relay_peers(flags.relay_peer_count);
+    ui.set_is_offline(flags.is_offline);
+}
+
 fn apply_chats(ui: &AppWindow, chats: Vec<ChatListItem>) {
+    let direct_online = chats
+        .iter()
+        .filter(|c| matches!(c.kind, crate::contract::ConversationKind::Direct) && c.is_online && !c.is_relay)
+        .count() as i32;
+    let relay_online = chats
+        .iter()
+        .filter(|c| matches!(c.kind, crate::contract::ConversationKind::Direct) && c.is_online && c.is_relay)
+        .count() as i32;
+    let group_online = chats
+        .iter()
+        .filter(|c| matches!(c.kind, crate::contract::ConversationKind::Group) && c.is_online)
+        .count() as i32;
+
     let rows: Vec<ChatPreview> = chats.iter().map(|c| ChatPreview {
         id: c.conversation_id.clone().into(),
         name: c.title.clone().into(),
@@ -141,8 +164,11 @@ fn apply_chats(ui: &AppWindow, chats: Vec<ChatListItem>) {
         member_count: c.member_count,
     }).collect();
     ui.set_chats(VecModel::from_slice(&rows).into());
+    ui.set_direct_peers(direct_online);
+    ui.set_relay_peers(relay_online);
+    ui.set_is_offline(direct_online == 0 && relay_online == 0 && group_online == 0);
 
-    // Populate Group List for Contacts Screen
+    // Reuse the chat snapshot to populate the group picker shown from the contacts screen.
     let groups: Vec<GroupData> = chats.into_iter()
         .filter(|c| matches!(c.kind, crate::contract::ConversationKind::Group))
         .map(|c| GroupData {
@@ -188,13 +214,13 @@ fn apply_conversation(ui: &AppWindow, convo: ConversationView) {
     ctx.connection_stage = convo.connection_stage.into();
     ui.set_active_conversation(ctx);
     
-    // Also update active-group if it's a group
+    // Keep the group-specific state in sync for invite and membership flows.
     if matches!(convo.kind, crate::contract::ConversationKind::Group) {
          ui.set_active_group(GroupData {
              id: convo.conversation_id.into(),
              name: convo.title.into(),
              initials: convo.initials.into(),
-             topic: convo.ticket.into(), // Using ticket as topic id for group
+            topic: convo.ticket.into(), // Reuses the shared conversation identifier slot for groups.
              secret_key: "".into(),
              member_count: convo.member_count,
          });
@@ -211,7 +237,7 @@ fn append_message(ui: &AppWindow, message: MessageItem) {
     if let Some(model) = messages.as_any().downcast_ref::<VecModel<MessageData>>() {
         model.push(map_message(message));
     } else {
-        // If it's not a VecModel (e.g. empty array property), we need to replace it
+        // Replace the backing model when Slint is still holding the default empty array.
         let mut rows: Vec<MessageData> = messages.iter().collect();
         rows.push(map_message(message));
         ui.set_active_messages(VecModel::from_slice(&rows).into());

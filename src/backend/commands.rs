@@ -18,10 +18,9 @@ impl RealBackend {
             Command::LoadConversation { conversation_id } => {
                 self.active_conversation_id = conversation_id.clone();
                 
-                // --- UNREAD MANAGEMENT ---
+                // Mark the conversation as read before rebuilding the visible state.
                 queries::mark_as_read(&self.conn, &conversation_id, &self.local_node_id)?;
                 let chat_list = self.build_chat_list()?;
-                // -------------------------
 
                 let view = self.build_conversation_view(&conversation_id)?;
                 let messages = self.build_message_items(&conversation_id)?;
@@ -31,7 +30,7 @@ impl RealBackend {
                         conversation_id: view.conversation_id,
                         messages,
                     },
-                    AppEvent::ChatListUpdated(chat_list), // Refresh counters on home screen
+                    AppEvent::ChatListUpdated(chat_list), // Refresh unread counters and preview state.
                 ])
             }
 
@@ -55,7 +54,7 @@ impl RealBackend {
                 
                 if !is_group {
                     if let Ok(Some(peer)) = queries::get_peer(&self.conn, &conversation_id) {
-                        if !peer.verified {
+                        if peer.x25519_pubkey.is_empty() {
                             self.spawn_handshake(conversation_id.clone(), peer.endpoint_ticket, 1);
                         }
                     }
@@ -92,7 +91,7 @@ impl RealBackend {
                     AppEvent::ContactListUpdated(contact_list),
                     AppEvent::ConversationUpdated(ConversationView::empty(ConversationKind::Direct)),
                     AppEvent::OperationSuccess("delete-chat".to_string()),
-                    AppEvent::StatusNotice("conversation deleted".to_string()),
+                    AppEvent::StatusNotice("Conversation deleted.".to_string()),
                 ])
             }
 
@@ -121,7 +120,8 @@ impl RealBackend {
                 Ok(vec![
                     AppEvent::ContactListUpdated(contact_list),
                     AppEvent::ChatListUpdated(chat_list),
-                    AppEvent::StatusNotice(format!("contact added: {}", peer.display_name)),
+                    AppEvent::OperationSuccess("add-contact".to_string()),
+                    AppEvent::StatusNotice(format!("Contact added: {}", peer.display_name)),
                 ])
             }
 
@@ -173,14 +173,14 @@ impl RealBackend {
                     AppEvent::GroupCandidatesUpdated(candidates),
                     AppEvent::ConversationUpdated(conv_view),
                     AppEvent::OperationSuccess("create-group".to_string()),
-                    AppEvent::StatusNotice(format!("group created: {}", name)),
+                    AppEvent::StatusNotice(format!("Group created: {}", name)),
                 ])
             }
 
             Command::InviteToGroup { group_id } => {
                 let group = queries::get_group(&self.conn, &group_id)?;
                 if group.is_none() {
-                    return Ok(vec![AppEvent::UserError("Group not found".to_string())]);
+                    return Ok(vec![AppEvent::UserError("Group not found.".to_string())]);
                 }
                 let group = group.unwrap();
                 let mut chats_updated = false;
@@ -270,7 +270,7 @@ impl RealBackend {
                 let identity = self.build_identity_view()?;
                 Ok(vec![
                     AppEvent::IdentityUpdated(identity),
-                    AppEvent::StatusNotice("identity ready".to_string())
+                    AppEvent::StatusNotice("Identity created successfully.".to_string())
                 ])
             }
 
@@ -278,7 +278,7 @@ impl RealBackend {
 
             Command::UnlockApp { pin } => {
                 match queries::get_local_identity(&self.conn)? {
-                    None => Ok(vec![AppEvent::UserError("no identity found".to_string())]),
+                    None => Ok(vec![AppEvent::UserError("No local identity was found.".to_string())]),
                     Some(id) => {
                         if id.pin_hash.is_empty() || id.pin_hash == secure_hash_pin(&pin) {
                             self.local_node_id = id.node_id_hex;
@@ -293,7 +293,7 @@ impl RealBackend {
                                 AppEvent::OperationSuccess("unlock".to_string()),
                             ])
                         } else {
-                            Ok(vec![AppEvent::UserError("incorrect PIN".to_string())])
+                            Ok(vec![AppEvent::UserError("Incorrect PIN.".to_string())])
                         }
                     }
                 }
@@ -301,7 +301,7 @@ impl RealBackend {
 
             Command::ChangePassword { current_pin, new_pin } => {
                 match queries::get_local_identity(&self.conn)? {
-                    None => Ok(vec![AppEvent::UserError("no identity found".to_string())]),
+                    None => Ok(vec![AppEvent::UserError("No local identity was found.".to_string())]),
                     Some(id) => {
                         if id.pin_hash.is_empty() || id.pin_hash == secure_hash_pin(&current_pin) {
                             queries::update_pin_hash(&self.conn, &secure_hash_pin(&new_pin))?;
@@ -309,10 +309,10 @@ impl RealBackend {
                             Ok(vec![
                                 AppEvent::IdentityUpdated(identity),
                                 AppEvent::OperationSuccess("password-update".to_string()),
-                                AppEvent::StatusNotice("password updated".to_string())
+                                AppEvent::StatusNotice("Password updated.".to_string())
                             ])
                         } else {
-                            Ok(vec![AppEvent::UserError("incorrect current PIN".to_string())])
+                            Ok(vec![AppEvent::UserError("Incorrect current PIN.".to_string())])
                         }
                     }
                 }
@@ -354,13 +354,13 @@ impl RealBackend {
                     }
                 }
                 if let Ok(list) = self.build_chat_list() { events.push(AppEvent::ChatListUpdated(list)); }
-                events.push(AppEvent::StatusNotice(format!("Contact {} shared", peer.display_name)));
+                events.push(AppEvent::StatusNotice(format!("Contact shared: {}", peer.display_name)));
                 Ok(events)
             }
 
             Command::UpdateDisplayName { display_name } => {
                 if display_name.trim().is_empty() {
-                    return Ok(vec![AppEvent::UserError("display name cannot be empty".to_string())]);
+                    return Ok(vec![AppEvent::UserError("Display name cannot be empty.".to_string())]);
                 }
                 queries::update_display_name(&self.conn, &display_name)?;
                 self.local_display_name = display_name;
@@ -378,7 +378,7 @@ impl RealBackend {
                     AppEvent::ChatListUpdated(vec![]),
                     AppEvent::ContactListUpdated(vec![]),
                     AppEvent::OperationSuccess("reset-identity".to_string()),
-                    AppEvent::StatusNotice("identity reset".to_string()),
+                    AppEvent::StatusNotice("Identity reset.".to_string()),
                 ])
             }
 
@@ -434,7 +434,7 @@ impl RealBackend {
                     AppEvent::ChatListUpdated(self.build_chat_list()?),
                     AppEvent::MessageListReplaced { conversation_id: self.active_conversation_id.clone(), messages: vec![] },
                     AppEvent::OperationSuccess("clear-history".to_string()),
-                    AppEvent::StatusNotice("history cleared".to_string()),
+                    AppEvent::StatusNotice("Message history cleared.".to_string()),
                 ])
             }
             
@@ -446,7 +446,7 @@ impl RealBackend {
                 Ok(vec![
                     AppEvent::MessageListReplaced { conversation_id: convo_id, messages },
                     AppEvent::ChatListUpdated(chat_list),
-                    AppEvent::StatusNotice("Message deleted".to_string()),
+                    AppEvent::StatusNotice("Message deleted.".to_string()),
                 ])
             }
         }

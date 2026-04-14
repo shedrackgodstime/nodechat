@@ -1,10 +1,7 @@
-//! P2P transport layer — direct unicast via Iroh, group broadcast via Iroh Gossip.
+//! Peer-to-peer transport layer for direct and group messaging.
 //!
-//! IMPORTANT: This module is scaffolded. The internal `iroh` and `iroh-gossip` API
-//! calls must be verified against the pinned iroh 0.97.0 documentation before
-//! filling in the bodies marked `// WIRE:`. The public interface and types are final.
-//!
-//! See `src/p2p/direct.rs` for 1:1 unicast and `src/p2p/group.rs` for gossip.
+//! Direct traffic uses Iroh point-to-point connections and group traffic uses
+//! Iroh Gossip subscriptions and broadcasts.
 
 use anyhow::{bail, Result};
 use iroh::protocol::Router;
@@ -46,7 +43,7 @@ pub enum NetworkEvent {
     PeerConnected {
         /// Hex-encoded NodeId.
         node_id: String,
-        /// `true` if the connection is via DERP relay (RULES.md P-06).
+        /// `true` when the transport path uses a relay.
         via_relay: bool,
     },
 
@@ -69,11 +66,7 @@ pub enum NetworkEvent {
     },
 }
 
-/// Manages all network connections: Iroh direct connections for 1:1 and Iroh Gossip for groups.
-///
-/// Iroh connections are reused per peer — not reopened per message (RULES.md P-04).
-/// Gossip subscriptions are idempotent — subscribing twice is a no-op (RULES.md P-05).
-// Scaffold: fields are unused until iroh 0.97.0 API is wired. Remove this allow before Phase 3.
+/// Manages direct peer connections and group gossip subscriptions.
 #[derive(Clone)]
 pub struct NetworkManager {
     inner: Arc<Mutex<NetworkManagerInner>>,
@@ -89,10 +82,10 @@ struct NetworkManagerInner {
     /// Iroh Gossip handle.
     gossip: Option<iroh_gossip::net::Gossip>,
 
-    /// Reused connections keyed by hex-encoded NodeId (RULES.md P-04).
+    /// Reused connections keyed by hex-encoded NodeId.
     connections: Arc<Mutex<HashMap<String, iroh::endpoint::Connection>>>,
 
-    /// Topics currently subscribed (for idempotency guard — RULES.md P-05).
+    /// Topics currently subscribed so duplicate joins can be ignored safely.
     subscribed_topics: HashSet<String>,
 
     /// Count of active gossip neighbors per topic.
@@ -122,6 +115,12 @@ impl NetworkManager {
     pub fn group_neighbor_count(&self, topic_id: &str) -> usize {
         let inner = self.inner.lock().unwrap_or_else(|p| p.into_inner());
         *inner.group_neighbors.get(topic_id).unwrap_or(&0)
+    }
+
+    /// Returns the total number of active group neighbors across all subscribed topics.
+    pub fn total_group_neighbors(&self) -> usize {
+        let inner = self.inner.lock().unwrap_or_else(|p| p.into_inner());
+        inner.group_neighbors.values().copied().sum()
     }
 
     pub(crate) fn update_group_neighbor_count(&self, topic_id: &str, delta: i32) {
@@ -201,13 +200,13 @@ impl NetworkManager {
         Ok(EndpointTicket::new(endpoint.addr()).to_string())
     }
 
-    /// Send an encrypted payload to a peer directly (Iroh unicast).
+    /// Send an encrypted payload to a peer over the direct transport.
     ///
-    /// Reuses an existing connection if one exists (RULES.md P-04).
-    /// If the peer is unreachable the caller should queue the message (RULES.md A-06).
+    /// Existing transport connections are reused when available. If delivery fails,
+    /// the caller decides whether the message should remain queued.
     ///
     /// # Errors
-    /// Returns an error if the peer is unreachable after Pkarr discovery (RULES.md P-02, P-03).
+    /// Returns an error if the peer cannot be reached.
     pub async fn send_direct(
         &self,
         target_node_id: &str,
@@ -220,10 +219,10 @@ impl NetworkManager {
         direct::send(self, target_node_id, dial_hint, payload).await
     }
 
-    /// Broadcast an encrypted payload to all subscribers of a gossip topic (Iroh Gossip).
+    /// Broadcast an encrypted payload to all subscribers of a gossip topic.
     ///
     /// # Errors
-    /// Returns an error if the group swarm broadcast fails (RULES.md P-02).
+    /// Returns an error if the group swarm broadcast fails.
     pub async fn broadcast_group(&self, topic_id: &str, payload: Vec<u8>) -> Result<()> {
         if payload.len() > MAX_PAYLOAD_BYTES {
             bail!("payload too large");
@@ -235,7 +234,7 @@ impl NetworkManager {
         group::broadcast(self.clone(), topic_id, payload).await
     }
 
-    /// Join the gossip swarm for a group topic. No-op if already subscribed (RULES.md P-05).
+    /// Join the gossip swarm for a group topic. Repeated joins refresh bootstrap peers.
     ///
     /// # Errors
     /// Returns an error if the subscription fails.
@@ -255,7 +254,7 @@ impl NetworkManager {
         if is_new {
             group::subscribe(self.clone(), topic_id, bootstrap_ids).await?;
         } else {
-            // Already subscribed, just add new bootstrap peers to the swarm
+            // Already subscribed, so only refresh the peer list for the existing topic join.
             group::join_topic(self.clone(), topic_id, bootstrap_ids).await?;
         }
         Ok(())
@@ -269,17 +268,8 @@ impl NetworkManager {
         group::leave(self.clone(), topic_id).await
     }
 
-    /// Proactively dial a peer to establish a connection (RULES.md P-04).
+    /// Proactively dial a peer to establish a reusable transport connection.
     pub async fn dial_peer(&self, target_node_id: &str, ticket: Option<&str>) -> Result<()> {
-        // We can just call send_direct with an empty payload?
-        // No, let's just use the connection logic.
-        // Actually, send_direct with empty payload is 0 bytes on wire?
-        // Most protocols allow it.
-        // But better is to just connect.
-        
-        // I'll just use the existing logic in direct::send by making it a bit more flexible.
-        // Actually, I'll just implement it here for simplicity since it's just a connect.
-        
         if self.has_connection(target_node_id) {
             return Ok(());
         }
@@ -316,7 +306,7 @@ impl NetworkManager {
     pub fn connection_status(&self) -> NetworkStatusInfo {
         let inner = self.inner.lock().unwrap_or_else(|p| p.into_inner());
         let direct = inner.connections.lock().map(|map| map.len()).unwrap_or(0);
-        // WIRE: filter by iroh::endpoint::Connection stats to distinguish direct vs relay
+        // Relay usage is not yet distinguished from direct transport in the current status view.
         NetworkStatusInfo { direct, relay: 0 }
     }
 

@@ -45,19 +45,13 @@ impl UiBridge {
         events
     }
 }
-
-
-
-// ── UiLogLayer ───────────────────────────────────────────────────────────────
-// A tracing Layer that pipes log events to both:
-//   1. stderr   (so the terminal shows colour output while developing)
-//   2. the UI   (so the in-app debug panel is live)
+// Tracing layer that mirrors selected log events into the in-app debug console.
 
 struct UiLogLayer {
     event_tx: mpsc::SyncSender<AppEvent>,
 }
 
-// Visitor that pulls the "message" field out of a tracing event.
+// Extracts the formatted `message` field from tracing events.
 struct MsgVisitor(String);
 impl Visit for MsgVisitor {
     fn record_str(&mut self, field: &Field, value: &str) {
@@ -66,7 +60,7 @@ impl Visit for MsgVisitor {
     fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
         if field.name() == "message" {
             let s = format!("{value:?}");
-            // strip surrounding quotes that Debug adds to strings
+            // Remove the extra quotes added by `Debug` formatting for string values.
             self.0 = if s.len() >= 2 && s.starts_with('"') && s.ends_with('"') {
                 s[1..s.len()-1].to_string()
             } else { s };
@@ -79,8 +73,7 @@ impl<S: tracing::Subscriber> Layer<S> for UiLogLayer {
         let target = event.metadata().target();
         let level  = event.metadata().level();
 
-        // ── Smart filter ─────────────────────────────────────────────────────
-        // Tier 1 – our own crate (loose matching): DEBUG and above.
+        // Keep full visibility for application logs and only surface warnings from dependencies.
         let is_ours  = target.to_lowercase().contains("nodechat");
         
         let is_net   = target.starts_with("iroh")
@@ -108,13 +101,12 @@ impl<S: tracing::Subscriber> Layer<S> for UiLogLayer {
 
         if !pass { return; }
 
-        // ── Format ───────────────────────────────────────────────────────────
         let mut visitor = MsgVisitor(String::new());
         event.record(&mut visitor);
         let msg = visitor.0;
         if msg.is_empty() { return; }
 
-        // Short readable module tag: last 1-2 path segments
+        // Collapse the tracing target to a short module tag for the debug panel.
         let tag = {
             let parts: Vec<&str> = target.split("::").collect();
             if parts.len() <= 2 { target.to_string() }
@@ -150,20 +142,19 @@ impl RealRuntime {
             .enable_all()
             .build()?;
 
-        // We still use std threads/channels for UI boundary since Slint is sync on one end
+        // The Slint boundary is synchronous, so the UI bridge uses std channels and threads.
         let (command_tx, command_rx) = mpsc::channel::<Command>();
         let (event_tx, event_rx) = mpsc::channel::<AppEvent>();
 
-        // ── Tracing subscriber ──────────────────────────────────────────────
-        // Sync channel (capacity 256) so the UI layer never blocks the backend.
+        // Buffer log forwarding separately so diagnostics never block application work.
         let (log_tx, log_rx) = mpsc::sync_channel::<AppEvent>(256);
         let ui_layer = UiLogLayer { event_tx: log_tx };
 
-        // stderr layer: mirrors the UiLogLayer filter so terminal and panel agree.
+        // Keep stderr output aligned with the same filtering strategy used by the in-app panel.
         let stderr_filter = tracing_subscriber::EnvFilter::try_from_default_env()
             .unwrap_or_else(|_| {
                 tracing_subscriber::EnvFilter::new(
-                    // our code = DEBUG+, useful net libs = WARN+, codec noise = off
+                    // Application logs stay verbose; dependency output is reduced to actionable signals.
                     "nodechat_new=debug,\
                      iroh=warn,quinn=warn,rustls=warn,\
                      n0_=warn,noq=warn,hickory=warn,\
@@ -184,7 +175,7 @@ impl RealRuntime {
                 Err(e) => eprintln!("[BRIDGE] FAILED to install tracing subscriber: {}. It might already be set.", e),
             }
 
-        // Drain log events from the sync channel into the main event channel.
+        // Forward accepted log lines into the same event stream consumed by the UI.
         let event_tx_log = event_tx.clone();
         std::thread::spawn(move || {
             while let Ok(event) = log_rx.recv() {
@@ -192,7 +183,7 @@ impl RealRuntime {
             }
         });
 
-        // Bridge the std sync channel -> tokio async channel
+        // Relay UI commands into Tokio so backend tasks can remain asynchronous.
         let (async_cmd_tx, mut async_cmd_rx) = tokio::sync::mpsc::channel::<Command>(100);
         thread::spawn(move || {
             while let Ok(cmd) = command_rx.recv() {
@@ -259,33 +250,24 @@ impl RealRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contract::Command;
+    use crate::contract::AppEvent;
+    use std::sync::{mpsc, Arc, Mutex};
 
     #[test]
-    fn runtime_emits_snapshot_then_command_results() {
-        let runtime = MockRuntime::start();
-
-        let snapshot = loop {
-            if let Some(event) = runtime.ui.try_recv() {
-                if let AppEvent::SnapshotReady(snapshot) = event {
-                    break snapshot;
-                }
-            }
+    fn drain_events_collects_pending_events() {
+        let (command_tx, _command_rx) = mpsc::channel();
+        let (event_tx, event_rx) = mpsc::channel();
+        let bridge = UiBridge {
+            command_tx,
+            event_rx: Arc::new(Mutex::new(event_rx)),
         };
 
-        assert!(!snapshot.chat_list.is_empty());
+        event_tx.send(AppEvent::StatusNotice("first".to_string())).unwrap();
+        event_tx.send(AppEvent::StatusNotice("second".to_string())).unwrap();
 
-        runtime.ui.send(Command::Refresh).expect("command send should work");
-
-        let events = runtime
-            .ui
-            .recv_timeout(Duration::from_millis(200))
-            .into_iter()
-            .collect::<Vec<_>>();
-        assert!(
-            events
-                .iter()
-                .any(|event| matches!(event, AppEvent::SnapshotReady(_)))
-        );
+        let events = bridge.drain_events();
+        assert_eq!(events.len(), 2);
+        assert!(matches!(events[0], AppEvent::StatusNotice(_)));
+        assert!(bridge.drain_events().is_empty());
     }
 }

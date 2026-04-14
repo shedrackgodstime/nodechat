@@ -1,5 +1,4 @@
-// NodeChat New — Settings Screen
-// ---------------------------------------------------------
+// Settings screen for profile, security, diagnostics, and destructive actions.
 
 import { AppTheme, VertScroll } from "../theme.slint";
 import { ActionRow } from "../components/action_row.slint";
@@ -32,7 +31,7 @@ export component SettingsScreen inherits Rectangle {
         height: 100%;
         spacing: 0;
 
-        // 1. Header
+        // Header
         Rectangle {
             height: is-desktop ? 80px : 64px;
             background: AppTheme.surface-secondary;
@@ -58,12 +57,12 @@ export component SettingsScreen inherits Rectangle {
                 VerticalLayout {
                     alignment: center;
                     Text { text: "Settings"; font-size: is-desktop ? 28px : 18px; font-weight: 700; color: AppTheme.text-primary; }
-                    Text { text: "Manage your P2P Identity"; font-size: 13px; color: AppTheme.text-secondary; }
+                    Text { text: "Manage your local identity and app security"; font-size: 13px; color: AppTheme.text-secondary; }
                 }
             }
         }
 
-        // 2. Body
+        // Body
         VertScroll {
             vertical-stretch: 1;
             viewport-height: settings-body.preferred-height;
@@ -75,7 +74,7 @@ export component SettingsScreen inherits Rectangle {
                 spacing: AppTheme.sp-lg;
                 alignment: start;
 
-                // --- 1. Profile Preview ---
+                // Profile summary
                 Rectangle {
                     background: AppTheme.surface-secondary;
                     border-radius: AppTheme.radius-lg;
@@ -99,12 +98,12 @@ export component SettingsScreen inherits Rectangle {
                             alignment: center;
                             spacing: 2px;
                             Text { text: display-name; font-size: 20px; font-weight: 700; color: AppTheme.text-primary; }
-                            Text { text: "Node Status: Online"; font-size: 13px; color: AppTheme.accent-success; }
+                            Text { text: "Local identity configured"; font-size: 13px; color: AppTheme.text-secondary; }
                         }
                     }
                 }
 
-                // --- 2. Identity & Security ---
+                // Identity and security actions
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text { text: "IDENTITY & SECURITY"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
@@ -126,8 +125,8 @@ export component SettingsScreen inherits Rectangle {
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
                                 icon: "🔑";
-                                title: "My Unique Join Code";
-                                subtitle: endpoint-ticket != "" ? endpoint-ticket : "Copy your P2P connection code";
+                                title: "My Connection Ticket";
+                                subtitle: endpoint-ticket != "" ? endpoint-ticket : "Copy the ticket another peer can use to add you";
                                 accessory: "copy";
                                 show-copied: root.show-copied;
                                 clicked => { 
@@ -137,15 +136,15 @@ export component SettingsScreen inherits Rectangle {
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
                                 icon: "🔐";
-                                title: root.has-password ? "Change Password/PIN" : "Setup Password/PIN";
-                                subtitle: root.has-password ? "Update security credentials" : "Lock your app (Optional)";
+                                title: root.has-password ? "Change Password or PIN" : "Set Password or PIN";
+                                subtitle: root.has-password ? "Update the local app lock" : "Enable an optional local app lock";
                                 clicked => { root.change-password(); }
                             }
                         }
                     }
                 }
 
-                // --- 3. About & Diagnostics ---
+                // About and diagnostics
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text { text: "INFO & SUPPORT"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1px; }
@@ -169,7 +168,7 @@ export component SettingsScreen inherits Rectangle {
                     }
                 }
 
-                // --- 4. Danger Zone ---
+                // Destructive actions
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text { text: "DANGER ZONE"; font-size: 11px; font-weight: 800; color: AppTheme.accent-danger; letter-spacing: 1px; }
@@ -192,7 +191,7 @@ export component SettingsScreen inherits Rectangle {
                             HorizontalLayout { padding-left: 56px; Rectangle { height: 1px; background: AppTheme.divider; } }
                             ActionRow {
                                 icon: "⚠️";
-                                title: "Reset P2P Identity";
+                                title: "Reset Identity";
                                 subtitle: "Permanently delete your identity & keys";
                                 is-danger: true;
                                 clicked => { root.request-reset-identity(); }
@@ -201,7 +200,7 @@ export component SettingsScreen inherits Rectangle {
                     }
                 }
 
-                // Simple Footer
+                // Footer
                 VerticalLayout {
                     padding-top: AppTheme.sp-lg;
                     Text {

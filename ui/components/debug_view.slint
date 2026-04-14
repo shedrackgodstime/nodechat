@@ -1,8 +1,4 @@
-// NodeChat New — Real-time Debug View
-// ---------------------------------------------------------
-// 2-D scrollable console for diagnostic logs.
-// Vertical scroll: see all lines. Horizontal scroll: read long lines fully.
-// ---------------------------------------------------------
+// Debug console for runtime diagnostics and log inspection.
 
 import { AppTheme } from "../theme.slint";
 
@@ -23,7 +19,6 @@ export component DebugView inherits Rectangle {
         padding: AppTheme.sp-md;
         spacing: AppTheme.sp-sm;
 
-        // ── Header bar ──────────────────────────────────────────
         HorizontalLayout {
             spacing: AppTheme.sp-sm;
             alignment: space-between;
@@ -40,7 +35,6 @@ export component DebugView inherits Rectangle {
                 spacing: AppTheme.sp-sm;
                 alignment: end;
 
-                // Refresh Button (Replaces "Latest")
                 refresh-touch := TouchArea {
                     width: 72px;
                     height: 26px;
@@ -62,7 +56,6 @@ export component DebugView inherits Rectangle {
                     }
                 }
 
-                // Copy button
                 copy-touch := TouchArea {
                     width: 72px;
                     height: 26px;
@@ -90,10 +83,9 @@ export component DebugView inherits Rectangle {
             }
         }
 
-        // ── Optimized Console Area ──────────────────────────────
         Rectangle {
             vertical-stretch: 1;
-            min-height: is-desktop ? 250px : 350px; // Larger touch target on mobile
+            min-height: is-desktop ? 250px : 350px; // Larger inspection area on mobile.
             background: #09090B;
             border-radius: 4px;
             clip: true;
@@ -105,8 +97,7 @@ export component DebugView inherits Rectangle {
                 viewport-width: Math.max(parent.width, log-text.preferred-width + 32px);
                 viewport-height: log-text.preferred-height + 24px;
                 
-                // CRITICAL FOR MOBILE: 
-                // We ensure it is interactive and has a background to catch touches
+                // The background rectangle below ensures touch gestures are captured reliably.
                 interactive: true;
 
                 Rectangle {
@@ -127,7 +118,6 @@ export component DebugView inherits Rectangle {
             }
         }
 
-        // ── Mobile UX Hint ─────────────────────────────────────
         HorizontalLayout {
             alignment: center;
             opacity: 0.3;

@@ -1,9 +1,5 @@
-// NodeChat New — Chat List Screen
-// ---------------------------------------------------------
-// The main home screen. Shows recent conversations.
-// Desktop: renders as the sidebar panel.
-// Mobile: renders as a full-screen panel.
-// ---------------------------------------------------------
+// Chat list screen showing recent conversations and summary state.
+// On desktop it serves as the left panel; on mobile it occupies the full screen.
 
 
 import { AppTheme, VertScroll } from "../theme.slint";
@@ -33,7 +29,7 @@ export component ChatListScreen inherits Rectangle {
         spacing: 0;
 
         if !compact: VerticalLayout {
-            // --- Header Bar ---
+            // Header
             Rectangle {
                 height: is-desktop ? 80px : 60px;
                 background: is-desktop ? transparent : AppTheme.surface-secondary;
@@ -44,7 +40,7 @@ export component ChatListScreen inherits Rectangle {
                     padding-right: 2px; // Absolute far right
                     alignment: stretch;
 
-                    // --- Left: Brand & Status ---
+                    // Title and network status
                     HorizontalLayout {
                         spacing: AppTheme.space.sm;
                         alignment: start;
@@ -60,7 +56,7 @@ export component ChatListScreen inherits Rectangle {
                             }
                         }
 
-                        // System Status Dot (Integrated)
+                        // Connection summary indicator
                         VerticalLayout {
                             alignment: center;
                             Rectangle {
@@ -72,7 +68,7 @@ export component ChatListScreen inherits Rectangle {
                         }
                     }
 
-                    // --- Right: Key Actions ---
+                    // Primary action
                     HorizontalLayout {
                         spacing: AppTheme.space.xs;
                         alignment: end;
@@ -98,11 +94,10 @@ export component ChatListScreen inherits Rectangle {
                 background: AppTheme.divider;
             }
             
-            // Header-to-list breathing room
+            // Space between the header and the conversation list.
             Rectangle { height: AppTheme.space.sm; }
         }
 
-        // --- Chat List Body ---
         if chats.length == 0 && !compact: VerticalLayout {
             alignment: center;
             spacing: AppTheme.space.md;

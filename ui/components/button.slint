@@ -1,11 +1,4 @@
-// NodeChat New — Premium Reusable Button
-// ---------------------------------------------------------
-// Standardised button system with support for:
-//   - Primary (Accent)
-//   - Secondary (Surface)
-//   - Ghost (Transparent)
-//   - Danger (Red)
-// ---------------------------------------------------------
+// Reusable button component with primary, secondary, ghost, and danger variants.
 
 import { AppTheme } from "../theme.slint";
 
@@ -24,7 +17,7 @@ export component Button inherits Rectangle {
     border-radius: AppTheme.radius-md;
     clip: true;
 
-    // --- Kinetic Backgrounds ---
+    // Variant-driven background styling.
     background: kind == "primary" ? AppTheme.accent 
               : kind == "secondary" ? AppTheme.surface-tertiary 
               : kind == "danger" ? AppTheme.accent-danger

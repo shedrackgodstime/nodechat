@@ -1,11 +1,4 @@
-// NodeChat New — Chat View Screen
-// ---------------------------------------------------------
-// The main messaging surface for 1:1 and group conversations.
-// Layout zones:
-//   1. Header (peer info, back, actions)
-//   2. Message stream (scrollable, bottom-anchored)
-//   3. Composer (keyboard-safe, fixed bottom)
-// ---------------------------------------------------------
+// Main messaging surface for direct and group conversations.
 
 
 import { AppTheme, VertScroll } from "../theme.slint";
@@ -42,19 +35,18 @@ export component ChatViewScreen inherits Rectangle {
 
     background: AppTheme.surface-primary;
 
-    // --- Scroll Control ---
+    // Keep the latest message visible whenever the viewport has overflow content.
     public function scroll-to-bottom() {
         if (msg-scroll.viewport-height > msg-scroll.height) {
             msg-scroll.viewport-y = msg-scroll.height - msg-scroll.viewport-height;
         }
     }
 
-    // Auto-scroll when messages update (e.g. typing or receiving)
     changed messages => {
         root.scroll-to-bottom();
     }
 
-    // Force scroll-to-bottom on entry (with slight delay for layout calculation)
+    // Run one delayed scroll after entry so layout-dependent sizes are available.
     property <bool> entry-scroll-pending: true;
     Timer {
         interval: 50ms;
@@ -68,7 +60,6 @@ export component ChatViewScreen inherits Rectangle {
     VerticalLayout {
         spacing: 0;
 
-        // 1. HEADER
         Rectangle {
             height: 60px;
             background: AppTheme.surface-secondary;
@@ -80,7 +71,6 @@ export component ChatViewScreen inherits Rectangle {
                 spacing: AppTheme.sp-sm;
                 alignment: stretch;
 
-                // Back Button
                 TouchArea {
                     width: 44px;
                     clicked => {
@@ -96,7 +86,6 @@ export component ChatViewScreen inherits Rectangle {
                     }
                 }
 
-                // Avatar
                 Rectangle {
                     width: 38px;
                     height: 38px;
@@ -117,7 +106,7 @@ export component ChatViewScreen inherits Rectangle {
                             vertical-alignment: center;
                         }
 
-                        // Presence Dot (Only for 1:1 direct chats)
+                        // Group conversations do not expose a single peer presence indicator.
                         if connection-mode != "group" && (is-online || is-relay): Rectangle {
                             width: 12px;
                             height: 12px;
@@ -131,7 +120,6 @@ export component ChatViewScreen inherits Rectangle {
                     }
                 }
 
-                // Peer Name + Status
                 VerticalLayout {
                     alignment: center;
                     horizontal-stretch: 1;
@@ -156,7 +144,6 @@ export component ChatViewScreen inherits Rectangle {
                     }
                 }
 
-                // Info Button
                 TouchArea {
                     width: 44px;
                     clicked => {
@@ -175,18 +162,16 @@ export component ChatViewScreen inherits Rectangle {
             }
         }
 
-        // Thin separator
         Rectangle {
             height: 1px;
             background: AppTheme.divider;
         }
 
-        // 2. MESSAGE LIST (vertical scroll only)
         msg-scroll := VertScroll {
             vertical-stretch: 1;
             viewport-height: msg-list.preferred-height;
 
-            // Background Unfocus Catcher
+            // Tapping empty space should dismiss transient focus state in the composer.
             TouchArea {
                 width: 100%;
                 height: 100%;
@@ -201,8 +186,7 @@ export component ChatViewScreen inherits Rectangle {
                 padding: AppTheme.sp-sm;
                 spacing: AppTheme.sp-sm;
                 
-                // Vertical Spacer: Replaces expensive 'alignment: end'.
-                // It pushes messages to the bottom but is much faster for scrolling.
+                // A flexible spacer bottom-aligns the thread without the cost of `alignment: end`.
                 Rectangle {
                     vertical-stretch: 1;
                 }
@@ -253,14 +237,13 @@ export component ChatViewScreen inherits Rectangle {
                     }
                 }
 
-                // --- BREATHING ROOM (Bottom Padding) ---
+                // Preserve comfortable spacing above the composer and safe area inset.
                 Rectangle {
                     height: 50px;
                 }
             }
         }
 
-        // 3. COMPOSER (Keyboard-safe, anchored bottom)
         Composer {
             is-disabled: false;
             is-mobile: !root.is-desktop;
@@ -268,13 +251,12 @@ export component ChatViewScreen inherits Rectangle {
             placeholder: "Message...";
             send-message(msg) => {
                 root.send-message(msg);
-                // Instant follow-up jump
+                // Follow the newly sent message immediately after the draft clears.
                 root.scroll-to-bottom();
             }
         }
     }
 
-    // --- TOAST NOTIFICATION (Top Float) ---
     if root.show-copied: Rectangle {
         background: AppTheme.accent-success;
         y: 80px;

@@ -1,5 +1,4 @@
-// NodeChat New — Information Screen (Contact & Group Info)
-// ---------------------------------------------------------
+// Information screen for contacts and groups.
 
 import { AppTheme, VertScroll } from "../theme.slint";
 import { ActionRow } from "../components/action_row.slint";
@@ -93,7 +92,7 @@ export component InfoScreen inherits Rectangle {
         height: 100%;
         spacing: 0;
 
-        // 1. Header (Mirrors PasswordScreen consistency)
+        // Header
         Rectangle {
             height: is-desktop ? 80px : 64px;
             background: AppTheme.surface-secondary;
@@ -125,13 +124,13 @@ export component InfoScreen inherits Rectangle {
                 VerticalLayout {
                     alignment: center;
                     Text { 
-                        text: is-group ? "Group Info" : "Peer Identity"; 
+                        text: is-group ? "Group Info" : "Contact Info"; 
                         font-size: is-desktop ? 24px : 18px; 
                         font-weight: 700; 
                         color: AppTheme.text-primary; 
                     }
                     Text { 
-                        text: is-group ? "Manage swarm settings and keys" : "View network identifiers and trust"; 
+                        text: is-group ? "View group details and identifiers" : "View contact details and trust status"; 
                         font-size: 13px; 
                         color: AppTheme.text-secondary; 
                     }
@@ -139,7 +138,7 @@ export component InfoScreen inherits Rectangle {
             }
         }
 
-        // 2. Body
+        // Body
         VertScroll {
             vertical-stretch: 1;
             viewport-height: body.preferred-height;
@@ -151,7 +150,7 @@ export component InfoScreen inherits Rectangle {
                 spacing: AppTheme.sp-lg;
                 alignment: start;
 
-                // --- 1. Hero Summary ---
+                // Summary card
                 Rectangle {
                     background: AppTheme.surface-secondary;
                     border-radius: AppTheme.radius-lg;
@@ -192,7 +191,7 @@ export component InfoScreen inherits Rectangle {
                                 color: AppTheme.text-primary;
                             }
                             Text {
-                                text: is-group ? (group.member-count + " Active Members") : (contact.is-online ? "Connected via " + (contact.is-relay ? "Relay" : "Direct P2P") : "Identity Offline");
+                                text: is-group ? (group.member-count + " active members") : (contact.is-online ? "Connected via " + (contact.is-relay ? "relay" : "direct session") : "Not currently connected");
                                 font-size: 13px;
                                 font-weight: 600;
                                 color: (is-group || !contact.is-online) ? AppTheme.text-tertiary : AppTheme.accent-success;
@@ -201,7 +200,7 @@ export component InfoScreen inherits Rectangle {
                     }
                 }
 
-                // --- 2. Action Controls (PRO Action Bar Card) ---
+                // Primary actions
                 Rectangle {
                     background: AppTheme.surface-secondary;
                     border-radius: AppTheme.radius-lg;
@@ -216,28 +215,24 @@ export component InfoScreen inherits Rectangle {
                         padding-left: AppTheme.sp-md;
                         padding-right: AppTheme.sp-md;
 
-                        // 1. Message
                         ActionCircle {
                             label: "Message";
                             icon: @image-url("../../assets/icons/chats.svg");
                             clicked => { root.chat-clicked(); }
                         }
 
-                        // 2. Share
                         if !is-group : ActionCircle {
                             label: "Share";
                             icon: @image-url("../../assets/icons/globe.svg");
                             clicked => { root.share-clicked(); }
                         }
 
-                        // 3. Add (Group Only)
                         if is-group : ActionCircle {
                             label: "Add Member";
                             icon: @image-url("../../assets/icons/add.svg");
                             clicked => { root.add-members(); }
                         }
 
-                        // 4. Verify (Peer Only)
                         if !is-group : ActionCircle {
                             label: contact.is-verified ? "Verified" : "Verify";
                             icon: @image-url("../../assets/icons/check.svg");
@@ -247,7 +242,7 @@ export component InfoScreen inherits Rectangle {
                     }
                 }
 
-                // --- 3. Persistent Data (Improved Display) ---
+                // Persistent identifiers
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text { text: is-group ? "PROTOCOL DATA" : "IDENTIFIERS"; font-size: 11px; font-weight: 800; color: AppTheme.text-tertiary; letter-spacing: 1.5px; }
@@ -288,7 +283,7 @@ export component InfoScreen inherits Rectangle {
                     }
                 }
 
-                // --- 4. Danger Zone ---
+                // Destructive actions
                 VerticalLayout {
                     spacing: AppTheme.sp-sm;
                     Text { text: "DANGER ZONE"; font-size: 11px; font-weight: 800; color: AppTheme.accent-danger; letter-spacing: 1.5px; }
@@ -312,7 +307,7 @@ export component InfoScreen inherits Rectangle {
                             ActionRow {
                                 icon-svg: @image-url("../../assets/icons/warning.svg");
                                 title: is-group ? "Leave Group" : "Remove Contact";
-                                subtitle: is-group ? "Exit the p2p conversation" : "Irreversibly unlink peer";
+                                subtitle: is-group ? "Remove this group from this device" : "Remove this contact from this device";
                                 is-danger: true;
                                 clicked => { root.request-delete(); }
                             }
@@ -320,7 +315,7 @@ export component InfoScreen inherits Rectangle {
                     }
                 }
 
-                // Bottom safe area spacer
+                // Bottom spacer for safe-area breathing room.
                 Rectangle { height: 40px; }
             }
         }

@@ -1,4 +1,4 @@
-//! Iroh unicast — direct 1:1 message delivery.
+//! Direct one-to-one message delivery over an Iroh connection.
 
 use anyhow::Result;
 
@@ -6,11 +6,11 @@ use super::{NetworkManager, DIRECT_ALPN};
 
 /// Send `payload` to `target_node_id` over Iroh direct connection.
 ///
-/// Reuses `manager.connections[target_node_id]` if available.
-/// Otherwise attempts Pkarr discovery first (RULES.md P-03), then connects.
+/// Reuses an existing transport connection when one is available and otherwise
+/// establishes a fresh connection before opening a unidirectional send stream.
 ///
 /// # Errors
-/// Returns an error if the peer is unreachable. Caller is responsible for queuing.
+/// Returns an error if the peer cannot be reached. The caller decides whether to queue the payload.
 pub(crate) async fn send(
     manager: &NetworkManager,
     target_node_id: &str,
@@ -20,7 +20,7 @@ pub(crate) async fn send(
     let (endpoint, connections) = {
         let inner = manager.inner.lock().unwrap_or_else(|p| p.into_inner());
         let ep = inner.endpoint.clone().ok_or_else(|| anyhow::anyhow!("endpoint not initialised"))?;
-        // We can't return a reference under lock, so we clone common stuff
+        // Clone the shared handles before releasing the lock.
         (ep, manager.inner.clone()) 
     };
 
@@ -36,7 +36,7 @@ pub(crate) async fn send(
         target.into()
     };
 
-    // Reuse existing connection if possible (RULES.md P-04)
+    // Reuse the cached transport connection when it is still valid.
     let conn = {
         let maybe_conn = {
             let inner = connections.lock().unwrap_or_else(|p| p.into_inner());
@@ -77,7 +77,7 @@ pub(crate) async fn send(
 
     tracing::info!(peer = %target_node_id, "Direct: opening stream for payload (len={})", payload.len());
 
-    // Open uni-directional stream for fire-and-forget message delivery
+    // Use a unidirectional stream because this send path does not wait for an inline response.
     let result = async {
         let mut send_stream = conn.open_uni().await?;
         send_stream.write_all(&payload).await?;
@@ -87,7 +87,7 @@ pub(crate) async fn send(
 
     if let Err(e) = result {
         tracing::error!(peer = %target_node_id, "Direct: stream failed (peer might be offline): {}. Purging dead connection.", e);
-        // CRITICAL: if the connection failed, remove it from the map so we dial fresh next time
+        // Remove failed connections so the next attempt forces a fresh dial.
         let inner = manager.inner.lock().unwrap_or_else(|p| p.into_inner());
         let mut conns = inner.connections.lock().unwrap_or_else(|p| p.into_inner());
         conns.remove(target_node_id);

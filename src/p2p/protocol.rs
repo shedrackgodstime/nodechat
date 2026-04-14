@@ -1,18 +1,17 @@
-//! nodechat binary protocol (NC-P2P) — Version 1.0 (Academic Build)
-//! -------------------------------------------------------------------
-//! This module defines the binary wire format for the NodeChat network.
-//! It uses a custom TLV-style (Type-Length-Value) framing to ensure 
-//! compatibility and strict validation of incoming P2P signals.
+//! Binary wire frames used for NodeChat peer and group traffic.
+//!
+//! Each frame carries a magic header and explicit field lengths so inbound
+//! payloads can be validated before higher-level processing.
 
 use anyhow::{Result, bail};
 
-/// Magic bytes [0x4E, 0x43, 0x31, 0x48] -> "NC1H"
+/// Magic header for handshake frames (`NC1H`).
 pub const MAGIC: [u8; 4] = [0x4E, 0x43, 0x31, 0x48];
 
-/// Current Protocol Version
+/// Current protocol version.
 pub const VERSION: u8 = 0x01;
 
-/// Handshake Frame Types
+/// Handshake frame types.
 pub const HELLO: u8     = 0x01;
 pub const HELLO_ACK: u8 = 0x02;
 
@@ -25,12 +24,12 @@ pub struct HandshakeFrame {
 }
 
 impl HandshakeFrame {
-    /// Serialize frame to bytes for transmission over Iroh.
+    /// Serializes the handshake frame into its network representation.
     pub fn encode(&self) -> Vec<u8> {
         let ticket_bytes = self.ticket.as_bytes();
         let name_bytes = self.display_name.as_bytes();
         
-        // Size = Magic(4) + Type(1) + Pubkey(32) + TicketLen(2) + Ticket(N) + NameLen(2) + Name(M)
+        // Layout: magic + kind + public key + ticket length/value + display-name length/value.
         let mut buf = Vec::with_capacity(4 + 1 + 32 + 2 + ticket_bytes.len() + 2 + name_bytes.len());
         
         buf.extend_from_slice(&MAGIC);
@@ -46,7 +45,7 @@ impl HandshakeFrame {
         buf
     }
 
-    /// Deserialize frame from raw Iroh bytes.
+    /// Decodes a handshake frame from raw network bytes.
     pub fn decode(data: &[u8]) -> Result<Self> {
         if data.len() < 4 + 1 + 32 + 2 + 2 {
             bail!("handshake frame too short");
@@ -76,11 +75,7 @@ impl HandshakeFrame {
     }
 }
 
-/// Direct Message Frame (NC2D)
-/// ---------------------------------------------------------
-/// Framing for messages sent over established secure streams.
-/// Magic(4) + Kind(1) + MessageId(16) + PayloadLen(4) + Payload(N)
-
+/// Magic header for direct-message frames (`NC2D`).
 pub const DIRECT_MAGIC: [u8; 4] = [0x4E, 0x43, 0x32, 0x44]; // NC2D
 pub const KIND_TEXT: u8    = 0x01;
 pub const KIND_RECEIPT: u8 = 0x02;
@@ -146,11 +141,7 @@ impl DirectFrame {
         }
     }
 }
-/// Group Message Frame (NC3G)
-/// ---------------------------------------------------------
-/// Framing for messages broadcast over Iroh Gossip.
-/// Magic(4) + SenderNodeId(32) + PayloadLen(4) + Payload(N)
-
+/// Magic header for group-message frames (`NC3G`).
 pub const GROUP_MAGIC: [u8; 4] = [0x4E, 0x43, 0x33, 0x47]; // NC3G
 
 #[derive(Debug, Clone)]
@@ -164,7 +155,7 @@ pub struct GroupFrame {
 impl GroupFrame {
     pub fn encode(&self) -> Vec<u8> {
         let sender_bytes = hex::decode(&self.sender_id).unwrap_or_else(|_| vec![0u8; 32]);
-        // Size = Magic(4) + Id(16) + Timestamp(8) + SenderNodeId(32) + PayloadLen(4) + Payload(N)
+        // Layout: magic + message id + timestamp + sender id + payload length/value.
         let mut buf = Vec::with_capacity(4 + 16 + 8 + 32 + 4 + self.content.len());
         buf.extend_from_slice(&GROUP_MAGIC);
         buf.extend_from_slice(self.id.as_bytes());
@@ -190,10 +181,7 @@ impl GroupFrame {
     }
 }
 
-/// Sync Frame (NC4S)
-/// ---------------------------------------------------------
-/// Used for reconciling missing group history when coming online.
-/// Magic(4) + Kind(1) + TopicLen(2) + Topic(N) + Data(...)
+/// Magic header for group-history synchronization frames (`NC4S`).
 pub const SYNC_MAGIC: [u8; 4] = [0x4E, 0x43, 0x34, 0x53]; // NC4S
 pub const SYNC_QUERY: u8 = 0x01;
 pub const SYNC_REPLY: u8 = 0x02;

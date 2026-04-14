@@ -1,26 +1,20 @@
-// NodeChat New — Unified Action Row Component
-// ---------------------------------------------------------
-// Standardised row for all list-oriented surfaces:
-//   - Chat List (Preview + Badge + Timestamp)
-//   - Contacts (Avatar + Status + Verified)
-//   - Settings (Icon + Action Toggle)
-// Supports compact (Rail) and expanded layouts.
-// ---------------------------------------------------------
+// Shared row component for chat lists, contacts, settings, and similar list surfaces.
+// Supports both compact rail layouts and full-width list layouts.
 
 import { AppTheme } from "../theme.slint";
 
 export component ActionRow inherits Rectangle {
-    // --- Data Properties ---
+    // Content properties.
     in property <string> title;
     in property <string> subtitle;
-    in property <string> initials;    // Set for Avatar Mode
-    in property <string> icon;        // Text icon (Emoji)
-    in property <image> icon-svg: @image-url(""); // Set for Settings Mode
+    in property <string> initials;
+    in property <string> icon;
+    in property <image> icon-svg: @image-url("");
     in property <string> timestamp;
     in property <int> badge-count: 0;
     in property <int> member-count: 0;
     
-    // --- State Properties ---
+    // State properties.
     in property <bool> is-online: false;
     in property <bool> is-session-ready: true;
     in property <bool> has-queued-messages: false;
@@ -30,21 +24,21 @@ export component ActionRow inherits Rectangle {
     in property <bool> is-danger: false;
     in property <bool> compact: false;
     
-    // --- Last Message Status (Chat List Mode) ---
+    // Outgoing-message preview state used in chat list rows.
     in property <bool> is-last-message-outgoing: false;
-    in property <string> last-message-status: ""; // "sent", "delivered", "failed", "queued"
+    in property <string> last-message-status: "";
     
-    // --- Appearance ---
-    in property <string> accessory: "none"; // "arrow", "toggle", "checkbox", "copy", "none"
+    // Appearance properties.
+    in property <string> accessory: "none";
     in property <bool> is-toggle-on: false;
     in property <bool> show-copied: false;
     in property <color> icon-color: root.is-danger ? AppTheme.accent-danger : AppTheme.accent;
     
-    // --- Callbacks ---
+    // User actions.
     callback clicked();
     callback toggled(bool);
 
-    // --- Layout Constants ---
+    // Layout.
     property <length> item-height: root.compact ? 60px : (subtitle != "" ? 72px : 64px); 
     height: item-height;
     
@@ -52,7 +46,7 @@ export component ActionRow inherits Rectangle {
     border-radius: AppTheme.radius-md;
     clip: false;
 
-    // --- Interactions ---
+    // Hover state for pointer-driven platforms.
     states [
         hovered when touch.has-hover && !is-selected : {
             background: AppTheme.surface-hover;
@@ -62,7 +56,7 @@ export component ActionRow inherits Rectangle {
     touch := TouchArea {
         clicked => { 
             root.clicked(); 
-            // Pro Flow: Tapping the row also toggles if it's a multi-select or setting row
+            // Tapping the row also toggles checkbox and switch accessories.
             if root.accessory == "checkbox" || root.accessory == "toggle" {
                 root.toggled(!root.is-toggle-on);
             }
@@ -75,7 +69,7 @@ export component ActionRow inherits Rectangle {
         spacing: AppTheme.sp-lg;
         alignment: root.compact ? center : start;
 
-        // --- 1. LEFT ZONE (Avatar or Icon) ---
+        // Leading avatar or icon.
         Rectangle {
             width: root.compact ? 48px : (root.initials != "" ? 48px : 38px);
             height: self.width;
@@ -91,7 +85,7 @@ export component ActionRow inherits Rectangle {
                 }
                 if (root.is-online || root.is-relay || !root.is-session-ready) && !root.compact : Rectangle {
                     width: 12px; height: 12px; border-radius: 6px;
-                    // Order of priority: Online (Success) > Session Ready (Warning) > Relay (Accent)
+                    // Status priority: online, then handshake-needed, then relay.
                     background: root.is-online ? AppTheme.accent-success : (!root.is-session-ready ? AppTheme.accent-warning : AppTheme.accent);
                     border-color: AppTheme.surface-primary; border-width: 2px;
                     x: parent.width - self.width - 1px; y: parent.height - self.height - 1px;
@@ -130,16 +124,16 @@ export component ActionRow inherits Rectangle {
                     font-size: 13px; font-weight: 500; color: AppTheme.text-tertiary;
                     vertical-alignment: center;
                 }
-                if root.is-verified && (root.subtitle == "" || root.subtitle == "Waiting for handshake...") : Rectangle {
+                if root.is-verified && (root.subtitle == "" || root.subtitle == "Awaiting secure handshake") : Rectangle {
                     width: 8px; height: 8px; border-radius: 4px;
-                    background: #5090FF; // Clean Blue Dot for Established Handshake
+                    background: #5090FF;
                     y: (parent.height - self.height) / 2;
                 }
             }
 
             if root.subtitle != "" : HorizontalLayout {
                 spacing: 4px;
-                // Status indicator for outgoing messages
+                // Delivery status indicator for the last outgoing preview.
                 if root.is-last-message-outgoing : Rectangle {
                     width: 14px;
                     height: 14px;
@@ -168,7 +162,7 @@ export component ActionRow inherits Rectangle {
                     color: AppTheme.text-tertiary; 
                     overflow: elide;
                     wrap: no-wrap;
-                    height: 18px; // Force single line height
+                    height: 18px;
                     horizontal-stretch: 1;
                 }
             }
