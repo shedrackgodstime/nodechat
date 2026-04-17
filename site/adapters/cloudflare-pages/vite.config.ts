@@ -17,6 +17,7 @@ export default extendConfig(baseConfig, () => {
           origin: "https://nodechat.pages.dev",
           sitemapOutFile: "sitemap.xml",
         },
+        staticPaths: ["/robots.txt", "/sitemap.xml", "/favicon.ico", "/manifest.json"],
       }),
     ],
   };
