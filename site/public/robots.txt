@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://nodechat.pages.dev/sitemap.xml
