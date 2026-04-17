@@ -20,4 +20,24 @@ declare global {
 
 const fetch = createQwikCity({ render, qwikCityPlan });
 
-export { fetch };
+const onRequest: typeof fetch = async (request, env, ctx) => {
+  if (request.method !== "HEAD") {
+    return fetch(request, env, ctx);
+  }
+
+  const getRequest = new Request(request.url, {
+    method: "GET",
+    headers: request.headers,
+    redirect: request.redirect,
+  });
+
+  const response = await fetch(getRequest, env, ctx);
+
+  return new Response(null, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+};
+
+export { onRequest as fetch };
