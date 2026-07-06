@@ -12,7 +12,7 @@ storage. Channel-based bridge (mpsc) connects the Dioxus UI to a Tokio backend.
 
 | Crate | Version |
 |---|---|
-| `iroh` | `1.0.1` |
+| `iroh` | `1.0.2` |
 | `iroh-gossip` | `0.101.0` |
 | `iroh-tickets` | `1.0.0` |
 | `iroh-blobs` | `0.103.0` |
