@@ -4,3 +4,6 @@
 
 /materials
 /nodechat-new/target
+/projects
+.env.secrete
+.~lock.*
