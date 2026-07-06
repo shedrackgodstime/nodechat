@@ -1,0 +1,9 @@
+pub mod chat_pane;
+pub mod dashboard;
+pub mod diagnostics_tab;
+pub mod info_drawer;
+pub mod lock_screen;
+pub mod modals;
+pub mod onboarding;
+pub mod settings_tab;
+pub mod sidebar;

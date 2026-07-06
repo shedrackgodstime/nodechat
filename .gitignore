@@ -4,3 +4,7 @@
 
 /materials
 /nodechat-new/target
+/projects
+/dioxus-version/target
+.env.secrete
+.~lock.*
