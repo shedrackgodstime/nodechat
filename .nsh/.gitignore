@@ -1,0 +1,6 @@
+# The runner workspaces and test bundles NSH generates: rebuildable, never
+# committed. The type declarations (`types/`) and `tsconfig.json` stay, as
+# `nsh init` tracks them for an editor.
+/rust
+/test
+/out

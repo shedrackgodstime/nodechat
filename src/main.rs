@@ -12,13 +12,14 @@ use nsh_platform_windows as platform;
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 fn main() -> impl std::process::Termination {
     env_logger::init();
+    let app_id = "com.example.nodechat";
     platform::run_app(
-        platform::AppSource::Rust(platform::Root::of::<nsh_app_nodechat::App>()),
+        platform::AppSource::Rust(platform::Root::of::<nsh_app_nodechat::App>().app_id(app_id)),
         platform::AppOptions {
-            title: "nodechat".to_owned(),
+            title: "NodeChat".to_owned(),
             #[cfg(any(target_os = "linux", target_os = "windows"))]
-            app_id: "com.example.nodechat".to_owned(),
-            size: (480, 640),
+            app_id: app_id.to_owned(),
+            size: (1200, 800),
             ..Default::default()
         },
     )

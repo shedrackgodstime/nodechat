@@ -1,49 +1,19 @@
-//! The app's Rust UI: its root component, which `nsh run`, `nsh package`
+//! NodeChat's Rust UI: its root component, which `nsh run`, `nsh package`
 //! and `cargo run` mount.
+//!
+//! The whole app is Rust on Native Shell (NSH); see [`ui`] for the shell,
+//! the screens and the theme.
 
 use nsh_core::prelude::*;
-use nsh_base::theme;
 
-/// The app's UI set (`nsh.json` `"rust"`): what a TSX entry may import from
-/// `nodechat/native` (`README.md`, "Adding a TSX entry").
+pub mod ui;
+
+pub use crate::ui::App;
+
+/// The app's UI set (`nsh.json` `"rust"`): the components a TSX entry could
+/// import from `nodechat/native`, were there one. The app is Rust-only, so
+/// this registers what the crate ships for the host to find by name.
 #[native_module("nodechat/native")]
 fn native(registry: &mut Registry) {
     registry.register::<App>();
-}
-
-/// The application's root component.
-#[component]
-pub fn App() -> impl IntoElement {
-    let count = signal(0_u32);
-    view()
-        .flex_1()
-        .bg(move || theme().background)
-        .text_color(move || theme().foreground)
-        .child(
-            view()
-                .flex_1()
-                .p_safe_area()
-                .child(
-                    view()
-                        .flex_1()
-                        .items_center()
-                        .justify_center()
-                        .gap_4()
-                        .child(text(move || format!("Count: {}", count.get())).text_size(px(28.0)))
-                        .child(
-                            view()
-                                .px_5()
-                                .py_3()
-                                .rounded(px(10.0))
-                                .bg(move || theme().primary)
-                                .active(|s| s.opacity(0.6))
-                                .on_press(move || count.update(|value| *value += 1))
-                                .child(
-                                    text("Tap")
-                                        .text_size(px(17.0))
-                                        .text_color(move || theme().primary_foreground),
-                                ),
-                        ),
-                ),
-        )
 }
