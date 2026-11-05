@@ -100,6 +100,9 @@ fn apply_schema(conn: &Connection) -> Result<()> {
     // If table existed before we added 'description', SQLITE won't update it automatically.
     let _ = conn.execute("ALTER TABLE groups ADD COLUMN description TEXT NOT NULL DEFAULT ''", []);
     let _ = conn.execute("ALTER TABLE messages ADD COLUMN received_at INTEGER NOT NULL DEFAULT 0", []);
+    let _ = conn.execute("ALTER TABLE messages ADD COLUMN invite_topic_id TEXT NOT NULL DEFAULT ''", []);
+    let _ = conn.execute("ALTER TABLE messages ADD COLUMN invite_group_name TEXT NOT NULL DEFAULT ''", []);
+    let _ = conn.execute("ALTER TABLE messages ADD COLUMN invite_key TEXT NOT NULL DEFAULT ''", []);
 
     Ok(())
 }

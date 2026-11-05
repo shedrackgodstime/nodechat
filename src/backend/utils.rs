@@ -59,8 +59,14 @@ pub fn secure_hash_pin(pin: &str) -> String {
 }
 
 /// Resolves the absolute path to the local SQLite database file.
+/// Set `NODECHAT_DATA_DIR` to use a custom data directory (useful for running multiple instances).
 #[cfg(not(target_os = "android"))]
 pub fn resolve_database_path() -> PathBuf {
+    if let Ok(custom) = std::env::var("NODECHAT_DATA_DIR") {
+        let dir = PathBuf::from(&custom);
+        let _ = std::fs::create_dir_all(&dir);
+        return dir.join("nodechat.db");
+    }
     use directories::ProjectDirs;
     let path = if let Some(proj) = ProjectDirs::from("com", "nodechat", "NodeChat") {
         let dir = proj.data_dir().to_path_buf();
