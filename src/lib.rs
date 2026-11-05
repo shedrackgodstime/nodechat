@@ -1,33 +1,49 @@
-pub mod contract;
-pub mod storage;
-pub mod p2p;
-pub mod backend;
-pub mod bridge;
-pub mod crypto;
-pub mod error;
-pub mod ui;
-pub mod ui_models;
-pub mod notifications;
+//! The app's Rust UI: its root component, which `nsh run`, `nsh package`
+//! and `cargo run` mount.
 
-slint::include_modules!();
+use nsh_core::prelude::*;
+use nsh_base::theme;
 
-pub use bridge::{RealRuntime, UiBridge};
-pub use contract::*;
+/// The app's UI set (`nsh.json` `"rust"`): what a TSX entry may import from
+/// `nodechat/native` (`README.md`, "Adding a TSX entry").
+#[native_module("nodechat/native")]
+fn native(registry: &mut Registry) {
+    registry.register::<App>();
+}
 
-pub static ANDROID_DATA_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
-
-#[cfg(target_os = "android")]
-#[unsafe(no_mangle)]
-fn android_main(app: slint::android::AndroidApp) {
-    if let Some(path) = app.internal_data_path() {
-        let _ = ANDROID_DATA_DIR.set(path);
-    }
-
-    if let Err(e) = slint::android::init(app) {
-        eprintln!("failed to initialize Android backend: {e}");
-        return;
-    }
-    if let Err(e) = ui::run_app() {
-        eprintln!("NodeChatNew failed to start on Android: {e}");
-    }
+/// The application's root component.
+#[component]
+pub fn App() -> impl IntoElement {
+    let count = signal(0_u32);
+    view()
+        .flex_1()
+        .bg(move || theme().background)
+        .text_color(move || theme().foreground)
+        .child(
+            view()
+                .flex_1()
+                .p_safe_area()
+                .child(
+                    view()
+                        .flex_1()
+                        .items_center()
+                        .justify_center()
+                        .gap_4()
+                        .child(text(move || format!("Count: {}", count.get())).text_size(px(28.0)))
+                        .child(
+                            view()
+                                .px_5()
+                                .py_3()
+                                .rounded(px(10.0))
+                                .bg(move || theme().primary)
+                                .active(|s| s.opacity(0.6))
+                                .on_press(move || count.update(|value| *value += 1))
+                                .child(
+                                    text("Tap")
+                                        .text_size(px(17.0))
+                                        .text_color(move || theme().primary_foreground),
+                                ),
+                        ),
+                ),
+        )
 }

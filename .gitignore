@@ -2,9 +2,7 @@
 /site/node_modules
 /site/dist
 
-/materials
-/nodechat-new/target
-/projects
-/data
+/ref
+
 .env.secrete
 .~lock.*
