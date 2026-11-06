@@ -28,10 +28,19 @@ hiding the chat list. New chat and the empty pane's Browse contacts action open 
 to its conversation. Search filters chats by name and latest-message preview. On phones, the same sections use bottom
 tabs and conversations open as pushed screens.
 
-The sample conversations have locally simulated sending so the composer can be exercised before the transport and
-persistence layers are connected.
+## P2P lifecycle prototype
 
-The current screens use sample data while the transport and persistence layers are developed.
+Chats' New Chat action opens a focused chooser for connecting by ticket, creating a group, or joining with a group
+ticket. Group creation first selects people, then collects the group name and join-approval policy. The People page is
+a searchable directory of saved contacts and groups; Requests is a separate inbox for incoming and sent contact/group
+requests, including cancellation of pending outgoing requests. A user's invite ticket is shown in the new-conversation
+chooser. Invitations also render as actionable conversation cards.
+
+These are local UI simulations using sample data, not network operations. There is no live peer connection, relay,
+cryptographic ticket validation, ticket copying, QR scanning, or message delivery. Messages are shown as queued on
+this device; an offline peer is not treated as having received them. The interface distinguishes an outgoing request,
+an accepted contact, a group join request, and membership so a future transport can replace the simulation without
+changing what each state means.
 
 The `nsh` commands build the app's runners from the NSH crates `Cargo.toml` depends on: crates.io's at the version of
 the `nsh` you run (keep the `nsh-*` dependencies at that version when you upgrade `nsh`), or an NSH checkout's by path.

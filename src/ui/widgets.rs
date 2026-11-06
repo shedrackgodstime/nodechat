@@ -137,6 +137,87 @@ impl Styled for Avatar {
 
 impl FluentBuilder for Avatar {}
 
+/// A contact's shared avatar and identity layout, with context-specific
+/// subtitle and trailing content.
+pub(crate) struct ContactIdentity {
+    name: Label,
+    online: Option<bool>,
+    verified: bool,
+    subtitle: Option<AnyElement>,
+    title_trailing: Option<AnyElement>,
+}
+
+impl ContactIdentity {
+    pub(crate) fn new(name: impl IntoReactive<SharedString>) -> Self {
+        Self {
+            name: name.into_reactive(),
+            online: None,
+            verified: false,
+            subtitle: None,
+            title_trailing: None,
+        }
+    }
+
+    pub(crate) fn online(mut self, online: bool) -> Self {
+        self.online = Some(online);
+        self
+    }
+
+    pub(crate) fn verified(mut self, verified: bool) -> Self {
+        self.verified = verified;
+        self
+    }
+
+    pub(crate) fn subtitle(mut self, subtitle: impl IntoElement) -> Self {
+        self.subtitle = Some(subtitle.into_element());
+        self
+    }
+
+    pub(crate) fn title_trailing(mut self, trailing: impl IntoElement) -> Self {
+        self.title_trailing = Some(trailing.into_element());
+        self
+    }
+}
+
+impl IntoElement for ContactIdentity {
+    fn into_element(self) -> AnyElement {
+        let avatar = Avatar::new(self.name.clone())
+            .size(44.0)
+            .verified(self.verified);
+        let avatar = match self.online {
+            Some(online) => avatar.online(online),
+            None => avatar,
+        };
+        view()
+            .flex_row()
+            .items_center()
+            .gap_3()
+            .child(avatar)
+            .child(
+                view()
+                    .flex_1()
+                    .gap(px(2.0))
+                    .child(
+                        view()
+                            .flex_row()
+                            .items_center()
+                            .gap_2()
+                            .child(
+                                text(self.name)
+                                    .flex_1()
+                                    .number_of_lines(1)
+                                    .text_size(px(15.0))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(colors::TEXT),
+                            )
+                            .children(self.title_trailing),
+                    )
+                    .children(self.subtitle),
+            )
+            .into_element()
+    }
+}
+
 /// A message's state as a small mark (a tick, a clock, an alert).
 pub fn state_mark(state: impl IntoReactive<MessageState>) -> View {
     let state = state.into_reactive();
@@ -145,12 +226,14 @@ pub fn state_mark(state: impl IntoReactive<MessageState>) -> View {
         MessageState::Failed => IconName::Alert,
         _ => IconName::Check,
     });
-    let tint = state.map(|s| Tint::from(match s {
-        MessageState::Queued => chat::QUEUED,
-        MessageState::Failed => chat::FAILED,
-        MessageState::Read => chat::ONLINE,
-        _ => colors::FAINT,
-    }));
+    let tint = state.map(|s| {
+        Tint::from(match s {
+            MessageState::Queued => chat::QUEUED,
+            MessageState::Failed => chat::FAILED,
+            MessageState::Read => chat::ONLINE,
+            _ => colors::FAINT,
+        })
+    });
     view()
         .size(px(14.0))
         .child(icon().name(name).size(13.0).tint(tint).label(None))

@@ -9,7 +9,7 @@ mod settings;
 
 pub(crate) use self::{
     chats::{chats_list, chats_page},
-    contacts::contacts_page,
+    contacts::{contacts_page, new_chat_page},
     conversation::conversation,
     settings::settings_page,
 };

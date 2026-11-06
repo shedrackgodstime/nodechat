@@ -46,5 +46,8 @@ pub use self::shell::AppShell;
 /// The application's root component.
 #[component]
 pub fn App() -> impl IntoElement {
-    view().flex_1().bg(colors::BACKGROUND).child(shell::app_shell())
+    view()
+        .flex_1()
+        .bg(colors::BACKGROUND)
+        .child(shell::app_shell())
 }

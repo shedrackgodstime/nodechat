@@ -59,6 +59,18 @@ pub struct Message {
     pub time: SharedString,
     /// Its state (only meaningful for the user's own messages).
     pub state: MessageState,
+    /// An actionable contact or group invitation attached to this message.
+    pub invitation: Option<Invitation>,
+}
+
+/// Whether a conversation is one-to-one or a group.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ConversationKind {
+    /// A direct conversation with one peer.
+    #[default]
+    Direct,
+    /// A conversation with several members.
+    Group,
 }
 
 /// A conversation in the list: a peer or a group.
@@ -76,8 +88,71 @@ pub struct Conversation {
     pub unread: u32,
     /// The peer is reachable now.
     pub online: bool,
-    /// A peer's messages (empty: a group; the UI is single-threaded for now).
+    /// Direct or group conversation.
+    pub kind: ConversationKind,
+    /// Shareable ticket for a group.
+    pub ticket: SharedString,
+    /// Display names of known group members.
+    pub members: Vec<SharedString>,
+    /// Whether a group admin must approve ticket-based join requests.
+    pub approval_required: bool,
+    /// Messages in this conversation.
     pub messages: Vec<Message>,
+}
+
+/// The object an invitation offers to connect to or join.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InvitationKind {
+    /// A direct contact invitation.
+    Contact,
+    /// A private group invitation.
+    Group,
+}
+
+/// A previewable invitation carried in a conversation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Invitation {
+    /// Stable identifier for this invitation.
+    pub id: SharedString,
+    /// The invitation destination.
+    pub kind: InvitationKind,
+    /// Person or group to preview.
+    pub name: SharedString,
+    /// Shareable connection or group ticket.
+    pub ticket: SharedString,
+    /// State of the invitation in this device's flow.
+    pub status: InvitationStatus,
+    /// Whether an admin must approve joining the group.
+    pub approval_required: bool,
+}
+
+/// Local UI state of a received invitation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum InvitationStatus {
+    /// The person has not acted on the preview.
+    #[default]
+    Pending,
+    /// A group join request was sent and awaits approval.
+    RequestSent,
+    /// The contact or group was added to this device.
+    Joined,
+}
+
+/// A request waiting for the user to respond, or an outgoing request status.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConnectionRequest {
+    /// Stable identifier.
+    pub id: SharedString,
+    /// Person or group that initiated the request.
+    pub name: SharedString,
+    /// Ticket associated with the request.
+    pub ticket: SharedString,
+    /// Short explanation shown in the request inbox.
+    pub note: SharedString,
+    /// Contact or group request.
+    pub kind: InvitationKind,
+    /// Whether the request came from another peer.
+    pub incoming: bool,
 }
 
 /// A contact: a peer this device knows, with its connection ticket.
@@ -103,6 +178,8 @@ pub struct Store {
     pub conversations: Vec<Conversation>,
     /// The known contacts.
     pub contacts: Vec<Contact>,
+    /// Incoming and outgoing contact/group requests.
+    pub requests: Vec<ConnectionRequest>,
     /// This device's display name.
     pub me: SharedString,
     /// This device is reachable.
@@ -125,6 +202,7 @@ pub fn sample_store() -> Store {
             body: body.into(),
             time: time.into(),
             state,
+            invitation: None,
         }
     }
     fn conversation(
@@ -134,6 +212,9 @@ pub fn sample_store() -> Store {
         time: &'static str,
         unread: u32,
         online: bool,
+        kind: ConversationKind,
+        ticket: &'static str,
+        members: &[&'static str],
         messages: Vec<Message>,
     ) -> Conversation {
         Conversation {
@@ -143,6 +224,10 @@ pub fn sample_store() -> Store {
             time: time.into(),
             unread,
             online,
+            kind,
+            ticket: ticket.into(),
+            members: members.iter().map(|member| (*member).into()).collect(),
+            approval_required: kind == ConversationKind::Group,
             messages,
         }
     }
@@ -155,6 +240,9 @@ pub fn sample_store() -> Store {
                 "09:41",
                 2,
                 true,
+                ConversationKind::Direct,
+                "",
+                &[],
                 vec![
                     message(
                         "ada-1",
@@ -184,6 +272,21 @@ pub fn sample_store() -> Store {
                         "09:39",
                         MessageState::Read,
                     ),
+                    Message {
+                        id: "ada-group-invite".into(),
+                        sender: Sender::Peer,
+                        body: "Invited you to join Study Circle".into(),
+                        time: "09:40".into(),
+                        state: MessageState::Read,
+                        invitation: Some(Invitation {
+                            id: "study-circle-invite".into(),
+                            kind: InvitationKind::Group,
+                            name: "Study Circle".into(),
+                            ticket: "nodechat://group/study-circle-7h4k".into(),
+                            status: InvitationStatus::Pending,
+                            approval_required: true,
+                        }),
+                    },
                     message(
                         "ada-5",
                         Sender::Peer,
@@ -195,11 +298,14 @@ pub fn sample_store() -> Store {
             ),
             conversation(
                 "kai",
-                "Kai (group)",
+                "Design Room",
                 "Tunde: the ticket works on my side.",
                 "08:12",
                 0,
                 false,
+                ConversationKind::Group,
+                "nodechat://group/design-room-4p2m",
+                &["You", "Kai", "Tunde", "Mira"],
                 vec![
                     message(
                         "kai-1",
@@ -231,6 +337,9 @@ pub fn sample_store() -> Store {
                 "Yesterday",
                 0,
                 true,
+                ConversationKind::Direct,
+                "",
+                &[],
                 vec![
                     message(
                         "mira-1",
@@ -262,6 +371,9 @@ pub fn sample_store() -> Store {
                 "Tue",
                 0,
                 false,
+                ConversationKind::Direct,
+                "",
+                &[],
                 vec![
                     message(
                         "jonas-1",
@@ -308,6 +420,24 @@ pub fn sample_store() -> Store {
                 ticket: "nodechat8u9i…7n".into(),
                 online: false,
                 verified: false,
+            },
+        ],
+        requests: vec![
+            ConnectionRequest {
+                id: "request-noor".into(),
+                name: "Noor".into(),
+                ticket: "nodechat://contact/noor-9c2a".into(),
+                note: "Hi, we met at the study group.".into(),
+                kind: InvitationKind::Contact,
+                incoming: true,
+            },
+            ConnectionRequest {
+                id: "request-design".into(),
+                name: "Design Critique".into(),
+                ticket: "nodechat://group/design-critique-5w8n".into(),
+                note: "Join our weekly design feedback group.".into(),
+                kind: InvitationKind::Group,
+                incoming: true,
             },
         ],
         me: "You".into(),

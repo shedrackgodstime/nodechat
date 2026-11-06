@@ -12,7 +12,7 @@ use crate::ui::{
     icons::icon,
     press,
     theme::{chat, colors, radius},
-    widgets::{Avatar, state_mark},
+    widgets::{ContactIdentity, state_mark},
 };
 
 /// The list header: the title and the new-chat action.
@@ -117,35 +117,15 @@ fn chat_row(conversation: Conversation, on_open: Listener<()>, selected: bool) -
         .active(|s| s.bg(colors::SURFACE))
         .on_press(on_open)
         .child(
-            Avatar::new(conversation.name.clone())
-                .size(48.0)
-                .online(online),
-        )
-        .child(
-            view()
-                .flex_1()
-                .gap(px(3.0))
-                .child(
-                    view()
-                        .flex_row()
-                        .items_center()
-                        .gap_2()
-                        .child(
-                            text(conversation.name.clone())
-                                .flex_1()
-                                .number_of_lines(1)
-                                .text_size(px(15.0))
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(colors::TEXT),
-                        )
-                        .child(
-                            text(conversation.time.clone())
-                                .text_size(px(12.0))
-                                .text_color(colors::FAINT)
-                                .tabular_nums(),
-                        ),
+            ContactIdentity::new(conversation.name.clone())
+                .online(online)
+                .title_trailing(
+                    text(conversation.time.clone())
+                        .text_size(px(12.0))
+                        .text_color(colors::FAINT)
+                        .tabular_nums(),
                 )
-                .child(
+                .subtitle(
                     view()
                         .flex_row()
                         .items_center()

@@ -27,12 +27,12 @@ use nsh_core::{
 
 use crate::ui::{
     IconName, colors,
-    data::{Contact, Conversation, Store, sample_store},
+    data::{Conversation, Store, sample_store},
     desktop,
     icons::icon,
     layout::{desktop_rail, sidebar_width},
     nav, press,
-    screens::{chats_list, chats_page, contacts_page, conversation, settings_page},
+    screens::{chats_list, chats_page, contacts_page, conversation, new_chat_page, settings_page},
     theme::{chat, radius, tints},
 };
 
@@ -86,6 +86,10 @@ pub fn open() -> Signal<Option<Conversation>> {
     global::<Option<Conversation>>()
 }
 
+fn new_chat_mode() -> Signal<bool> {
+    global::<bool>()
+}
+
 /// The app's data, a surface-wide signal (seeded at mount with the sample
 /// store until the backend fills it).
 pub fn store() -> Signal<Store> {
@@ -106,6 +110,7 @@ pub fn AppShell() -> impl IntoElement {
 /// Opens the conversation `conversation`: fills the wide pane, or pushes it
 /// on phones.
 fn open_conversation(conversation: &Conversation) {
+    new_chat_mode().set(false);
     section().set(Chosen(Section::Chats));
     if desktop() {
         open().set(Some(conversation.clone()));
@@ -166,14 +171,25 @@ fn detail_pane(chosen: Signal<Chosen>) -> AnyElement {
     view()
         .flex_1()
         .child(dynamic(move || match chosen.get().0 {
-            Section::Chats => conversation(
-                open(),
-                None,
-                Some(Listener::from(|_: &()| {
-                    section().set(Chosen(Section::Contacts));
-                })),
-            ),
-            Section::Contacts => contacts_page(store(), Some(back_to_chats(chosen)), open_contact),
+            Section::Chats => {
+                conversation(open(), None, Some(Listener::from(|_: &()| open_new_chat())))
+            }
+            Section::Contacts => {
+                if new_chat_mode().get() {
+                    new_chat_page(
+                        store(),
+                        Some(back_to_chats(chosen)),
+                        open_people_conversation,
+                    )
+                } else {
+                    contacts_page(
+                        store(),
+                        Some(back_to_chats(chosen)),
+                        open_people_conversation,
+                        open_new_chat,
+                    )
+                }
+            }
             Section::Settings => settings_page(store(), Some(back_to_chats(chosen))),
         }))
         .into_element()
@@ -181,12 +197,47 @@ fn detail_pane(chosen: Signal<Chosen>) -> AnyElement {
 
 /// A listener that returns the wide layout to the conversations.
 fn back_to_chats(chosen: Signal<Chosen>) -> Listener<()> {
-    Listener::from(move |_: &()| chosen.set(Chosen(Section::Chats)))
+    Listener::from(move |_: &()| {
+        new_chat_mode().set(false);
+        chosen.set(Chosen(Section::Chats));
+    })
+}
+
+fn select_section(chosen: Signal<Chosen>, selected: Section) {
+    new_chat_mode().set(false);
+    chosen.set(Chosen(selected));
+}
+
+/// Opens the new-conversation chooser in the desktop pane or phone stack.
+fn open_new_chat() {
+    if desktop() {
+        new_chat_mode().set(true);
+        section().set(Chosen(Section::Contacts));
+    } else {
+        nav::push("new-chat", || new_chat_screen());
+    }
+}
+
+fn new_chat_screen() -> Screen {
+    let back = Listener::from(|_: &()| nav::pop());
+    nsh_base::nav_page()
+        .header_visible(false)
+        .child(new_chat_page(
+            store(),
+            Some(back),
+            open_new_chat_conversation,
+        ))
+}
+
+fn open_new_chat_conversation(conversation: &Conversation) {
+    nav::pop();
+    open_people_conversation(conversation);
 }
 
 /// The phone layout: the section's page over a tab bar.
 fn phone_layout() -> AnyElement {
     let chosen = section();
+    let routes = nav::routes();
     view()
         .flex_1()
         .bg(colors::BACKGROUND)
@@ -196,22 +247,25 @@ fn phone_layout() -> AnyElement {
                 .child(
                     nav_page().key("root").header_visible(false).child(dynamic(
                         move || match chosen.get().0 {
-                            Section::Chats => chats_page(
+                            Section::Chats => {
+                                chats_page(store(), open(), |c| open_conversation(c), open_new_chat)
+                            }
+                            Section::Contacts => contacts_page(
                                 store(),
-                                open(),
-                                |c| open_conversation(c),
-                                || {
-                                    section().set(Chosen(Section::Contacts));
-                                },
+                                None,
+                                open_people_conversation,
+                                open_new_chat,
                             ),
-                            Section::Contacts => contacts_page(store(), None, open_contact),
                             Section::Settings => settings_page(store(), None),
                         },
                     )),
                 )
                 .child(pushed()),
         )
-        .child(tab_bar(chosen))
+        .child(when(
+            move || routes.with(|routes| routes.0.is_empty()),
+            move || tab_bar(chosen),
+        ))
         .into_element()
 }
 
@@ -229,17 +283,9 @@ fn pushed() -> AnyElement {
     .into_element()
 }
 
-/// Opens a contact's conversation, returning the wide layout to Chats first.
-fn open_contact(contact: &Contact) {
-    let matching = store().with_untracked(|s| {
-        s.conversations
-            .iter()
-            .find(|conversation| conversation.id == contact.id)
-            .cloned()
-    });
-    if let Some(conversation) = matching {
-        open_conversation(&conversation);
-    }
+/// Opens a People-directory conversation, returning the wide layout to Chats first.
+fn open_people_conversation(conversation: &Conversation) {
+    open_conversation(conversation);
 }
 
 /// The wide sidebar: app identity, section navigation and the chat list.
@@ -266,9 +312,7 @@ fn sidebar(chosen: Signal<Chosen>) -> AnyElement {
                         .font_weight(FontWeight::BOLD)
                         .text_color(colors::TEXT),
                 )
-                .child(new_chat_button(move || {
-                    chosen.set(Chosen(Section::Contacts));
-                })),
+                .child(new_chat_button(open_new_chat)),
         )
         .child(chats_list(store, open(), |c| open_conversation(c)))
         .into_element()
@@ -296,9 +340,7 @@ fn chat_list_panel() -> AnyElement {
                         .font_weight(FontWeight::BOLD)
                         .text_color(colors::TEXT),
                 )
-                .child(new_chat_button(|| {
-                    section().set(Chosen(Section::Contacts));
-                })),
+                .child(new_chat_button(open_new_chat)),
         )
         .child(chats_list(store, open(), |c| open_conversation(c)))
         .into_element()
@@ -386,7 +428,7 @@ fn navigation_rail(chosen: Signal<Chosen>) -> AnyElement {
                 .style_when(selected, |style| style.bg(tints::ACCENT))
                 .hover(|style| style.bg(colors::SURFACE))
                 .active(|style| style.bg(colors::SURFACE))
-                .on_press(move || chosen.set(Chosen(s)))
+                .on_press(move || select_section(chosen, s))
                 .child(icon().name(s.icon()).size(19.0).tint(move || {
                     if selected() {
                         colors::ACCENT
@@ -493,7 +535,7 @@ fn nav_items(chosen: Signal<Chosen>) -> AnyElement {
                 .style_when(selected, |st| st.bg(colors::SURFACE))
                 .hover(|st| st.bg(colors::SURFACE))
                 .active(|st| st.bg(colors::SURFACE))
-                .on_press(move || chosen.set(Chosen(s)))
+                .on_press(move || select_section(chosen, s))
                 .child(icon().name(s.icon()).size(18.0).tint(move || {
                     if selected() {
                         colors::TEXT
@@ -545,7 +587,7 @@ fn tab_bar(chosen: Signal<Chosen>) -> AnyElement {
                     if nav::depth() > 0 {
                         nav::pop_to_top();
                     }
-                    chosen.set(Chosen(s));
+                    select_section(chosen, s);
                 })
                 .child(icon().name(s.icon()).size(22.0).tint(move || {
                     if selected() {

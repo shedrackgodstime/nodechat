@@ -45,7 +45,6 @@ pub fn settings_page(store: Signal<Store>, back: Option<Listener<()>>) -> AnyEle
     let online = computed(move || store.with(|s| s.online));
     let notifications = signal(true);
     let read_receipts = signal(true);
-    let relay = signal(false);
 
     let identity = Section::new("Identity")
         .child(
@@ -147,25 +146,25 @@ pub fn settings_page(store: Signal<Store>, back: Option<Listener<()>>) -> AnyEle
                 ),
         );
 
-    let network = Section::new("Network").child(
-        Row::new(true)
-            .child(
-                view()
-                    .flex_1()
-                    .gap(px(1.0))
-                    .child(
-                        text("Relay mode")
-                            .text_size(px(15.0))
-                            .text_color(colors::TEXT),
-                    )
-                    .child(
-                        text("Help deliver messages for others")
-                            .text_size(px(12.0))
-                            .text_color(colors::FAINT),
-                    ),
-            )
-            .child(toggle().value(relay).on_change(move |&on: &bool| relay.set(on))),
-    );
+    let network = Section::new("Network & delivery")
+        .child(setting_row(
+            IconName::Contacts,
+            "Direct peer-to-peer",
+            Some("Connect directly to peers without a central account"),
+            None,
+        ))
+        .child(setting_row(
+            IconName::Clock,
+            "Offline messages",
+            Some("Queued on this device until a direct path is available"),
+            None,
+        ))
+        .child(setting_row(
+            IconName::Lock,
+            "Background availability",
+            Some("The operating system may pause network work while the app is closed"),
+            None,
+        ));
 
     scroll()
         .flex_1()
