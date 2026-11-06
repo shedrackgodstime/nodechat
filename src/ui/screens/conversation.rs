@@ -1,4 +1,10 @@
-//! A conversation: its messages and the composer.
+//! A conversation: its header, its messages and the composer.
+//!
+//! The header follows the platform conventions (Apple's navigation bar,
+//! Material's top app bar): a leading back control, then the peer (avatar,
+//! name and status), then the conversation's actions. The back control
+//! appears when the conversation is a pushed screen (phones); in the wide
+//! layout's pane there is nothing to go back to, so it is left out.
 //!
 //! The message list is a virtualized list whose cells bind to the message
 //! they show (as NSH's own chat demo does): a cell is made once and reads its
@@ -12,7 +18,7 @@ use nsh_core::{
 
 use crate::ui::{
     IconName,
-    data::{Conversation, Message, MessageState, Sender},
+    data::{Message, MessageState, Sender},
     icons::icon,
     press,
     theme::{chat, colors, radius},
@@ -71,43 +77,152 @@ fn bubble(message: Message) -> AnyElement {
         .into_element()
 }
 
-/// The conversation's header: the peer and its actions.
-fn header(name: SharedString, online: bool) -> AnyElement {
+/// A round header button (the back control, the actions).
+fn header_button(name: IconName, label: &'static str, on_press: Listener<()>) -> AnyElement {
+    press()
+        .label(label)
+        .on_press(on_press)
+        .child(
+            view()
+                .size(px(40.0))
+                .rounded(px(12.0))
+                .items_center()
+                .justify_center()
+                .active(|s| s.bg(colors::RAISED))
+                .child(icon().name(name).size(20.0).tint(colors::TEXT).label(None)),
+        )
+        .into_element()
+}
+
+/// The conversation's header: a back control (when pushed), the peer, and
+/// the actions. `back` is `Some` on a pushed screen, `None` in the pane.
+fn header(name: SharedString, online: bool, back: Option<Listener<()>>) -> AnyElement {
+    let name2 = name.clone();
     view()
         .flex_row()
         .items_center()
-        .gap_3()
-        .px_4()
-        .py_3()
+        .gap_2()
+        .px_2()
+        .pt_safe_area()
+        .pb_2()
         .border_b_1()
         .border_b_color(colors::LINE)
-        .child(Avatar::new(name.clone()).size(36.0).online(online))
-        .child(
-            text(name)
-                .flex_1()
-                .text_size(px(16.0))
-                .font_weight(FontWeight::SEMIBOLD)
-                .text_color(colors::TEXT),
-        )
-        .child(
+        .children(back.map(|pop| {
+            // The back control's chevron points left.
             press()
-                .label("More")
-                .on_press(|| {})
+                .label("Back")
+                .on_press(pop)
                 .child(
                     view()
-                        .size(px(36.0))
-                        .rounded(px(10.0))
+                        .size(px(40.0))
+                        .rounded(px(12.0))
                         .items_center()
                         .justify_center()
+                        .rotate(deg(180.0))
                         .active(|s| s.bg(colors::RAISED))
                         .child(
                             icon()
-                                .name(IconName::More)
-                                .size(18.0)
-                                .tint(colors::MUTED)
+                                .name(IconName::Chevron)
+                                .size(20.0)
+                                .tint(colors::TEXT)
                                 .label(None),
                         ),
+                )
+                .into_element()
+        }))
+        .child(
+            view()
+                .flex_1()
+                .flex_row()
+                .items_center()
+                .gap_3()
+                .px(px(2.0))
+                .child(Avatar::new(name).size(36.0).online(online))
+                .child(
+                    view()
+                        .flex_1()
+                        .gap(px(1.0))
+                        .child(
+                            text(name2)
+                                .number_of_lines(1)
+                                .text_size(px(16.0))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(colors::TEXT),
+                        )
+                        .child(
+                            text(if online { "Online" } else { "Offline" })
+                                .text_size(px(12.0))
+                                .text_color(if online { chat::ONLINE } else { colors::FAINT }),
+                        ),
                 ),
+        )
+        .child(header_button(
+            IconName::More,
+            "More",
+            Listener::from(|_: &()| {}),
+        ))
+        .into_element()
+}
+
+/// The conversation content: the messages, or the empty state when none.
+///
+/// `back` is `Some` where the conversation is a pushed screen (its header
+/// shows a back control); `None` in the wide layout's pane.
+pub fn conversation(
+    conversation: Signal<Option<crate::ui::data::Conversation>>,
+    back: Option<Listener<()>>,
+    on_new: Option<Listener<()>>,
+) -> AnyElement {
+    let messages = signal(Vec::<Message>::new());
+    let id = signal(SharedString::default());
+    effect(move || {
+        if let Some(c) = conversation.get() {
+            id.set(c.id.clone());
+            messages.set(c.messages.clone());
+        }
+    });
+    let name = computed(move || {
+        conversation
+            .with(|c| c.as_ref().map(|c| c.name.clone()))
+            .unwrap_or_else(|| SharedString::from("Conversation"))
+    });
+    let online = computed(move || conversation.with(|c| c.as_ref().is_some_and(|c| c.online)));
+    let has = computed(move || conversation.with(|c| c.is_some()));
+
+    view()
+        .flex_1()
+        .bg(colors::BACKGROUND)
+        .child(
+            when(has, move || {
+                view()
+                    .flex_1()
+                    .child(header(
+                        name.get_untracked(),
+                        online.get_untracked(),
+                        back.clone(),
+                    ))
+                    .child(
+                        virtual_list(
+                            move || messages.with(Vec::len),
+                            move |at: Position| {
+                                let message =
+                                    computed(move || messages.with(|m| m.get(at.index()).cloned()));
+                                dynamic(move || message.get().map(bubble))
+                            },
+                        )
+                        .keys(move || {
+                            messages.with(|m| m.iter().map(|m| m.id.clone()).collect::<Vec<_>>())
+                        })
+                        .estimated_item_size(px(64.0))
+                        .flex_1()
+                        .content_padding_top(px(12.0))
+                        .content_padding_bottom(px(12.0))
+                        .follow_end(px(40.0)),
+                    )
+                    .child(composer(id.get_untracked()))
+                    .into_element()
+            })
+            .otherwise(move || empty(on_new.clone())),
         )
         .into_element()
 }
@@ -123,8 +238,6 @@ fn composer(conversation_id: SharedString) -> AnyElement {
             return;
         }
         let _ = &id;
-        // The message is queued in the conversation's store (wired to the
-        // backend later); the composer only clears the field.
         draft.set(String::new());
     };
     let submit = send.clone();
@@ -167,31 +280,28 @@ fn composer(conversation_id: SharedString) -> AnyElement {
             view()
                 .opacity(move || if can_send.get() { 1.0_f32 } else { 0.4 })
                 .child(
-                    press()
-                        .label("Send")
-                        .on_press(send)
-                        .child(
-                            view()
-                                .size(px(44.0))
-                                .rounded(px(22.0))
-                                .items_center()
-                                .justify_center()
-                                .bg(chat::SENT)
-                                .child(
-                                    icon()
-                                        .name(IconName::Send)
-                                        .size(20.0)
-                                        .tint(chat::SENT_FOREGROUND)
-                                        .label(None),
-                                ),
-                        ),
+                    press().label("Send").on_press(send).child(
+                        view()
+                            .size(px(44.0))
+                            .rounded(px(22.0))
+                            .items_center()
+                            .justify_center()
+                            .bg(chat::SENT)
+                            .child(
+                                icon()
+                                    .name(IconName::Send)
+                                    .size(20.0)
+                                    .tint(chat::SENT_FOREGROUND)
+                                    .label(None),
+                            ),
+                    ),
                 ),
         )
         .into_element()
 }
 
 /// An empty conversation: a centered invitation.
-fn empty() -> AnyElement {
+fn empty(on_new: Option<Listener<()>>) -> AnyElement {
     view()
         .flex_1()
         .items_center()
@@ -227,59 +337,30 @@ fn empty() -> AnyElement {
                 .max_w(px(320.0))
                 .text_center(),
         )
-        .into_element()
-}
-
-/// The conversation content: the messages, or the empty state when none.
-pub fn conversation(conversation: Signal<Option<Conversation>>) -> AnyElement {
-    // The messages shown, kept in a signal the composer writes to and the
-    // list reads (the open conversation's, set when the selection changes).
-    let messages = signal(Vec::<Message>::new());
-    let id = signal(SharedString::default());
-    effect(move || {
-        if let Some(c) = conversation.get() {
-            id.set(c.id.clone());
-            messages.set(c.messages.clone());
-        }
-    });
-    let name = computed(move || {
-        conversation
-            .with(|c| c.as_ref().map(|c| c.name.clone()))
-            .unwrap_or_else(|| SharedString::from("Conversation"))
-    });
-    let online = computed(move || conversation.with(|c| c.as_ref().is_some_and(|c| c.online)));
-    let has = computed(move || conversation.with(|c| c.is_some()));
-
-    view()
-        .flex_1()
-        .bg(colors::BACKGROUND)
-        .child(
-            when(has, move || {
+        .children(on_new.map(|on_new| {
+            press().label("Browse contacts").on_press(on_new).child(
                 view()
-                    .flex_1()
-                    .child(header(name.get_untracked(), online.get_untracked()))
+                    .h(px(40.0))
+                    .px_3()
+                    .rounded(px(radius::CONTROL))
+                    .flex_row()
+                    .items_center()
+                    .gap_2()
+                    .bg(chat::SENT)
                     .child(
-                        virtual_list(
-                            move || messages.with(Vec::len),
-                            move |at: Position| {
-                                let message =
-                                    computed(move || messages.with(|m| m.get(at.index()).cloned()));
-                                dynamic(move || message.get().map(bubble))
-                            },
-                        )
-                        .keys(move || {
-                            messages.with(|m| m.iter().map(|m| m.id.clone()).collect::<Vec<_>>())
-                        })
-                        .estimated_item_size(px(64.0))
-                        .flex_1()
-                        .content_padding_top(px(12.0))
-                        .content_padding_bottom(px(12.0))
-                        .follow_end(px(40.0)),
+                        icon()
+                            .name(IconName::Contacts)
+                            .size(16.0)
+                            .tint(chat::SENT_FOREGROUND)
+                            .label(None),
                     )
-                    .child(composer(id.get_untracked()))
-                    .into_element()
-            })
-            .otherwise(empty),
-        )
+                    .child(
+                        text("Browse contacts")
+                            .text_size(px(14.0))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(chat::SENT_FOREGROUND),
+                    ),
+            )
+        }))
         .into_element()
 }

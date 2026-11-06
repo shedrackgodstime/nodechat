@@ -32,6 +32,32 @@ test("opening a chat on a desktop fills the pane", async () => {
   expect(app.texts()).toContain("Sounds good, see you then.");
 });
 
+test("desktop navigation reaches contacts and settings", async () => {
+  const app = await open(".", { platform: "linux", width: 1200, height: 800 });
+  await app.press("Browse contacts");
+  expect(app.texts()).toContain("YOUR TICKET");
+  await app.press("Chats");
+  await app.press("Contacts");
+  expect(app.texts()).toContain("YOUR TICKET");
+  await app.press("Settings");
+  expect(app.texts()).toContain("Notifications");
+});
+
+test("desktop chat search filters conversations", async () => {
+  const app = await open(".", { platform: "linux", width: 1200, height: 800 });
+  await app.type("Search", "Mira");
+  expect(app.texts()).toContain("Mira");
+  expect(app.texts()).not.toContain("Ada");
+});
+
+test("new chat opens contacts and selecting a peer opens their conversation", async () => {
+  const app = await open(".", { platform: "linux", width: 1200, height: 800 });
+  await app.press("New chat");
+  expect(app.texts()).toContain("YOUR TICKET");
+  await app.press("Open chat with Mira");
+  expect(app.texts()).toContain("Sent you the notes.");
+});
+
 test("opening a chat on a phone pushes it", async () => {
   const app = await open("."); // iOS, 390 × 844
   await app.press("Ada");

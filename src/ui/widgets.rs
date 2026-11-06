@@ -155,3 +155,83 @@ pub fn state_mark(state: impl IntoReactive<MessageState>) -> View {
         .size(px(14.0))
         .child(icon().name(name).size(13.0).tint(tint).label(None))
 }
+
+/// A page's header: an optional back control, the title, and trailing
+/// actions, on the page's background over a hairline. Used where a page
+/// replaces the content area (wide windows); on phones the tab bar is the
+/// navigation, so a page header there is title-only.
+pub struct PageHeader {
+    title: SharedString,
+    back: Option<Listener<()>>,
+    right: Option<AnyElement>,
+}
+
+impl PageHeader {
+    /// A header titled `title`.
+    pub fn new(title: impl Into<SharedString>) -> Self {
+        Self {
+            title: title.into(),
+            back: None,
+            right: None,
+        }
+    }
+
+    /// A back control: `Some` where the page replaces the content area.
+    pub fn back(mut self, back: Option<Listener<()>>) -> Self {
+        self.back = back;
+        self
+    }
+
+    /// A trailing action.
+    pub fn right(mut self, right: impl IntoElement) -> Self {
+        self.right = Some(right.into_element());
+        self
+    }
+}
+
+impl IntoElement for PageHeader {
+    fn into_element(self) -> AnyElement {
+        let title = self.title;
+        view()
+            .h(px(56.0))
+            .flex_row()
+            .items_center()
+            .gap_2()
+            .px_2()
+            .pt_safe_area()
+            .border_b_1()
+            .border_b_color(colors::LINE)
+            .children(self.back.map(|pop| {
+                view()
+                    .size(px(40.0))
+                    .rounded(px(12.0))
+                    .items_center()
+                    .justify_center()
+                    .cursor_pointer()
+                    .role(AccessibilityRole::Button)
+                    .label("Back")
+                    .active(|s| s.bg(colors::RAISED))
+                    .on_press(pop)
+                    .child(
+                        view().rotate(nsh_core::geometry::deg(180.0)).child(
+                            icon()
+                                .name(IconName::Chevron)
+                                .size(20.0)
+                                .tint(colors::TEXT)
+                                .label(None),
+                        ),
+                    )
+            }))
+            .child(
+                text(title)
+                    .flex_1()
+                    .px(px(2.0))
+                    .number_of_lines(1)
+                    .text_size(px(20.0))
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(colors::TEXT),
+            )
+            .children(self.right)
+            .into_element()
+    }
+}

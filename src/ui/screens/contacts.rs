@@ -1,9 +1,8 @@
-//! The contacts screen: the peers this device knows, with their tickets.
+//! The contacts screen: the peers this device knows, with their tickets. It
+//! is a full page (a tab page on phones, a page in the content area on wide
+//! windows).
 
-use nsh_core::{
-    element::{AnyElement, SharedString},
-    prelude::*,
-};
+use nsh_core::{element::AnyElement, prelude::*};
 
 use crate::ui::{
     IconName,
@@ -11,17 +10,23 @@ use crate::ui::{
     icons::icon,
     press,
     theme::{chat, colors, radius},
-    widgets::Avatar,
+    widgets::{Avatar, PageHeader},
 };
 
 /// A contact's row: avatar, name, ticket, and its verified mark.
-fn contact_row(contact: Contact) -> AnyElement {
+fn contact_row(contact: Contact, on_open: Listener<()>) -> AnyElement {
     view()
         .h(px(72.0))
         .flex_row()
         .items_center()
         .gap_3()
         .px_4()
+        .cursor_pointer()
+        .role(AccessibilityRole::Button)
+        .label(format!("Open chat with {}", contact.name))
+        .hover(|s| s.bg(colors::RAISED))
+        .active(|s| s.bg(colors::RAISED))
+        .on_press(on_open)
         .child(
             Avatar::new(contact.name.clone())
                 .size(48.0)
@@ -56,121 +61,134 @@ fn contact_row(contact: Contact) -> AnyElement {
         .into_element()
 }
 
-/// The contacts list content.
-pub fn contacts_list(store: Signal<Store>) -> AnyElement {
+/// The contacts page. `back` is `Some` where the page replaces the content
+/// area (wide windows); `None` when it is a tab page (phones).
+pub fn contacts_page(
+    store: Signal<Store>,
+    back: Option<Listener<()>>,
+    on_open: impl Fn(&Contact) + Clone + 'static,
+) -> AnyElement {
     let add = move |_: &()| {};
     let copy = move |_: &()| {};
     view()
         .flex_1()
         .bg(colors::BACKGROUND)
         .child(
-            press()
-                .label("Add contact")
-                .on_press(add)
+            view()
+                .max_w(px(760.0))
+                .w_full()
+                .self_center()
+                .flex_1()
                 .child(
-                    view()
-                        .h(px(56.0))
-                        .flex_row()
-                        .items_center()
-                        .gap_3()
-                        .px_4()
-                        .child(
-                            text("Contacts")
-                                .flex_1()
-                                .text_size(px(24.0))
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(colors::TEXT),
-                        )
-                        .child(
+                    PageHeader::new("Contacts").back(back).right(
+                        press().label("Add contact").on_press(add).child(
                             view()
-                                .size(px(36.0))
+                                .h(px(36.0))
+                                .px_3()
                                 .rounded(px(10.0))
+                                .flex_row()
                                 .items_center()
-                                .justify_center()
+                                .gap_2()
                                 .bg(colors::RAISED)
                                 .border_1()
                                 .border_color(colors::BORDER)
                                 .child(
                                     icon()
                                         .name(IconName::Plus)
-                                        .size(18.0)
+                                        .size(16.0)
                                         .tint(colors::TEXT)
                                         .label(None),
+                                )
+                                .child(
+                                    text("Add")
+                                        .text_size(px(14.0))
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(colors::TEXT),
                                 ),
                         ),
-                ),
-        )
-        .child(
-            text("YOUR TICKET")
-                .px_4()
-                .pt_2()
-                .pb_1()
-                .text_size(px(11.0))
-                .font_weight(FontWeight::SEMIBOLD)
-                .letter_spacing(px(0.6))
-                .text_color(colors::FAINT),
-        )
-        .child(
-            view()
-                .mx_4()
-                .p_3()
-                .rounded(px(radius::INSET))
-                .border_curve(BorderCurve::Continuous)
-                .bg(colors::RAISED)
-                .border_1()
-                .border_color(colors::BORDER)
-                .flex_row()
-                .items_center()
-                .gap_3()
-                .child(
-                    icon()
-                        .name(IconName::Lock)
-                        .size(18.0)
-                        .tint(chat::SENT)
-                        .label(None),
+                    ),
                 )
                 .child(
-                    text("nodechat4k7p…2v")
-                        .flex_1()
-                        .text_size(px(13.0))
-                        .text_color(colors::MUTED)
-                        .font_family("monospace"),
+                    text("YOUR TICKET")
+                        .px_4()
+                        .pt_3()
+                        .pb_1()
+                        .text_size(px(11.0))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .letter_spacing(px(0.6))
+                        .text_color(colors::FAINT),
                 )
                 .child(
-                    press()
-                        .label("Copy ticket")
-                        .on_press(copy)
+                    view()
+                        .mx_4()
+                        .p_3()
+                        .rounded(px(radius::INSET))
+                        .border_curve(BorderCurve::Continuous)
+                        .bg(colors::RAISED)
+                        .border_1()
+                        .border_color(colors::BORDER)
+                        .flex_row()
+                        .items_center()
+                        .gap_3()
                         .child(
-                            text("Copy")
+                            icon()
+                                .name(IconName::Lock)
+                                .size(18.0)
+                                .tint(chat::SENT)
+                                .label(None),
+                        )
+                        .child(
+                            text("nodechat4k7p…2v")
+                                .flex_1()
                                 .text_size(px(13.0))
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(chat::SENT),
+                                .text_color(colors::MUTED)
+                                .font_family("monospace"),
+                        )
+                        .child(
+                            press().label("Copy ticket").on_press(copy).child(
+                                text("Copy")
+                                    .text_size(px(13.0))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(chat::SENT),
+                            ),
                         ),
+                )
+                .child(
+                    text("KNOWN PEERS")
+                        .px_4()
+                        .pt_4()
+                        .pb_1()
+                        .text_size(px(11.0))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .letter_spacing(px(0.6))
+                        .text_color(colors::FAINT),
+                )
+                .child(
+                    virtual_list(
+                        move || store.with(|s| s.contacts.len()),
+                        move |at: Position| {
+                            let contact = computed(move || {
+                                store.with(|s| s.contacts.get(at.index()).cloned())
+                            });
+                            let open = on_open.clone();
+                            dynamic(move || {
+                                let open = open.clone();
+                                contact.get().map(|contact| {
+                                    let selected = contact.clone();
+                                    contact_row(
+                                        contact,
+                                        Listener::from(move |_: &()| open(&selected)),
+                                    )
+                                })
+                            })
+                        },
+                    )
+                    .keys(move || {
+                        store.with(|s| s.contacts.iter().map(|c| c.id.clone()).collect::<Vec<_>>())
+                    })
+                    .estimated_item_size(px(72.0))
+                    .flex_1(),
                 ),
-        )
-        .child(
-            text("KNOWN PEERS")
-                .px_4()
-                .pt_4()
-                .pb_1()
-                .text_size(px(11.0))
-                .font_weight(FontWeight::SEMIBOLD)
-                .letter_spacing(px(0.6))
-                .text_color(colors::FAINT),
-        )
-        .child(
-            virtual_list(
-                move || store.with(|s| s.contacts.len()),
-                move |at: Position| {
-                    let contact = computed(move || store.with(|s| s.contacts.get(at.index()).cloned()));
-                    dynamic(move || contact.get().map(contact_row))
-                },
-            )
-            .keys(move || {
-                store.with(|s| s.contacts.iter().map(|c| c.id.clone()).collect::<Vec<_>>())
-            })
-            .estimated_item_size(px(72.0))
-            .flex_1(),
         )
         .into_element()
 }

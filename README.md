@@ -20,6 +20,16 @@ cargo run
 This starts the root directly on the machine's native desktop backend: GTK 4 on Linux, AppKit on macOS, Win32 on
 Windows. Install the backend's development libraries before building.
 
+## Desktop and phone navigation
+
+On wide windows, the sidebar keeps the conversation list available while the main pane switches between Chats,
+Contacts, and Settings. Selecting a conversation opens it in the main pane; New chat or the empty pane's Browse
+contacts action opens the peer list, where selecting a peer returns to that conversation. The sidebar search filters
+conversations by name and latest-message preview. On phones, the same sections use bottom tabs and conversations
+open as pushed screens.
+
+The current screens use sample data while the transport and persistence layers are developed.
+
 The `nsh` commands build the app's runners from the NSH crates `Cargo.toml` depends on: crates.io's at the version of
 the `nsh` you run (keep the `nsh-*` dependencies at that version when you upgrade `nsh`), or an NSH checkout's by path.
 
