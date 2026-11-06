@@ -25,7 +25,7 @@ use crate::ui::{
     icons::icon,
     press,
     shell::store,
-    theme::{chat, colors, radius},
+    theme::{chat, colors, radius, tints},
     widgets::{Avatar, ContactIdentity, state_mark},
 };
 
@@ -794,6 +794,75 @@ fn group_details(
         .into_element()
 }
 
+fn contact_action_row(
+    label: &'static str,
+    detail: &'static str,
+    deleting: bool,
+    on_press: Listener<()>,
+) -> AnyElement {
+    let accent = if deleting {
+        colors::DANGER
+    } else {
+        colors::WARN
+    };
+    let tint = if deleting { tints::DANGER } else { tints::WARN };
+    press()
+        .label(label)
+        .on_press(on_press)
+        .child(
+            view()
+                .min_h(px(68.0))
+                .flex_row()
+                .items_center()
+                .gap_3()
+                .p_3()
+                .rounded(px(radius::CARD))
+                .bg(colors::SURFACE)
+                .border_1()
+                .border_color(colors::BORDER)
+                .hover(|style| style.bg(colors::RAISED))
+                .child(
+                    view()
+                        .size(px(38.0))
+                        .rounded(px(13.0))
+                        .items_center()
+                        .justify_center()
+                        .bg(tint)
+                        .child(
+                            icon()
+                                .name(if deleting {
+                                    IconName::Delete
+                                } else {
+                                    IconName::Contacts
+                                })
+                                .size(18.0)
+                                .tint(accent)
+                                .label(None),
+                        ),
+                )
+                .child(
+                    view()
+                        .flex_1()
+                        .gap(px(2.0))
+                        .child(
+                            text(label)
+                                .text_size(px(14.0))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(accent),
+                        )
+                        .child(text(detail).text_size(px(12.0)).text_color(colors::MUTED)),
+                )
+                .child(
+                    icon()
+                        .name(IconName::Chevron)
+                        .size(16.0)
+                        .tint(colors::FAINT)
+                        .label(None),
+                ),
+        )
+        .into_element()
+}
+
 fn contact_details(
     conversation: Signal<Option<Conversation>>,
     on_back: Listener<()>,
@@ -963,26 +1032,18 @@ fn contact_details(
                         move || {
                             view()
                                 .gap_2()
-                                .child(
-                                    press()
-                                        .label("Remove contact")
-                                        .on_press(move || confirmation.set(Some(false)))
-                                        .child(
-                                            text("Remove contact · keep chat history")
-                                                .text_size(px(13.0))
-                                                .text_color(colors::WARN),
-                                        ),
-                                )
-                                .child(
-                                    press()
-                                        .label("Delete chat")
-                                        .on_press(move || confirmation.set(Some(true)))
-                                        .child(
-                                            text("Delete chat · keep contact")
-                                                .text_size(px(13.0))
-                                                .text_color(colors::WARN),
-                                        ),
-                                )
+                                .child(contact_action_row(
+                                    "Remove contact",
+                                    "Keep this conversation in your chats.",
+                                    false,
+                                    Listener::from(move |_: &()| confirmation.set(Some(false))),
+                                ))
+                                .child(contact_action_row(
+                                    "Delete chat",
+                                    "Remove this thread; keep the contact.",
+                                    true,
+                                    Listener::from(move |_: &()| confirmation.set(Some(true))),
+                                ))
                         },
                     ))
                     .child(when(
@@ -1293,6 +1354,7 @@ fn header(
         .px_2()
         .pt_safe_area()
         .pb_2()
+        .bg(colors::SURFACE)
         .border_b_1()
         .border_b_color(colors::LINE)
         .children(back.map(|pop| {
@@ -1325,7 +1387,7 @@ fn header(
                 .items_center()
                 .gap_3()
                 .px(px(2.0))
-                .child(Avatar::new(name).size(36.0).online(online))
+                .child(Avatar::new(name).size(40.0).online(online))
                 .child(
                     view()
                         .flex_1()
@@ -1730,6 +1792,7 @@ fn composer(
         .px_3()
         .pt_2()
         .pb_3()
+        .bg(colors::SURFACE)
         .border_t_1()
         .border_t_color(colors::LINE)
         .child(when(
@@ -1784,7 +1847,37 @@ fn composer(
                             }
                         });
                     })
-                    .child(text("File").text_size(px(14.0)).text_color(colors::TEXT));
+                    .child(
+                        view()
+                            .h(px(48.0))
+                            .flex_row()
+                            .items_center()
+                            .gap_3()
+                            .px_3()
+                            .rounded(px(radius::CONTROL))
+                            .hover(|style| style.bg(colors::RAISED))
+                            .child(
+                                icon()
+                                    .name(IconName::Attach)
+                                    .size(18.0)
+                                    .tint(colors::ACCENT),
+                            )
+                            .child(
+                                view()
+                                    .gap(px(1.0))
+                                    .child(
+                                        text("File")
+                                            .text_size(px(14.0))
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_color(colors::TEXT),
+                                    )
+                                    .child(
+                                        text("Browse your device")
+                                            .text_size(px(11.0))
+                                            .text_color(colors::MUTED),
+                                    ),
+                            ),
+                    );
                 let image_attachment = attachment;
                 let image_menu = show_attachments;
                 let image_picker = press()
@@ -1802,14 +1895,46 @@ fn composer(
                             }
                         });
                     })
-                    .child(text("Photo").text_size(px(14.0)).text_color(colors::TEXT));
+                    .child(
+                        view()
+                            .h(px(48.0))
+                            .flex_row()
+                            .items_center()
+                            .gap_3()
+                            .px_3()
+                            .rounded(px(radius::CONTROL))
+                            .hover(|style| style.bg(colors::RAISED))
+                            .child(
+                                icon()
+                                    .name(IconName::Photos)
+                                    .size(18.0)
+                                    .tint(colors::ACCENT),
+                            )
+                            .child(
+                                view()
+                                    .gap(px(1.0))
+                                    .child(
+                                        text("Photo")
+                                            .text_size(px(14.0))
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_color(colors::TEXT),
+                                    )
+                                    .child(
+                                        text("Choose an image")
+                                            .text_size(px(11.0))
+                                            .text_color(colors::MUTED),
+                                    ),
+                            ),
+                    );
                 view()
-                    .flex_row()
-                    .gap_4()
-                    .px_3()
-                    .py_2()
-                    .rounded(px(radius::CONTROL))
-                    .bg(colors::RAISED)
+                    .w(px(240.0))
+                    .flex_col()
+                    .gap_1()
+                    .p_2()
+                    .rounded(px(radius::CARD))
+                    .bg(colors::SURFACE)
+                    .border_1()
+                    .border_color(colors::BORDER)
                     .children([file_picker.into_element(), image_picker.into_element()])
             },
         ))
@@ -1914,28 +2039,32 @@ fn empty(on_new: Option<Listener<()>>) -> AnyElement {
         .child(
             view()
                 .size(px(64.0))
-                .rounded(px(20.0))
+                .rounded(px(22.0))
                 .items_center()
                 .justify_center()
-                .bg(colors::RAISED)
-                .border_1()
-                .border_color(colors::BORDER)
+                .bg(tints::ACCENT)
                 .child(
                     icon()
-                        .name(IconName::Chat)
-                        .size(30.0)
-                        .tint(chat::SENT)
+                        .name(IconName::Node)
+                        .size(32.0)
+                        .tint(colors::ACCENT)
                         .label(None),
                 ),
         )
         .child(
+            text("YOUR NETWORK")
+                .text_size(px(11.0))
+                .font_weight(FontWeight::BOLD)
+                .text_color(colors::ACCENT),
+        )
+        .child(
             text("Select a conversation")
-                .text_size(px(17.0))
+                .text_size(px(20.0))
                 .font_weight(FontWeight::SEMIBOLD)
                 .text_color(colors::TEXT),
         )
         .child(
-            text("Choose a chat to read it, or start a new one.")
+            text("Open a thread or make a new connection to get started.")
                 .text_size(px(14.0))
                 .text_color(colors::MUTED)
                 .max_w(px(320.0))

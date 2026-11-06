@@ -60,6 +60,18 @@ impl Avatar {
 impl IntoElement for Avatar {
     fn into_element(self) -> AnyElement {
         let size = self.size;
+        let avatar_background = self.name.clone().map(|name| {
+            let index = name.bytes().fold(0usize, |hash, byte| {
+                hash.wrapping_mul(31).wrapping_add(byte as usize)
+            }) % chat::AVATAR_BACKGROUNDS.len();
+            chat::AVATAR_BACKGROUNDS[index]
+        });
+        let avatar_foreground = self.name.clone().map(|name| {
+            let index = name.bytes().fold(0usize, |hash, byte| {
+                hash.wrapping_mul(31).wrapping_add(byte as usize)
+            }) % chat::AVATAR_FOREGROUNDS.len();
+            chat::AVATAR_FOREGROUNDS[index]
+        });
         let initial = self.name.clone().map(|name| {
             SharedString::from(
                 name.chars()
@@ -77,14 +89,14 @@ impl IntoElement for Avatar {
                     .rounded(px(size / 2.0))
                     .items_center()
                     .justify_center()
-                    .bg(colors::RAISED)
+                    .bg(avatar_background)
                     .border_1()
                     .border_color(colors::BORDER)
                     .child(
                         text(initial)
                             .text_size(px(size * 0.4))
                             .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(colors::MUTED),
+                            .text_color(avatar_foreground),
                     ),
             )
             .children(self.online.map(|online| {
@@ -190,6 +202,7 @@ impl IntoElement for ContactIdentity {
         };
         view()
             .flex_row()
+            .flex_1()
             .items_center()
             .gap_3()
             .child(avatar)

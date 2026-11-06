@@ -100,6 +100,10 @@ pub(crate) enum IconName {
     More,
     /// A paperclip: attach.
     Attach,
+    /// Three connected points: NodeChat's network mark.
+    Node,
+    /// A waste basket: delete.
+    Delete,
     /// A minus: remove.
     Minus,
 }
@@ -408,6 +412,17 @@ impl IconName {
                     9.5, 9.5, 7.0, 12.0,
                 ],
             ),
+            IconName::Node => {
+                let c = line(c, &[6.0, 5.5, 14.0, 5.5, 14.0, 14.5, 6.0, 14.5, 6.0, 5.5]);
+                let c = circle(c, 6.0, 5.5, 2.2, true);
+                let c = circle(c, 14.0, 5.5, 2.2, true);
+                circle(c, 14.0, 14.5, 2.2, true)
+            }
+            IconName::Delete => {
+                let c = rect(c, 5.0, 7.0, 10.0, 10.0, 1.5);
+                let c = line(c, &[4.0, 5.0, 16.0, 5.0]);
+                line(c, &[8.0, 5.0, 8.0, 3.0, 12.0, 3.0, 12.0, 5.0])
+            }
             IconName::Minus => line(c, &[5.0, 10.0, 15.0, 10.0]),
         }
     }

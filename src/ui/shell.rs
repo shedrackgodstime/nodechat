@@ -395,10 +395,11 @@ fn navigation_rail(chosen: Signal<Chosen>) -> AnyElement {
                         .justify_center()
                         .bg(colors::ACCENT_FILL)
                         .child(
-                            text("N")
-                                .text_size(px(18.0))
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(colors::ON_ACCENT),
+                            icon()
+                                .name(IconName::Node)
+                                .size(22.0)
+                                .tint(colors::ON_ACCENT)
+                                .label(None),
                         ),
                 )
                 .child(
@@ -468,15 +469,16 @@ fn brand(store: Signal<Store>) -> AnyElement {
         .child(
             view()
                 .size(px(34.0))
-                .rounded(px(10.0))
+                .rounded(px(12.0))
                 .items_center()
                 .justify_center()
                 .bg(chat::SENT)
                 .child(
-                    text("N")
-                        .text_size(px(16.0))
-                        .font_weight(FontWeight::BOLD)
-                        .text_color(chat::SENT_FOREGROUND),
+                    icon()
+                        .name(IconName::Node)
+                        .size(20.0)
+                        .tint(chat::SENT_FOREGROUND)
+                        .label(None),
                 ),
         )
         .child(
@@ -533,6 +535,9 @@ fn nav_items(chosen: Signal<Chosen>) -> AnyElement {
                     ..AccessibilityState::default()
                 })
                 .style_when(selected, |st| st.bg(colors::SURFACE))
+                .when(selected(), |st| {
+                    st.border_l_1().border_l_color(colors::ACCENT)
+                })
                 .hover(|st| st.bg(colors::SURFACE))
                 .active(|st| st.bg(colors::SURFACE))
                 .on_press(move || select_section(chosen, s))
@@ -589,13 +594,22 @@ fn tab_bar(chosen: Signal<Chosen>) -> AnyElement {
                     }
                     select_section(chosen, s);
                 })
-                .child(icon().name(s.icon()).size(22.0).tint(move || {
-                    if selected() {
-                        chat::SENT
-                    } else {
-                        colors::FAINT
-                    }
-                }))
+                .child(
+                    view()
+                        .w(px(52.0))
+                        .h(px(30.0))
+                        .rounded(px(15.0))
+                        .items_center()
+                        .justify_center()
+                        .style_when(selected, |style| style.bg(tints::ACCENT))
+                        .child(icon().name(s.icon()).size(21.0).tint(move || {
+                            if selected() {
+                                chat::SENT
+                            } else {
+                                colors::FAINT
+                            }
+                        })),
+                )
                 .child(text(s.label()).text_size(px(11.0)).text_color(move || {
                     if selected() {
                         chat::SENT

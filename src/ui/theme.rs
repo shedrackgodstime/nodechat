@@ -1,5 +1,5 @@
-//! NodeChat's system-inspired look: quiet grouped surfaces, clear text
-//! hierarchy, restrained blue accents, and green presence states. Sizes
+//! NodeChat's signal-topology look: mineral ink, warm paper, sea-glass
+//! signals, and connected forms. Sizes
 //! are for phones: 16 pt gutters,
 //! 44 pt touch targets, 15 pt body text.
 //!
@@ -36,44 +36,44 @@ pub(crate) mod colors {
     use super::{AdaptiveColor, rgb, tone};
 
     /// The page behind the cards.
-    pub(crate) const BACKGROUND: AdaptiveColor = tone(rgb(0xf5f5f7), rgb(0x1c1c1e));
+    pub(crate) const BACKGROUND: AdaptiveColor = tone(rgb(0xf3f7f3), rgb(0x101819));
     /// A card.
-    pub(crate) const SURFACE: AdaptiveColor = tone(rgb(0xffffff), rgb(0x2c2c2e));
+    pub(crate) const SURFACE: AdaptiveColor = tone(rgb(0xffffff), rgb(0x182223));
     /// A surface inside a card.
-    pub(crate) const INSET: AdaptiveColor = tone(rgb(0xf2f2f7), rgb(0x18181a));
+    pub(crate) const INSET: AdaptiveColor = tone(rgb(0xeaf0ea), rgb(0x131d1e));
     /// A control on a card (buttons, fields, tracks).
-    pub(crate) const RAISED: AdaptiveColor = tone(rgb(0xffffff), rgb(0x3a3a3c));
+    pub(crate) const RAISED: AdaptiveColor = tone(rgb(0xf8fbf8), rgb(0x202c2d));
     /// Borders of cards and controls.
-    pub(crate) const BORDER: AdaptiveColor = tone(rgb(0xd1d1d6), rgb(0x48484a));
+    pub(crate) const BORDER: AdaptiveColor = tone(rgb(0xd6e2d9), rgb(0x304041));
     /// Hairlines inside insets.
-    pub(crate) const LINE: AdaptiveColor = tone(rgb(0xe5e5ea), rgb(0x38383a));
+    pub(crate) const LINE: AdaptiveColor = tone(rgb(0xe1eae2), rgb(0x263637));
     /// Text.
-    pub(crate) const TEXT: AdaptiveColor = tone(rgb(0x1c1c1e), rgb(0xf2f2f7));
+    pub(crate) const TEXT: AdaptiveColor = tone(rgb(0x192821), rgb(0xe9f1eb));
     /// Secondary text.
-    pub(crate) const MUTED: AdaptiveColor = tone(rgb(0x636366), rgb(0xaeaeb2));
+    pub(crate) const MUTED: AdaptiveColor = tone(rgb(0x5e7065), rgb(0xa4b3a9));
     /// Quiet text: counts, notes, chevrons.
-    pub(crate) const FAINT: AdaptiveColor = tone(rgb(0x8e8e93), rgb(0x8e8e93));
+    pub(crate) const FAINT: AdaptiveColor = tone(rgb(0x829087), rgb(0x718078));
     /// The accent as a foreground: text, icons, lines, small marks.
-    pub(crate) const ACCENT: AdaptiveColor = tone(rgb(0x0066cc), rgb(0x0a84ff));
+    pub(crate) const ACCENT: AdaptiveColor = tone(rgb(0x16735d), rgb(0x9ce3c5));
     /// The accent as a fill (buttons, bubbles), with [`ON_ACCENT`] on it.
-    pub(crate) const ACCENT_FILL: AdaptiveColor = tone(rgb(0x007aff), rgb(0x0a84ff));
+    pub(crate) const ACCENT_FILL: AdaptiveColor = tone(rgb(0x197960), rgb(0x8bdcbb));
     /// Text on the accent fill.
-    pub(crate) const ON_ACCENT: AdaptiveColor = tone(rgb(0xffffff), rgb(0xffffff));
+    pub(crate) const ON_ACCENT: AdaptiveColor = tone(rgb(0xffffff), rgb(0x132e25));
     /// The main action's button: light on the dark page, dark on the light
     /// one.
-    pub(crate) const LIGHT: AdaptiveColor = tone(rgb(0x1c1c1e), rgb(0xf2f2f7));
+    pub(crate) const LIGHT: AdaptiveColor = tone(rgb(0x192821), rgb(0xe9f1eb));
     /// Text on [`LIGHT`].
-    pub(crate) const ON_LIGHT: AdaptiveColor = tone(rgb(0xffffff), rgb(0x1c1c1e));
+    pub(crate) const ON_LIGHT: AdaptiveColor = tone(rgb(0xffffff), rgb(0x192821));
     /// A switch's track when off.
-    pub(crate) const TRACK: AdaptiveColor = tone(rgb(0xe5e5ea), rgb(0x48484a));
+    pub(crate) const TRACK: AdaptiveColor = tone(rgb(0xe1eae2), rgb(0x304041));
     /// A switch's knob when off.
-    pub(crate) const KNOB: AdaptiveColor = tone(rgb(0xffffff), rgb(0xaeaeb2));
+    pub(crate) const KNOB: AdaptiveColor = tone(rgb(0xffffff), rgb(0xa4b3a9));
     /// Code inside insets.
-    pub(crate) const CODE: AdaptiveColor = tone(rgb(0x2c2c2e), rgb(0xf2f2f7));
+    pub(crate) const CODE: AdaptiveColor = tone(rgb(0x273c33), rgb(0xe9f1eb));
     /// Information.
     pub(crate) const INFO: AdaptiveColor = tone(rgb(0x3d63d1), rgb(0x7ea8ff));
     /// A warning.
-    pub(crate) const WARN: AdaptiveColor = tone(rgb(0xb26a00), rgb(0xffb547));
+    pub(crate) const WARN: AdaptiveColor = tone(rgb(0x996238), rgb(0xd99b67));
     /// Danger.
     pub(crate) const DANGER: AdaptiveColor = tone(rgb(0xd43a4a), rgb(0xff6170));
     /// Rising figures.
@@ -87,11 +87,11 @@ pub(crate) mod tints {
     use super::{AdaptiveColor, rgb_a, tone};
 
     /// Of the accent.
-    pub(crate) const ACCENT: AdaptiveColor = tone(rgb_a(0x007aff, 0.1), rgb_a(0x0a84ff, 0.18));
+    pub(crate) const ACCENT: AdaptiveColor = tone(rgb_a(0x197960, 0.1), rgb_a(0x8bdcbb, 0.14));
     /// Of information.
     pub(crate) const INFO: AdaptiveColor = tone(rgb_a(0x3d63d1, 0.10), rgb_a(0x7ea8ff, 0.16));
     /// Of a warning.
-    pub(crate) const WARN: AdaptiveColor = tone(rgb_a(0xb26a00, 0.11), rgb_a(0xffb547, 0.16));
+    pub(crate) const WARN: AdaptiveColor = tone(rgb_a(0x996238, 0.12), rgb_a(0xd99b67, 0.16));
     /// Of danger.
     pub(crate) const DANGER: AdaptiveColor = tone(rgb_a(0xd43a4a, 0.10), rgb_a(0xff6170, 0.16));
     /// Of rising figures.
@@ -157,11 +157,11 @@ pub(crate) const MONO: &str = "monospace";
 /// Corner radii.
 pub(crate) mod radius {
     /// A card.
-    pub(crate) const CARD: f32 = 16.0;
+    pub(crate) const CARD: f32 = 18.0;
     /// An inset inside a card.
-    pub(crate) const INSET: f32 = 12.0;
+    pub(crate) const INSET: f32 = 14.0;
     /// A control (buttons, fields).
-    pub(crate) const CONTROL: f32 = 10.0;
+    pub(crate) const CONTROL: f32 = 12.0;
 }
 
 /// The motion every control shares: quick, slightly springy.
@@ -351,18 +351,18 @@ const LIGHT: Look = Look {
 const ACCENT: Look = Look {
     fill: None,
     stops: &[
-        stop(rgb(0x007aff), rgb(0x0a84ff), 0.0),
-        stop(rgb(0x0066cc), rgb(0x007aff), 1.0),
+        stop(rgb(0x26866b), rgb(0xb1ebd2), 0.0),
+        stop(rgb(0x146b56), rgb(0x78d5b5), 1.0),
     ],
     light: &[
         inner(1.0, 0.0, 0.0, rgb_a(WHITE, 0.6)),
-        drop(1.0, 1.0, rgb_a(0x506e0a, 0.2)),
-        lift(7.0, 14.0, -7.0, rgb_a(0x6e9614, 0.55)),
+        drop(1.0, 1.0, rgb_a(0x146b56, 0.2)),
+        lift(7.0, 14.0, -7.0, rgb_a(0x2a8b6d, 0.36)),
     ],
     dark: &[
         inner(1.0, 0.0, 0.0, rgb_a(WHITE, 0.55)),
         drop(1.0, 1.0, rgb_a(BLACK, 0.4)),
-        lift(8.0, 20.0, -9.0, rgb_a(0x007aff, 0.28)),
+        lift(8.0, 20.0, -9.0, rgb_a(0x78d5b5, 0.24)),
     ],
     border: None,
     backdrop_blur: 0.0,
@@ -571,26 +571,44 @@ pub(crate) mod chat {
     use super::{AdaptiveColor, rgb, rgb_a, tone};
 
     /// An outgoing message (the user's own): a filled accent.
-    pub(crate) const SENT: AdaptiveColor = tone(rgb(0x007aff), rgb(0x0a84ff));
+    pub(crate) const SENT: AdaptiveColor = tone(rgb(0x197960), rgb(0x8bdcbb));
     /// Text on [`SENT`].
-    pub(crate) const SENT_FOREGROUND: AdaptiveColor = tone(rgb(0xffffff), rgb(0xffffff));
+    pub(crate) const SENT_FOREGROUND: AdaptiveColor = tone(rgb(0xffffff), rgb(0x132e25));
     /// An incoming message (a peer's): a quiet raised surface.
-    pub(crate) const RECEIVED: AdaptiveColor = tone(rgb(0xe5e5ea), rgb(0x2c2c2e));
+    pub(crate) const RECEIVED: AdaptiveColor = tone(rgb(0xe7eee7), rgb(0x202d2e));
     /// Text on [`RECEIVED`].
-    pub(crate) const RECEIVED_FOREGROUND: AdaptiveColor = tone(rgb(0x1c1c1e), rgb(0xf2f2f7));
+    pub(crate) const RECEIVED_FOREGROUND: AdaptiveColor = tone(rgb(0x192821), rgb(0xe9f1eb));
 
     /// A peer is reachable now (presence dot).
-    pub(crate) const ONLINE: AdaptiveColor = tone(rgb(0x248a3d), rgb(0x30d158));
+    pub(crate) const ONLINE: AdaptiveColor = tone(rgb(0x16735d), rgb(0x8bdcbb));
     /// A message is queued or in flight.
     pub(crate) const QUEUED: AdaptiveColor = tone(rgb(0xb26a00), rgb(0xff9f0a));
     /// Delivery failed.
     pub(crate) const FAILED: AdaptiveColor = tone(rgb(0xd43a4a), rgb(0xff6170));
     /// A verified contact.
-    pub(crate) const VERIFIED: AdaptiveColor = tone(rgb(0x0066cc), rgb(0x0a84ff));
+    pub(crate) const VERIFIED: AdaptiveColor = tone(rgb(0x16735d), rgb(0x9ce3c5));
+    /// Stable, muted person colors for initials when no portrait is available.
+    pub(crate) const AVATAR_BACKGROUNDS: [AdaptiveColor; 6] = [
+        tone(rgb(0xe4edcf), rgb(0x34472f)),
+        tone(rgb(0xd8e9e9), rgb(0x294342)),
+        tone(rgb(0xf3e1cf), rgb(0x4b382b)),
+        tone(rgb(0xe7def0), rgb(0x40334e)),
+        tone(rgb(0xf2dfdf), rgb(0x4b3034)),
+        tone(rgb(0xdce3f2), rgb(0x303b50)),
+    ];
+    /// Initial colors paired with [`AVATAR_BACKGROUNDS`].
+    pub(crate) const AVATAR_FOREGROUNDS: [AdaptiveColor; 6] = [
+        tone(rgb(0x526d3e), rgb(0xd1e8ad)),
+        tone(rgb(0x316c67), rgb(0xa6e1d8)),
+        tone(rgb(0x8a5a32), rgb(0xf0c99e)),
+        tone(rgb(0x705482), rgb(0xd8c4eb)),
+        tone(rgb(0x8b4e56), rgb(0xf1bcc1)),
+        tone(rgb(0x4a608a), rgb(0xb9c9ed)),
+    ];
 
     /// A translucent tint of [`ONLINE`].
     pub(crate) const ONLINE_TINT: AdaptiveColor =
-        tone(rgb_a(0x248a3d, 0.12), rgb_a(0x30d158, 0.16));
+        tone(rgb_a(0x16735d, 0.12), rgb_a(0x8bdcbb, 0.16));
     /// A translucent tint of [`QUEUED`].
     pub(crate) const QUEUED_TINT: AdaptiveColor =
         tone(rgb_a(0xb26a00, 0.12), rgb_a(0xff9f0a, 0.16));
