@@ -12,7 +12,7 @@
 
 use nsh_base::input;
 use nsh_core::{
-    element::{AnyElement, SharedString},
+    element::{AnyElement, ScrollEvent, SharedString, Size},
     prelude::*,
 };
 
@@ -973,6 +973,8 @@ pub fn conversation(
     }));
     let list = element_ref();
     let input_ref = element_ref();
+    let following = signal(true);
+    let dragging = signal(false);
     effect(move || {
         if let Some(c) = conversation.get() {
             messages.set(c.messages.clone());
@@ -1042,39 +1044,95 @@ pub fn conversation(
                                         )
                                     })
                                     .otherwise(move || {
-                                        virtual_list(
-                                            move || messages.with(Vec::len),
-                                            move |at: Position| {
-                                                let message = computed(move || {
-                                                    messages.with(|m| m.get(at.index()).cloned())
-                                                });
-                                                dynamic(move || {
-                                                    message.get().map(|message| {
-                                                        bubble(
-                                                            message,
-                                                            store(),
-                                                            messages,
-                                                            conversation,
-                                                        )
+                                        view()
+                                            .flex_1()
+                                            .child(
+                                                virtual_list(
+                                                    move || messages.with(Vec::len),
+                                                    move |at: Position| {
+                                                        let message = computed(move || {
+                                                            messages.with(|m| {
+                                                                m.get(at.index()).cloned()
+                                                            })
+                                                        });
+                                                        dynamic(move || {
+                                                            message.get().map(|message| {
+                                                                bubble(
+                                                                    message,
+                                                                    store(),
+                                                                    messages,
+                                                                    conversation,
+                                                                )
+                                                            })
+                                                        })
+                                                    },
+                                                )
+                                                .keys(move || {
+                                                    messages.with(|m| {
+                                                        m.iter()
+                                                            .map(|m| m.id.clone())
+                                                            .collect::<Vec<_>>()
                                                     })
                                                 })
-                                            },
-                                        )
-                                        .keys(move || {
-                                            messages.with(|m| {
-                                                m.iter().map(|m| m.id.clone()).collect::<Vec<_>>()
-                                            })
-                                        })
-                                        .estimated_item_size(px(64.0))
-                                        .initial_scroll_index(
-                                            messages.with_untracked(|m| m.len().saturating_sub(1)),
-                                        )
-                                        .flex_1()
-                                        .content_padding_top(px(12.0))
-                                        .content_padding_bottom(px(12.0))
-                                        .follow_end(px(40.0))
-                                        .keyboard_dismiss_mode(KeyboardDismissMode::Interactive)
-                                        .element_ref(&list)
+                                                .estimated_item_size(px(64.0))
+                                                .initial_scroll_index(messages.with_untracked(
+                                                    |m| m.len().saturating_sub(1),
+                                                ))
+                                                .flex_1()
+                                                .content_padding_top(px(12.0))
+                                                .content_padding_bottom(px(12.0))
+                                                .follow_end(px(40.0))
+                                                .keyboard_dismiss_mode(
+                                                    KeyboardDismissMode::Interactive,
+                                                )
+                                                .element_ref(&list)
+                                                .on_scroll_drag_start(move |_| {
+                                                    dragging.set(true);
+                                                })
+                                                .on_scroll(move |event: &ScrollEvent| {
+                                                    if dragging.get() {
+                                                        following.set(
+                                                            event.offset.y + event.size.height
+                                                                >= event.content_size.height
+                                                                    - px(40.0),
+                                                        );
+                                                    }
+                                                })
+                                                .on_momentum_end(move |_| dragging.set(false))
+                                                .on_scroll_end(move |_| dragging.set(false)),
+                                            )
+                                            .child(when(
+                                                move || !following.get(),
+                                                move || {
+                                                    press()
+                                                        .label("Jump to latest message")
+                                                        .on_press(move || {
+                                                            following.set(true);
+                                                            list.scroll_to_end(true);
+                                                        })
+                                                        .child(
+                                                            view()
+                                                                .absolute()
+                                                                .right_4()
+                                                                .bottom_3()
+                                                                .size(px(44.0))
+                                                                .rounded_full()
+                                                                .items_center()
+                                                                .justify_center()
+                                                                .bg(colors::RAISED)
+                                                                .border_1()
+                                                                .border_color(colors::BORDER)
+                                                                .child(
+                                                                    icon()
+                                                                        .name(IconName::ArrowDown)
+                                                                        .size(18.0)
+                                                                        .tint(colors::TEXT)
+                                                                        .label(None),
+                                                                ),
+                                                        )
+                                                },
+                                            ))
+                                            .into_element()
                                     }),
                                 )
                                 .child(delivery_status(
