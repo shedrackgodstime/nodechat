@@ -4,7 +4,10 @@
 //! crypto layers (not this crate's UI) will produce them. They are plain,
 //! `Clone + PartialEq` data so a signal skips equal writes like any other.
 
-use nsh_core::element::{PropEnum, SharedString};
+use nsh_core::{
+    ImageData,
+    element::{PropEnum, SharedString},
+};
 
 /// A message's state, as the app shows it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, PropEnum)]
@@ -61,6 +64,19 @@ pub struct Message {
     pub state: MessageState,
     /// An actionable contact or group invitation attached to this message.
     pub invitation: Option<Invitation>,
+    /// A file or image sent with this message.
+    pub attachment: Option<MessageAttachment>,
+}
+
+/// File metadata and bytes attached to a message.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MessageAttachment {
+    /// User-facing filename.
+    pub name: SharedString,
+    /// Media type reported by the platform.
+    pub mime: SharedString,
+    /// Bytes selected by the user.
+    pub data: ImageData,
 }
 
 /// Whether a conversation is one-to-one or a group.
@@ -203,6 +219,7 @@ pub fn sample_store() -> Store {
             time: time.into(),
             state,
             invitation: None,
+            attachment: None,
         }
     }
     fn conversation(
@@ -286,6 +303,7 @@ pub fn sample_store() -> Store {
                             status: InvitationStatus::Pending,
                             approval_required: true,
                         }),
+                        attachment: None,
                     },
                     message(
                         "ada-5",

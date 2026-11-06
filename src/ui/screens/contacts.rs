@@ -923,13 +923,26 @@ fn people_home(
                     .filter(|contact| {
                         query.is_empty() || contact.name.to_string().to_lowercase().contains(&query)
                     })
-                    .filter_map(|contact| {
-                        state
+                    .map(|contact| {
+                        let chat = state
                             .conversations
                             .iter()
                             .find(|chat| chat.id == contact.id)
                             .cloned()
-                            .map(|chat| (chat, contact.verified))
+                            .unwrap_or_else(|| Conversation {
+                                id: contact.id.clone(),
+                                name: contact.name.clone(),
+                                preview: "Start a conversation".into(),
+                                time: "".into(),
+                                unread: 0,
+                                online: contact.online,
+                                kind: ConversationKind::Direct,
+                                ticket: contact.ticket.clone(),
+                                members: Vec::new(),
+                                approval_required: false,
+                                messages: Vec::new(),
+                            });
+                        (chat, contact.verified)
                     })
                     .collect::<Vec<_>>();
                 let pending = state
@@ -949,10 +962,22 @@ fn people_home(
                 .map(|(chat, verified)| {
                     let open = contact_open.clone();
                     let selected = chat.clone();
+                    let store = store;
                     conversation_row(
                         chat,
                         verified,
-                        Listener::from(move |_: &()| open(&selected)),
+                        Listener::from(move |_: &()| {
+                            store.update(|state| {
+                                if !state
+                                    .conversations
+                                    .iter()
+                                    .any(|conversation| conversation.id == selected.id)
+                                {
+                                    state.conversations.push(selected.clone());
+                                }
+                            });
+                            open(&selected);
+                        }),
                     )
                 })
                 .collect::<Vec<_>>();

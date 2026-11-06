@@ -230,6 +230,67 @@ test("sending after switching chats updates the selected chat only", async () =>
   expect(mentions()).toBe(2);
 });
 
+test("direct conversation details lead into a voice-call screen and return cleanly", async () => {
+  const app = await open(".", { platform: "linux", width: 1200, height: 800 });
+  await app.press("Ada");
+  await app.press("Conversation details");
+  expect(app.texts()).toContain("Contact info");
+  expect(app.texts()).toContain("Copy invite ticket");
+  await app.press("Start voice call");
+  expect(app.texts()).toContain("Voice call unavailable · not connected");
+  await app.press("End call");
+  expect(app.texts()).toContain("Contact info");
+});
+
+test("removing a contact keeps the existing conversation", async () => {
+  const app = await open(".", { platform: "linux", width: 1200, height: 800 });
+  await app.press("Ada");
+  await app.press("Conversation details");
+  await app.press("Remove contact");
+  expect(app.texts()).toContain("Remove this contact? The conversation history will stay.");
+  await app.press("Confirm remove contact");
+  expect(app.texts()).toContain("I pushed the new build — try it now.");
+  await app.press("Contacts");
+  expect(app.texts().filter((text) => text === "Ada").length).toBe(1);
+  await app.press("Chats");
+  expect(app.texts()).toContain("Ada");
+  await app.press("Ada");
+  expect(app.texts()).toContain("I pushed the new build — try it now.");
+});
+
+test("deleting a conversation keeps the contact", async () => {
+  const app = await open(".", { platform: "linux", width: 1200, height: 800 });
+  await app.press("Ada");
+  await app.press("Conversation details");
+  await app.press("Delete chat");
+  expect(app.texts()).toContain("Delete this conversation and its local history?");
+  await app.press("Confirm delete chat");
+  expect(app.texts()).toContain("Select a conversation");
+  await app.press("Contacts");
+  expect(app.texts()).toContain("Ada");
+});
+
+test("deleting a chat on a phone returns to the chat list", async () => {
+  const app = await open(".");
+  await app.press("Ada");
+  await app.press("Conversation details");
+  await app.press("Delete chat");
+  await app.press("Confirm delete chat");
+  expect(app.texts()).toContain("Chats");
+  expect(app.texts()).not.toContain("I pushed the new build — try it now.");
+  await app.press("Contacts");
+  expect(app.texts()).toContain("Ada");
+});
+
+test("the attachment menu distinguishes file and photo pickers", async () => {
+  const app = await open(".", { platform: "linux", width: 1200, height: 800 });
+  await app.press("Ada");
+  await app.press("Add attachment");
+  expect(app.texts()).toContain("File");
+  expect(app.texts()).toContain("Photo");
+  expect(app.texts()).not.toContain("Photo or video");
+});
+
 test("opening a chat on a phone pushes it", async () => {
   const app = await open("."); // iOS, 390 × 844
   expect(app.texts()).toContain("Contacts");
