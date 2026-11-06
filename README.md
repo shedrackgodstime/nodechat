@@ -22,11 +22,14 @@ Windows. Install the backend's development libraries before building.
 
 ## Desktop and phone navigation
 
-On wide windows, the sidebar keeps the conversation list available while the main pane switches between Chats,
-Contacts, and Settings. Selecting a conversation opens it in the main pane; New chat or the empty pane's Browse
-contacts action opens the peer list, where selecting a peer returns to that conversation. The sidebar search filters
-conversations by name and latest-message preview. On phones, the same sections use bottom tabs and conversations
-open as pushed screens.
+On wide windows, a compact section rail sits beside a dedicated chat list and conversation pane. At medium widths,
+section navigation and the chat list share a sidebar. Contacts and Settings replace the conversation pane without
+hiding the chat list. New chat and the empty pane's Browse contacts action open the peer list; selecting a peer returns
+to its conversation. Search filters chats by name and latest-message preview. On phones, the same sections use bottom
+tabs and conversations open as pushed screens.
+
+The sample conversations have locally simulated sending so the composer can be exercised before the transport and
+persistence layers are connected.
 
 The current screens use sample data while the transport and persistence layers are developed.
 

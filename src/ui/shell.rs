@@ -1,17 +1,20 @@
 //! NodeChat's shell: the responsive frame the app lives in.
 //!
-//! Two idioms, chosen by the window's width (`desktop()`):
+//! Three adaptive layouts, chosen by the window's width:
 //!
 //! - **Narrow** (phone / small tablet): the tab bar of the app's sections at
 //!   the bottom; each section is a full page. The **Chats** page is the
 //!   conversation list, and opening a chat **pushes** the conversation (its
 //!   header has a back control, and the swipe/back key pop it).
-//! - **Wide** (desktop / large tablet): the **master-detail** layout — the
+//! - **Medium** (desktop / large tablet): the **master-detail** layout — the
 //!   sidebar holds the conversation list, and the content area shows the
 //!   open conversation (a glance, not navigation). **Contacts** and
 //!   **Settings** are full pages that take over the content area (the
 //!   sidebar keeps its single job, the list), as desktop apps present their
 //!   settings (Discord, Telegram, Slack).
+//! - **Wide** (desktop): a compact section rail, a dedicated chat list, and
+//!   the conversation pane, keeping primary navigation visible without
+//!   crowding the list.
 //!
 //! The shell is made again when the width crosses the threshold, so a screen
 //! reads the layout once.
@@ -27,10 +30,10 @@ use crate::ui::{
     data::{Contact, Conversation, Store, sample_store},
     desktop,
     icons::icon,
-    layout::sidebar_width,
+    layout::{desktop_rail, sidebar_width},
     nav, press,
     screens::{chats_list, chats_page, contacts_page, conversation, settings_page},
-    theme::{chat, radius},
+    theme::{chat, radius, tints},
 };
 
 /// The app's sections.
@@ -127,15 +130,42 @@ fn conversation_screen(current: &Conversation) -> Screen {
         ))
 }
 
-/// The wide layout: the sidebar (the list) beside the content area.
+/// The adaptive desktop layout.
 fn wide_layout() -> AnyElement {
     let chosen = section();
+    when(desktop_rail, move || rail_layout(chosen))
+        .otherwise(move || sidebar_layout(chosen))
+        .into_element()
+}
+
+/// Desktop layout with a compact section rail, chat list, and detail pane.
+fn rail_layout(chosen: Signal<Chosen>) -> AnyElement {
+    view()
+        .flex_1()
+        .flex_row()
+        .bg(colors::BACKGROUND)
+        .child(navigation_rail(chosen))
+        .child(chat_list_panel())
+        .child(detail_pane(chosen))
+        .into_element()
+}
+
+/// Desktop layout with navigation and chats combined in the sidebar.
+fn sidebar_layout(chosen: Signal<Chosen>) -> AnyElement {
     view()
         .flex_1()
         .flex_row()
         .bg(colors::BACKGROUND)
         .child(sidebar(chosen))
-        .child(view().flex_1().child(dynamic(move || match chosen.get().0 {
+        .child(detail_pane(chosen))
+        .into_element()
+}
+
+/// The current section's main content.
+fn detail_pane(chosen: Signal<Chosen>) -> AnyElement {
+    view()
+        .flex_1()
+        .child(dynamic(move || match chosen.get().0 {
             Section::Chats => conversation(
                 open(),
                 None,
@@ -145,7 +175,7 @@ fn wide_layout() -> AnyElement {
             ),
             Section::Contacts => contacts_page(store(), Some(back_to_chats(chosen)), open_contact),
             Section::Settings => settings_page(store(), Some(back_to_chats(chosen))),
-        })))
+        }))
         .into_element()
 }
 
@@ -230,36 +260,154 @@ fn sidebar(chosen: Signal<Chosen>) -> AnyElement {
                 .items_center()
                 .px_4()
                 .child(
-                    text("CHATS")
+                    text("Chats")
                         .flex_1()
-                        .text_size(px(11.0))
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .letter_spacing(px(0.6))
-                        .text_color(colors::FAINT),
+                        .text_size(px(20.0))
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(colors::TEXT),
                 )
-                .child(
-                    press()
-                        .label("New chat")
-                        .on_press(move || chosen.set(Chosen(Section::Contacts)))
-                        .child(
-                            view()
-                                .size(px(30.0))
-                                .rounded(px(radius::CONTROL))
-                                .items_center()
-                                .justify_center()
-                                .hover(|s| s.bg(colors::SURFACE))
-                                .active(|s| s.bg(colors::SURFACE))
-                                .child(
-                                    icon()
-                                        .name(IconName::Plus)
-                                        .size(18.0)
-                                        .tint(colors::MUTED)
-                                        .label(None),
-                                ),
-                        ),
-                ),
+                .child(new_chat_button(move || {
+                    chosen.set(Chosen(Section::Contacts));
+                })),
         )
         .child(chats_list(store, open(), |c| open_conversation(c)))
+        .into_element()
+}
+
+/// The dedicated desktop list column.
+fn chat_list_panel() -> AnyElement {
+    let store = store();
+    view()
+        .w(px(sidebar_width()))
+        .flex_col()
+        .bg(colors::BACKGROUND)
+        .border_r_1()
+        .border_r_color(colors::LINE)
+        .child(
+            view()
+                .h(px(60.0))
+                .flex_row()
+                .items_center()
+                .px_4()
+                .child(
+                    text("Chats")
+                        .flex_1()
+                        .text_size(px(22.0))
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(colors::TEXT),
+                )
+                .child(new_chat_button(|| {
+                    section().set(Chosen(Section::Contacts));
+                })),
+        )
+        .child(chats_list(store, open(), |c| open_conversation(c)))
+        .into_element()
+}
+
+/// The main-action icon used to start a conversation.
+fn new_chat_button(on_new: impl Fn() + 'static) -> AnyElement {
+    press()
+        .label("New chat")
+        .on_press(on_new)
+        .child(
+            view()
+                .size(px(36.0))
+                .rounded(px(radius::CONTROL))
+                .items_center()
+                .justify_center()
+                .hover(|s| s.bg(colors::RAISED))
+                .active(|s| s.bg(colors::RAISED))
+                .child(
+                    icon()
+                        .name(IconName::Plus)
+                        .size(19.0)
+                        .tint(colors::ACCENT)
+                        .label(None),
+                ),
+        )
+        .into_element()
+}
+
+/// The compact desktop rail for the app's primary sections.
+fn navigation_rail(chosen: Signal<Chosen>) -> AnyElement {
+    view()
+        .w(px(72.0))
+        .flex_col()
+        .items_center()
+        .gap_2()
+        .pt_3()
+        .bg(colors::INSET)
+        .border_r_1()
+        .border_r_color(colors::LINE)
+        .child(
+            view()
+                .flex_col()
+                .items_center()
+                .gap(px(4.0))
+                .mb_2()
+                .child(
+                    view()
+                        .size(px(38.0))
+                        .rounded(px(11.0))
+                        .items_center()
+                        .justify_center()
+                        .bg(colors::ACCENT_FILL)
+                        .child(
+                            text("N")
+                                .text_size(px(18.0))
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(colors::ON_ACCENT),
+                        ),
+                )
+                .child(
+                    text("NodeChat")
+                        .text_size(px(10.0))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(colors::MUTED),
+                ),
+        )
+        .children(Section::ALL.into_iter().map(move |s| {
+            let selected = move || chosen.get().0 == s;
+            view()
+                .w(px(58.0))
+                .h(px(54.0))
+                .rounded(px(radius::CONTROL))
+                .flex_col()
+                .items_center()
+                .justify_center()
+                .gap(px(3.0))
+                .cursor_pointer()
+                .role(AccessibilityRole::Button)
+                .label(s.label())
+                .accessibility_state(move || AccessibilityState {
+                    selected: selected(),
+                    ..AccessibilityState::default()
+                })
+                .style_when(selected, |style| style.bg(tints::ACCENT))
+                .hover(|style| style.bg(colors::SURFACE))
+                .active(|style| style.bg(colors::SURFACE))
+                .on_press(move || chosen.set(Chosen(s)))
+                .child(icon().name(s.icon()).size(19.0).tint(move || {
+                    if selected() {
+                        colors::ACCENT
+                    } else {
+                        colors::MUTED
+                    }
+                }))
+                .child(
+                    text(s.label())
+                        .text_size(px(10.0))
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(move || {
+                            if selected() {
+                                colors::TEXT
+                            } else {
+                                colors::MUTED
+                            }
+                        }),
+                )
+                .into_element()
+        }))
         .into_element()
 }
 

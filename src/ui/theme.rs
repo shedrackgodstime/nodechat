@@ -1,6 +1,6 @@
-//! The gallery's look (as the TSX gallery's `ui.tsx`): a graphite page (or
-//! a paper one in light appearance), cards with an inset surface, tabular
-//! numbers and one citrus accent. Sizes are for phones: 16 pt gutters,
+//! NodeChat's system-inspired look: quiet grouped surfaces, clear text
+//! hierarchy, restrained blue accents, and green presence states. Sizes
+//! are for phones: 16 pt gutters,
 //! 44 pt touch targets, 15 pt body text.
 //!
 //! Colors are [`AdaptiveColor`]s, so the platform switches them with the
@@ -36,40 +36,40 @@ pub(crate) mod colors {
     use super::{AdaptiveColor, rgb, tone};
 
     /// The page behind the cards.
-    pub(crate) const BACKGROUND: AdaptiveColor = tone(rgb(0xf4f4f2), rgb(0x101113));
+    pub(crate) const BACKGROUND: AdaptiveColor = tone(rgb(0xf5f5f7), rgb(0x1c1c1e));
     /// A card.
-    pub(crate) const SURFACE: AdaptiveColor = tone(rgb(0xffffff), rgb(0x18191c));
+    pub(crate) const SURFACE: AdaptiveColor = tone(rgb(0xffffff), rgb(0x2c2c2e));
     /// A surface inside a card.
-    pub(crate) const INSET: AdaptiveColor = tone(rgb(0xf0f0ec), rgb(0x0c0d0f));
+    pub(crate) const INSET: AdaptiveColor = tone(rgb(0xf2f2f7), rgb(0x18181a));
     /// A control on a card (buttons, fields, tracks).
-    pub(crate) const RAISED: AdaptiveColor = tone(rgb(0xfbfbf9), rgb(0x24262a));
+    pub(crate) const RAISED: AdaptiveColor = tone(rgb(0xffffff), rgb(0x3a3a3c));
     /// Borders of cards and controls.
-    pub(crate) const BORDER: AdaptiveColor = tone(rgb(0xd8d8d1), rgb(0x2c2e33));
+    pub(crate) const BORDER: AdaptiveColor = tone(rgb(0xd1d1d6), rgb(0x48484a));
     /// Hairlines inside insets.
-    pub(crate) const LINE: AdaptiveColor = tone(rgb(0xe2e2dc), rgb(0x24262a));
+    pub(crate) const LINE: AdaptiveColor = tone(rgb(0xe5e5ea), rgb(0x38383a));
     /// Text.
-    pub(crate) const TEXT: AdaptiveColor = tone(rgb(0x16171a), rgb(0xeceef1));
+    pub(crate) const TEXT: AdaptiveColor = tone(rgb(0x1c1c1e), rgb(0xf2f2f7));
     /// Secondary text.
-    pub(crate) const MUTED: AdaptiveColor = tone(rgb(0x5f636a), rgb(0x8d9198));
+    pub(crate) const MUTED: AdaptiveColor = tone(rgb(0x636366), rgb(0xaeaeb2));
     /// Quiet text: counts, notes, chevrons.
-    pub(crate) const FAINT: AdaptiveColor = tone(rgb(0x9a9ea4), rgb(0x5a5e65));
+    pub(crate) const FAINT: AdaptiveColor = tone(rgb(0x8e8e93), rgb(0x8e8e93));
     /// The accent as a foreground: text, icons, lines, small marks.
-    pub(crate) const ACCENT: AdaptiveColor = tone(rgb(0x4f6e0c), rgb(0xc8f26d));
+    pub(crate) const ACCENT: AdaptiveColor = tone(rgb(0x0066cc), rgb(0x0a84ff));
     /// The accent as a fill (buttons, bubbles), with [`ON_ACCENT`] on it.
-    pub(crate) const ACCENT_FILL: AdaptiveColor = tone(rgb(0xc8f26d), rgb(0xc8f26d));
+    pub(crate) const ACCENT_FILL: AdaptiveColor = tone(rgb(0x007aff), rgb(0x0a84ff));
     /// Text on the accent fill.
-    pub(crate) const ON_ACCENT: AdaptiveColor = tone(rgb(0x13160c), rgb(0x13160c));
+    pub(crate) const ON_ACCENT: AdaptiveColor = tone(rgb(0xffffff), rgb(0xffffff));
     /// The main action's button: light on the dark page, dark on the light
     /// one.
-    pub(crate) const LIGHT: AdaptiveColor = tone(rgb(0x16171a), rgb(0xeef0f2));
+    pub(crate) const LIGHT: AdaptiveColor = tone(rgb(0x1c1c1e), rgb(0xf2f2f7));
     /// Text on [`LIGHT`].
-    pub(crate) const ON_LIGHT: AdaptiveColor = tone(rgb(0xffffff), rgb(0x111214));
+    pub(crate) const ON_LIGHT: AdaptiveColor = tone(rgb(0xffffff), rgb(0x1c1c1e));
     /// A switch's track when off.
-    pub(crate) const TRACK: AdaptiveColor = tone(rgb(0xe2e2dd), rgb(0x24262a));
+    pub(crate) const TRACK: AdaptiveColor = tone(rgb(0xe5e5ea), rgb(0x48484a));
     /// A switch's knob when off.
-    pub(crate) const KNOB: AdaptiveColor = tone(rgb(0xffffff), rgb(0x8d9198));
+    pub(crate) const KNOB: AdaptiveColor = tone(rgb(0xffffff), rgb(0xaeaeb2));
     /// Code inside insets.
-    pub(crate) const CODE: AdaptiveColor = tone(rgb(0x2a2d33), rgb(0xd9dde3));
+    pub(crate) const CODE: AdaptiveColor = tone(rgb(0x2c2c2e), rgb(0xf2f2f7));
     /// Information.
     pub(crate) const INFO: AdaptiveColor = tone(rgb(0x3d63d1), rgb(0x7ea8ff));
     /// A warning.
@@ -87,7 +87,7 @@ pub(crate) mod tints {
     use super::{AdaptiveColor, rgb_a, tone};
 
     /// Of the accent.
-    pub(crate) const ACCENT: AdaptiveColor = tone(rgb_a(0x7caa14, 0.14), rgb_a(0xc8f26d, 0.14));
+    pub(crate) const ACCENT: AdaptiveColor = tone(rgb_a(0x007aff, 0.1), rgb_a(0x0a84ff, 0.18));
     /// Of information.
     pub(crate) const INFO: AdaptiveColor = tone(rgb_a(0x3d63d1, 0.10), rgb_a(0x7ea8ff, 0.16));
     /// Of a warning.
@@ -283,8 +283,8 @@ const fn stop(light: Rgba, dark: Rgba, at: f32) -> (AdaptiveColor, f32) {
 const CARD: Look = Look {
     fill: None,
     stops: &[
-        stop(rgb(0xffffff), rgb(0x1b1c20), 0.0),
-        stop(rgb(0xfdfdfc), rgb(0x191a1d), 1.0),
+        stop(rgb(0xffffff), rgb(0x2c2c2e), 0.0),
+        stop(rgb(0xffffff), rgb(0x2c2c2e), 1.0),
     ],
     light: &[
         inner(1.0, 0.0, 0.0, rgb(WHITE)),
@@ -311,8 +311,8 @@ const INSET: Look = Look {
 const RAISED: Look = Look {
     fill: None,
     stops: &[
-        stop(rgb(0xffffff), rgb(0x2b2d32), 0.0),
-        stop(rgb(0xf6f6f2), rgb(0x24262a), 1.0),
+        stop(rgb(0xffffff), rgb(0x3a3a3c), 0.0),
+        stop(rgb(0xf8f8fa), rgb(0x3a3a3c), 1.0),
     ],
     light: &[
         inner(1.0, 0.0, 0.0, rgb(WHITE)),
@@ -331,8 +331,8 @@ const RAISED: Look = Look {
 const LIGHT: Look = Look {
     fill: None,
     stops: &[
-        stop(rgb(0x2e3035), rgb(0xfbfbfc), 0.0),
-        stop(rgb(0x1b1c20), rgb(0xe3e5e8), 1.0),
+        stop(rgb(0x1c1c1e), rgb(0xf2f2f7), 0.0),
+        stop(rgb(0x1c1c1e), rgb(0xf2f2f7), 1.0),
     ],
     light: &[
         inner(1.0, 0.0, 0.0, rgb_a(WHITE, 0.16)),
@@ -351,8 +351,8 @@ const LIGHT: Look = Look {
 const ACCENT: Look = Look {
     fill: None,
     stops: &[
-        stop(rgb(0xd6f78a), rgb(0xd6f78a), 0.0),
-        stop(rgb(0xc1ea5c), rgb(0xc1ea5c), 1.0),
+        stop(rgb(0x007aff), rgb(0x0a84ff), 0.0),
+        stop(rgb(0x0066cc), rgb(0x007aff), 1.0),
     ],
     light: &[
         inner(1.0, 0.0, 0.0, rgb_a(WHITE, 0.6)),
@@ -362,7 +362,7 @@ const ACCENT: Look = Look {
     dark: &[
         inner(1.0, 0.0, 0.0, rgb_a(WHITE, 0.55)),
         drop(1.0, 1.0, rgb_a(BLACK, 0.4)),
-        lift(8.0, 20.0, -9.0, rgb_a(0xc8f26d, 0.4)),
+        lift(8.0, 20.0, -9.0, rgb_a(0x007aff, 0.28)),
     ],
     border: None,
     backdrop_blur: 0.0,
@@ -571,29 +571,29 @@ pub(crate) mod chat {
     use super::{AdaptiveColor, rgb, rgb_a, tone};
 
     /// An outgoing message (the user's own): a filled accent.
-    pub(crate) const SENT: AdaptiveColor = tone(rgb(0x1d7a4d), rgb(0x1f7a4d));
+    pub(crate) const SENT: AdaptiveColor = tone(rgb(0x007aff), rgb(0x0a84ff));
     /// Text on [`SENT`].
-    pub(crate) const SENT_FOREGROUND: AdaptiveColor = tone(rgb(0xffffff), rgb(0xf2fff7));
+    pub(crate) const SENT_FOREGROUND: AdaptiveColor = tone(rgb(0xffffff), rgb(0xffffff));
     /// An incoming message (a peer's): a quiet raised surface.
-    pub(crate) const RECEIVED: AdaptiveColor = tone(rgb(0xf1f2ef), rgb(0x232629));
+    pub(crate) const RECEIVED: AdaptiveColor = tone(rgb(0xe5e5ea), rgb(0x2c2c2e));
     /// Text on [`RECEIVED`].
-    pub(crate) const RECEIVED_FOREGROUND: AdaptiveColor = tone(rgb(0x16171a), rgb(0xeceef1));
+    pub(crate) const RECEIVED_FOREGROUND: AdaptiveColor = tone(rgb(0x1c1c1e), rgb(0xf2f2f7));
 
     /// A peer is reachable now (presence dot).
-    pub(crate) const ONLINE: AdaptiveColor = tone(rgb(0x1d9d5a), rgb(0x34d17e));
+    pub(crate) const ONLINE: AdaptiveColor = tone(rgb(0x248a3d), rgb(0x30d158));
     /// A message is queued or in flight.
-    pub(crate) const QUEUED: AdaptiveColor = tone(rgb(0xb26a00), rgb(0xffb547));
+    pub(crate) const QUEUED: AdaptiveColor = tone(rgb(0xb26a00), rgb(0xff9f0a));
     /// Delivery failed.
     pub(crate) const FAILED: AdaptiveColor = tone(rgb(0xd43a4a), rgb(0xff6170));
     /// A verified contact.
-    pub(crate) const VERIFIED: AdaptiveColor = tone(rgb(0x0e7490), rgb(0x22d3ee));
+    pub(crate) const VERIFIED: AdaptiveColor = tone(rgb(0x0066cc), rgb(0x0a84ff));
 
     /// A translucent tint of [`ONLINE`].
     pub(crate) const ONLINE_TINT: AdaptiveColor =
-        tone(rgb_a(0x1d9d5a, 0.14), rgb_a(0x34d17e, 0.16));
+        tone(rgb_a(0x248a3d, 0.12), rgb_a(0x30d158, 0.16));
     /// A translucent tint of [`QUEUED`].
     pub(crate) const QUEUED_TINT: AdaptiveColor =
-        tone(rgb_a(0xb26a00, 0.12), rgb_a(0xffb547, 0.16));
+        tone(rgb_a(0xb26a00, 0.12), rgb_a(0xff9f0a, 0.16));
     /// A translucent tint of [`FAILED`].
     pub(crate) const FAILED_TINT: AdaptiveColor =
         tone(rgb_a(0xd43a4a, 0.10), rgb_a(0xff6170, 0.16));

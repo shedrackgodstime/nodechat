@@ -18,9 +18,10 @@ use nsh_core::{
 
 use crate::ui::{
     IconName,
-    data::{Message, MessageState, Sender},
+    data::{Conversation, Message, MessageState, Sender},
     icons::icon,
     press,
+    shell::store,
     theme::{chat, colors, radius},
     widgets::{Avatar, state_mark},
 };
@@ -174,10 +175,8 @@ pub fn conversation(
     on_new: Option<Listener<()>>,
 ) -> AnyElement {
     let messages = signal(Vec::<Message>::new());
-    let id = signal(SharedString::default());
     effect(move || {
         if let Some(c) = conversation.get() {
-            id.set(c.id.clone());
             messages.set(c.messages.clone());
         }
     });
@@ -219,7 +218,7 @@ pub fn conversation(
                         .content_padding_bottom(px(12.0))
                         .follow_end(px(40.0)),
                     )
-                    .child(composer(id.get_untracked()))
+                    .child(composer(messages, conversation))
                     .into_element()
             })
             .otherwise(move || empty(on_new.clone())),
@@ -228,16 +227,50 @@ pub fn conversation(
 }
 
 /// The composer: a rounded field and a send button.
-fn composer(conversation_id: SharedString) -> AnyElement {
+fn composer(
+    messages: Signal<Vec<Message>>,
+    conversation: Signal<Option<Conversation>>,
+) -> AnyElement {
     let draft = signal(String::new());
     let can_send = computed(move || !draft.with(|d| d.trim().is_empty()));
-    let id = conversation_id;
     let send = move || {
         let text = draft.with_untracked(|d| d.trim().to_owned());
         if text.is_empty() {
             return;
         }
-        let _ = &id;
+        let Some(conversation_id) =
+            conversation.with_untracked(|current| current.as_ref().map(|c| c.id.clone()))
+        else {
+            return;
+        };
+        let next_message = messages.with_untracked(Vec::len) + 1;
+        let message = Message {
+            id: format!("{conversation_id}-{next_message}").into(),
+            sender: Sender::Me,
+            body: text.clone().into(),
+            time: "Now".into(),
+            state: MessageState::Queued,
+        };
+        conversation.update(|current| {
+            if let Some(current) = current {
+                current.messages.push(message.clone());
+                current.preview = text.clone().into();
+                current.time = "Now".into();
+                current.unread = 0;
+            }
+        });
+        store().update(|store| {
+            if let Some(current) = store
+                .conversations
+                .iter_mut()
+                .find(|current| current.id == conversation_id)
+            {
+                current.messages.push(message);
+                current.preview = text.into();
+                current.time = "Now".into();
+                current.unread = 0;
+            }
+        });
         draft.set(String::new());
     };
     let submit = send.clone();
